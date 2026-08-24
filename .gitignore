@@ -6,6 +6,7 @@
 # ---------- 1. WorkBuddy 内部（含 memory 明文真 flag，绝对不传） ----------
 .workbuddy/
 .wb_*/
+.opensquilla/
 .bak_sprint/
 .workbuddy_cleanup_backup/
 .atomcode/
