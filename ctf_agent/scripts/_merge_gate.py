@@ -167,9 +167,11 @@ def kpi_check() -> bool:
         return False
     bl = load_baseline()
     if "offline_verified" not in bl:
-        # 首次运行：以当前计数建立基线（幂等，不误伤历史合并）
-        save_baseline(n)
-        print(f"ℹ️ KPI 基线不存在，已建立：offline_verified={n}（{BASELINE}）")
+        # 第九轮(2026-08-25) fail-closed 修复：基线文件缺失 = 删除基线即可重置棘轮的后门，
+        # 改为硬失败而非"以当前计数重建并放行"。棘轮锚必须存在，删除即视为篡改。
+        print("❌ KPI 基线文件缺失——棘轮锚被删除，合并硬失败（fail-closed）。"
+              "请勿删除 KPI_BASELINE.json；若确需重建，先从 REAL_SOLVES_LEDGER.md 恢复 offline_verified 记录。")
+        sys.exit(1)
     else:
         base = bl["offline_verified"]
         if n < base:
