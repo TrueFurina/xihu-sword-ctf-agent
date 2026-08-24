@@ -93,3 +93,17 @@ wt-final/
 wt_p1_vnctf/
 ctf_agent_broken/
 _copy_p1.py
+
+# ---------- 11. 内部治理/审计/敏感文档(不入库) ----------
+ctf_agent/环境变量与模型矩阵可用性确认-20260821.md
+ctf_agent/监督者提示词-v3-final.md
+ctf_agent/GIT_METADATA_DAMAGE_REPORT-20260824.md
+ctf_agent/audit/
+ctf_agent/tasks/
+ctf_agent/data/questions_real_llm_only/
+ctf_agent/REAL_SOLVES_LEDGER.md
+ctf_agent/solutions/
+ctf_agent/docs/DLP_独立性声明.md
+ctf_agent/Readme.txt
+ctf_agent/data/results/
+ctf_agent/docs/
