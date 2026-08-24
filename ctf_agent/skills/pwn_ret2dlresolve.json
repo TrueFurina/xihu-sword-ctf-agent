@@ -1,8 +1,0 @@
-{
-  "name": "pwn_ret2dlresolve",
-  "purpose": "pwn 无 libc/无 system 场景的 ret2dlresolve 攻击（无泄露直接 getshell）——决赛 pwn 难度升级方向；含 read 裸字节/fgets 行读交互提醒",
-  "input_spec": "params = {'binary': ELF 路径, 'vuln_kind': 'ret2dlresolve|stack_overflow', 'symbol': 目标符号}",
-  "output_spec": "利用链构造建议（payload 布局）",
-  "categories": ["pwn"],
-  "version": "1.0"
-}

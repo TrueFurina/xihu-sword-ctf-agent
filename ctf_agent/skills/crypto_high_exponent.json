@@ -1,9 +1,0 @@
-{
-  "name": "crypto_high_exponent",
-  "purpose": "高偶指数 RSA 攻击模板（西湖论剑正式赛 CRYPTO-02/10733 e=65536=2^16 真题已验证）：① hint=pow(e*p+e**2,q,n) 泄露分解 n（factor，W=e^n mod n, gcd(W²-hint,n)=p）；② e=2^k 且 p,q≡3 mod 4 走奇数阶子群求逆+一轮 Rabin 快速路径（自动识别 ROT 编码 flag 返回 rot13/rot18 版）；③ e=2^k 通用 Tonelli-Shanks 逐轮开方+前缀过滤（e2k）；④ gcd(e,phi)=1 常规解密（gcd1）；⑤ 通用模素数 e 次根（nth_root）",
-  "input_spec": "params = {'kind': 'gcd1|e2k|factor|nth_root|auto', 'c': 密文整数, 'e': 指数, 'n': 模数, 'hint': 泄露值(如 pow(e*p+e**2,q,n)), 'p': 素数p, 'q': 素数q, 'prefixes': [已知flag前缀,默认含 DASCTF{/flag{/ctf{/QNFPGS{], 'max_flag_len': flag最大字节数(默认128)}。auto 逻辑：有 hint 无 p 先 factor 分解；p,q 均3 mod 4 且 e=2^k 优先快速路径",
-  "output_spec": "恢复的明文 m、flag 字节、ROT 编码时的 rot13/rot18 变体；factor 时返回分解出的 p/q",
-  "categories": ["crypto"],
-  "version": "1.1",
-  "verified": "2026-08-21 10733 真题端到端：hint+c+e+n 输入 → 自动分解 → 明文 QNFPGS{enoovgf...} + rot13/rot18 flag"
-}

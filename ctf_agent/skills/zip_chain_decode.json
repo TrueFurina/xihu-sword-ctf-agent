@@ -1,8 +1,0 @@
-{
-  "name": "zip_chain_decode",
-  "purpose": "多层嵌套 zip 文件名链解码（如解压缩题：38层 zip 文件名拼装+base32解码）",
-  "input_spec": "params = {'path': '最外层 zip 文件路径'}",
-  "output_spec": "文件名链拼装解码后的 flag 字符串",
-  "categories": ["misc"],
-  "version": "1.0"
-}

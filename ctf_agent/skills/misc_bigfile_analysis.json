@@ -1,8 +1,0 @@
-{
-  "name": "misc_bigfile_analysis",
-  "purpose": "超大文件/嵌套压缩包/Linux 内存镜像快速分析模板（西湖论剑 2026-08-21 正式赛 MISC-01/10734 实测：外层zip→ubuntu flag.zip(449MB)→ubuntu flag.lime(449MB)）：只读中央目录列条目（zip_list）、流式尾部解析嵌套zip内层结构免全量解压（nested_tail）、分块解压大条目（extract_entry）、分块扫描flag/可疑串（flag_scan）、lime镜像探测（lime_probe）、题目名XOR线索扫描（xor_title_search）——全程流式，绝不整文件读入内存",
-  "input_spec": "params = {'kind': 'zip_list|nested_tail|extract_entry|flag_scan|lime_probe|strings_window|xor_title_search|xor_key_discovery', 'path': 文件路径, 'entry': zip条目名, 'out_path': 输出路径, 'patterns': [flag模式], 'offset': 字节偏移, 'length': 读取长度, 'tail_bytes': 尾部缓冲大小(默认8MB), 'max_matches': 最大命中数}",
-  "output_spec": "条目清单/内层结构/解出文件路径/flag 命中（含偏移）/镜像特征",
-  "categories": ["misc"],
-  "version": "1.0"
-}

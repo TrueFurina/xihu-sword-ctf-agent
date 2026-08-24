@@ -1,8 +1,0 @@
-{
-  "name": "pwn_nogdb_flow",
-  "purpose": "pwn 无 gdb 盲打备用路线（Windows 无 WSL/gdb 环境）：静态逆向 → 盲打验证 全流程范式——测试赛 easy_uaf/shopping 无 gdb 解出的方法论沉淀",
-  "input_spec": "params = {'binary': ELF 路径, 'host': 靶机, 'port': 端口}",
-  "output_spec": "利用链 + 盲打步骤",
-  "categories": ["pwn"],
-  "version": "1.0"
-}

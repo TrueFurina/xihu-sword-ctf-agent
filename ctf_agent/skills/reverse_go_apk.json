@@ -1,1 +1,0 @@
-{"name": "reverse_go_apk", "purpose": "Go 程序/APK 逆向（正式赛 REVERSE-01/02 沉淀——2026-08-21 0 解出根因④工具链补强）：Go 二进制字符串/符号段提取 + APK dex 静态分析——strings 无 flag 时的深挖路径", "input_spec": "params = {'path': 二进制/APK 路径, 'kind': 'go|apk'}", "output_spec": "flag 或关键线索（Go 符号/APK 清单）", "categories": ["reverse"], "version": "1.0"}

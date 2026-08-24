@@ -1,73 +1,91 @@
-# 西湖论剑 CTF-Agent (xihu-sword-ctf-agent)
+# xihu-sword-ctf-agent
 
-> 第九届西湖论剑中国杭州网络安全技能大赛 · AI Agent 解题夺旗赛专项工具
+> 🌏 **中文文档 / Chinese documentation**: [README.zh.md](./README.zh.md)
 
-一个面向 CTF 夺旗赛的 AI Agent 解题框架：以**确定性静态分析器（presolve）**为主、LLM 推理为辅，自动对历年真题/赛题做附件解析、密码学攻击、隐写提取、源码审计，并输出可复现的解题链路。
+> ⚠️ **Honesty disclaimer (read first)**: This project's real-world competition result on the live platform was **0 accepted flags**. All "solved / pass-rate" figures in this repo refer to **offline deterministic analysis** of historical CTF problems (the `data/questions_real/` corpus), not any live contest score. We do not claim LLM autonomous reasoning capability — the real capability here is a **deterministic static analyzer (presolve)** covering common CTF categories. See [Honest KPI](#honest-kpi) below.
 
----
-
-## ⚠️ 安全与合规声明（务必先读）
-
-本项目**仅开源工程骨架与解题方法论**，严格遵循以下红线：
-
-1. **真 flag 永不公开**：所有真题/赛题的真实 flag 明文均已从仓库移除，仅以 `<REDACTED>` 或 sha256 占位形式保留解题记录结构。真值文件（含明文 flag）均在 `.gitignore` 中屏蔽，不会进入版本库。
-2. **密钥不入库**：LLM provider API Key、平台 Token 等一律通过环境变量 / 注册表注入，仓库内不含任何明文凭证。
-3. **内部资源不公开**：真实赛事的题面内部资源、附件下载链接、签名等平台私有数据已在 `.gitignore` 屏蔽（`data/race_details/` 等）。
-4. **诚实水位**：本项目真实能力 = 确定性静态分析器（presolve）的题型覆盖度，并非 LLM 自主推理能力。详见文档，勿夸大。
+An open-source **AI agent framework for CTF (Capture The Flag)** competitions. The agent polls a DASCTF-style platform, triages challenges, runs deterministic solvers first, and only escalates to an LLM when static analysis misses. Built and battle-tested against the *West Lake Sword Tournament (西湖论剑)* AI CTF track.
 
 ---
 
-## 架构概览
+## Why this exists
+
+Most "CTF agents" are just an LLM with a shell. This one is the opposite: **deterministic-first**. A pre-solve layer (`core/presolve.py`) fans out dozens of ready-to-run skills (RSA attacks, stego extractors, source-code auditors, base64 multilayer decoders, …) in parallel. The LLM is a last-resort escalator, behind a whitelist, a token budget, and a wall-clock stop-loss. The result is a system that is **reproducible, debuggable, and honest about what it can and cannot do**.
+
+## Architecture
 
 ```
 ctf_agent/
-├── core/              # 主循环、presolve 静态分析器、监督 Agent、墙钟止损
-├── agents/            # 各题型求解器（crypto_toolkit / misc / web 等）
-├── skills/            # 确定性解题 skill（run(params)->dict 接口）
-├── llm/               # LLM 客户端（多 provider 白名单、fail-closed）
-├── ctfplatform/       # 赛事平台对接（DasCTF 等）
-├── sandbox/           # 代码执行沙箱（subprocess 隔离）
-├── eval/              # 真题集 benchmark（诚实 KPI 度量）
-├── data/questions_real/  # 历年真题题库结构（真值已占位脱敏）
-├── config.py          # 配置（默认值 + 环境变量回退）
-├── run.py             # 入口（--mode cli/web/mock）
-└── setup.sh           # 环境初始化
+├── core/          main loop, presolve static analyzer, supervisor agent, wall-clock stop-loss
+├── agents/        per-category solvers (crypto_toolkit / misc / web / reverse / pwn …)
+├── skills/        49 deterministic skills (run(params) -> dict interface)
+├── llm/           LLM client (provider whitelist, fail-closed circuit breaking)
+├── ctfplatform/   contest-platform client (DASCTF-style), retry / fail-open submit path
+├── sandbox/       code-execution sandbox (subprocess isolation)
+├── eval/          historical-problem benchmark (honest KPI measurement)
+├── data/questions_real/   historical problem corpus structure (flags redacted/placeholder)
+├── config.py      config (defaults + environment-variable fallback)
+├── run.py         entry point (--mode cli/web/mock)
+└── setup.sh       environment bootstrap
 ```
 
-## 解题链路
+### Solve pipeline
 
-`main_agent.py` 主循环每步顶检墙钟（EASY 120s / MEDIUM 300s / HARD 600s），超时即分级止损。
-`core/presolve.py` 并行跑多路确定性 skill（crypto / stego / 源码审计 / 嵌图 OCR 等），
-命中即直出 flag；未命中才升级给 LLM 阶段。
+```
+platform poll → triage/classify → attachment download + target probe
+             → deterministic skills (49) ⇄ LLM reasoning (whitelisted providers)
+             → flag validation → platform submit (fail-closed on request errors)
+```
 
-## 快速开始
+- **Supervisor architecture**: `core/main_agent.py` plans per challenge, `core/supervisor_agent.py` enforces step budgets, tool-first discipline, and the request-failure-vs-wrong-flag separation (the post-incident fix for a submit-circuit-breaker bug).
+- **Deterministic-first**: `skills/` holds 49 runnable skills. `core/presolve.py` runs them before any LLM token is spent.
+- **Whitelisted LLM only** (contest rule §3); multi-source fallback with 401/402 circuit breaking, per-question token budgets, heavy-model upgrade policy.
+- **Race harness**: `scripts/_race_start.py --compete` = first-blood scan → stable polling → final report, with a mandatory e2e data-link preflight (fail-closed).
+
+## Hard gates (lessons, codified)
+
+| Gate | What | Enforced by |
+|------|------|-------------|
+| Test gate | real `pytest` run, no per-file fake loops | `setup.sh` (exit 1 on failure) |
+| E2E gate | platform actually serves challenge data | `scripts/_e2e_verify.py`, wired into `--compete` |
+| Network gate | proxy alive / LLM endpoints reachable | `scripts/_net_check.py` (`trust_env=False`) |
+| Secret gate | no plaintext keys in staged files | pre-commit hook (`scripts/_scan_secrets.py`) |
+| Write-lease gate | one writer per scope; out-of-scope commits rejected | `scripts/_lease.py` + pre-commit |
+
+## Quick start
 
 ```bash
 cd ctf_agent
-bash setup.sh                      # 装依赖 + 预检 + 跑测试
+bash setup.sh                      # venv + deps + whitelist + net check + test gate
 export CTF_AGENT_LLM_PROVIDER=deepseek
 export CTF_AGENT_LIGHT_MODEL=deepseek-chat
-export DEEPSEEK_API_KEY=sk-xxx     # 你的密钥，勿提交
-.venv/Scripts/python.exe run.py --mode mock --category crypto   # 离线冒烟
-.venv/Scripts/python.exe run.py --mode cli   # 本地刷题
+export DEEPSEEK_API_KEY=sk-xxx     # your key — never commit it
+.venv/Scripts/python.exe run.py --mode mock --category crypto   # offline smoke test
+.venv/Scripts/python.exe run.py --mode cli                      # local practice
 ```
 
-## 诚实 KPI（真题集口径）
+Configuration is environment-variable driven (see `config.py`): `DASCTF_TOKEN`, `DASCTF_BASE_URL`, provider API keys. **Never commit keys** — the hook refuses.
 
-对 `data/questions_real/` 15 道历年真题的真实链路 benchmark：
-- **确定性管线（presolve 直出）**：14/15（93.3%）
-- **LLM 真推理贡献**：0/1（仅 misc LSB 隐写 vnctf_flag 待解，且该题为数据集缺陷）
+## Honest KPI
 
-即：**能力 = 静态分析器覆盖度**，不是 LLM 推理。扩展题型 = 写更多确定性 skill。
+Benchmark on the `data/questions_real/` corpus (15 historical real problems), run through the **real** tool chain:
 
-## 文档索引
+| Metric | Result |
+|--------|--------|
+| Deterministic pipeline (presolve direct solve) | **14 / 15 (93.3%)** |
+| LLM autonomous-reasoning contribution | **0 / 1** (the 1 miss is a dataset defect, not a capability gap) |
 
-- `ARCHITECTURE_PLAN.md` — 架构规划
-- `MODULE_DESIGN.md` — 模块设计
-- `赛前作战手册_20260821.md` — 赛前作战手册
-- `项目深度锐评报告-20260821_赛前夜复审.md` — 深度锐评（诚实水位）
-- `HANDOVER.md` — 交接文档
+Interpretation: **capability = static-analyzer coverage**, not LLM reasoning. To solve more problem types, write more deterministic skills. We say this plainly because over-claiming is the easiest way to embarrass an open-source security tool.
+
+## Security & compliance
+
+This repo publishes the **engineering skeleton and methodology only**. Red lines:
+
+1. **Real flags are never published.** All plaintext flags are stripped; only `<REDACTED>` / sha256 placeholders remain. Truth files live in `.gitignore`.
+2. **No secrets in the repo.** LLM keys and platform tokens are injected via env vars / registry only.
+3. **Internal contest resources are excluded** (`data/race_details/`, attachments, signatures) via `.gitignore`.
+4. **Honest water-level.** We do not exaggerate capability. See above.
 
 ## License
 
-[MIT](LICENSE) — 开源用于学习与研究，请遵守各 CTF 赛事规则与平台条款。
+[MIT](LICENSE) — open for learning and research. Respect each CTF's rules and platform terms.

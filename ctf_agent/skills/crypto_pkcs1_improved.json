@@ -1,8 +1,0 @@
-{
-  "name": "crypto_pkcs1_improved",
-  "purpose": "PKCS#1 改进型题（CRYPTO-01 正式赛题——2026-08-21 赛后沉淀）：hint=(e*p+e^2)^q mod n 型 + AES_KEY 加密 + 文件 AES-ECB 加密链——完整解法沉淀，下次遇到直接解",
-  "input_spec": "params = {'task_dir': 附件解压目录（含 task.py + .enc + 注释值）}",
-  "output_spec": "flag（DASCTF{} 内内容）",
-  "categories": ["crypto"],
-  "version": "1.0"
-}

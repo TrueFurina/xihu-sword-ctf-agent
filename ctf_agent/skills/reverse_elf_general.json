@@ -1,8 +1,0 @@
-{
-  "name": "reverse_elf_general",
-  "purpose": "ELF/程序逆向通用流程 skill：strings 扫 flag → capstone 反汇编定位校验函数（strcmp/循环比较）→ 恢复输入/提取 flag；覆盖子题型指引（Wasm/pyc/TLS 回调/Android SO）——reverse 40% 短板修复（reverse-001~005 题型覆盖）",
-  "input_spec": "params = {'binary': ELF/附件路径, 'kind': 'elf|wasm|pyc|tls|android'}",
-  "output_spec": "提取的 flag / 校验逻辑定位 / 工具链指引",
-  "categories": ["reverse"],
-  "version": "1.0"
-}

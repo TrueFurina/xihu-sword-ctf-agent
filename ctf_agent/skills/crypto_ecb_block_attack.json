@@ -1,8 +1,0 @@
-{
-  "name": "crypto_ecb_block_attack",
-  "purpose": "AES-ECB 块攻击（ECB 块独立性利用）：byte-at-a-time ECB 逐字节恢复未知明文 + 块重复检测（相同明文块=相同密文块）——正式赛 crypto 高频题型（crypto-004 跑分暴露的缺口）",
-  "input_spec": "params = {'encrypt_oracle': 加密函数（输入可控明文 bytes → 输出密文 bytes）, 'suffix': 未知明文（flag）位置, 'block_size': 16}",
-  "output_spec": "恢复的未知明文（flag）",
-  "categories": ["crypto"],
-  "version": "1.0"
-}

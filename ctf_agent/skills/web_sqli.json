@@ -1,9 +1,0 @@
-{
-  "name": "web_sqli",
-  "purpose": "SQL 注入检测与利用：自动探测万能密码/报错/UNION注入点，绕过简单WAF提取flag；UNION被拦时自动切布尔盲注（响应长度差异判定+逐字符二分提取，确定性兜底）",
-  "input_spec": "target_url: 目标URL, param_name: 注入参数名(默认username), method: GET/POST(默认POST)",
-  "output_spec": "flag: 提取的 flag, evidence: 探测证据(含布尔盲注提取记录), injectable: 是否存在注入点",
-  "safety_risk": "low",
-  "category": "web",
-  "keywords": ["sqli", "union", "injection", "waf", "bypass", "login", "布尔盲注", "盲注", "boolean", "blind"]
-}

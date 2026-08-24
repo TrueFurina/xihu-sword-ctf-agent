@@ -1,8 +1,0 @@
-{
-  "name": "crypto_pkcs1_padding_oracle",
-  "purpose": "PKCS#1 v1.5 低指数攻击与填充解析模板（西湖论剑 2026-08-21 正式赛 CRYPTO-01/10732 实测验证）：小 e 整数开方恢复 RSA 明文（cuberoot）、解析 00 02 PS 00 M 填充提取内层密钥（unpad）、AES-ECB 解密收尾（aes_ecb）、一键组合流程（full）",
-  "input_spec": "params = {'kind': 'cuberoot|unpad|aes_ecb|full', 'c': 密文整数, 'e': 指数(默认3), 'n': 模数, 'padded_hex': PKCS#1填充块hex, 'padded': 填充块bytes, 'key': AES密钥hex/bytes, 'enc_file': 密文文件路径, 'out_file': 解密输出路径}",
-  "output_spec": "恢复的明文/内层密钥/解密文件（flag 相关）",
-  "categories": ["crypto"],
-  "version": "1.0"
-}

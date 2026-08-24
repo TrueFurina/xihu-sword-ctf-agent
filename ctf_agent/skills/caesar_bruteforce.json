@@ -1,8 +1,0 @@
-{
-  "name": "caesar_bruteforce",
-  "purpose": "凯撒密码暴力破解（26种位移全遍历）",
-  "input_spec": "params = {'text': '密文'}",
-  "output_spec": "解出的明文（含flag）或 None",
-  "categories": ["crypto", "misc"],
-  "version": "1.0"
-}

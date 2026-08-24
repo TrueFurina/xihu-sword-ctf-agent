@@ -1,9 +1,0 @@
-{
-  "name": "web_ssrf",
-  "purpose": "SSRF利用：自动探测file:///内网地址/绕过127.0.0.1过滤，读取flag文件",
-  "input_spec": "target_url: 目标URL, url_param: URL参数名(默认url), method: GET/POST(默认GET)",
-  "output_spec": "flag: 提取的flag, evidence: 探测证据, ssrf_target: 成功的SSRF目标",
-  "safety_risk": "low",
-  "category": "web",
-  "keywords": ["ssrf", "file", "internal", "curl", "fetch", "redirect", "127.0.0.1"]
-}

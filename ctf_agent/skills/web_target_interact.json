@@ -1,8 +1,0 @@
-{
-  "name": "web_target_interact",
-  "purpose": "靶机 HTTP 000（连接层失败）诊断与交互模板（西湖论剑 2026-08-21 正式赛 Rank-U/10792 赛后实测：1.14.76.59:15445 http/https 均 WinError 10061 连接拒绝，与赛中 000 同源）：http/https 多方案探测 + httpx 异常分类（probe）、指数退避重试（retry）、完整 GET 抓取状态/头/正文（fetch）——把「000 到底哪一层断了」变成结构化诊断喂给 LLM",
-  "input_spec": "params = {'kind': 'probe|retry|fetch', 'url': 目标URL, 'host': 主机, 'port': 端口, 'schemes': ['http','https'], 'timeout': 秒(默认6), 'attempts': 重试次数, 'headers': 附加头, 'max_body': 正文预览字节数}",
-  "output_spec": "诊断结论（dns_fail/conn_refused/conn_timeout/tls_error/http_ok 等）+ 状态码/响应头/正文预览（flag 线索）",
-  "categories": ["web"],
-  "version": "1.0"
-}

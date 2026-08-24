@@ -5,6 +5,8 @@
 
 # ---------- 1. WorkBuddy 内部（含 memory 明文真 flag，绝对不传） ----------
 .workbuddy/
+ctf_agent/环境变量与模型矩阵可用性确认-20260821.md
+ctf_agent/监督者提示词-v3-final.md
 .wb_*/
 .opensquilla/
 .bak_sprint/
@@ -84,3 +86,10 @@ Thumbs.db
 # ---------- 9. 日志 / 大输出 ----------
 *.log
 data/results/*.jsonl
+
+# ---------- 10. 开发过程冗余副本/破损备份(不入库) ----------
+wt-delivery/
+wt-final/
+wt_p1_vnctf/
+ctf_agent_broken/
+_copy_p1.py

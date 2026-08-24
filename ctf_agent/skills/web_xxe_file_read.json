@@ -1,8 +1,0 @@
-{
-  "name": "web_xxe_file_read",
-  "purpose": "文件上传/XML 处理题的 XXE 探测与文件读取（SVG XXE 读 /flag），上传类 web 题前置 XXE 探测",
-  "input_spec": "params = {'upload_url': 上传端点, 'view_url': 查看端点, 'target_file': '/flag' 或 '/etc/passwd'}",
-  "output_spec": "读取到的文件内容（flag 体）",
-  "categories": ["web"],
-  "version": "1.0"
-}

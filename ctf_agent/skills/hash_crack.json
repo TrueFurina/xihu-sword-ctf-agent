@@ -1,8 +1,0 @@
-{
-  "name": "hash_crack",
-  "purpose": "MD5/SHA1/SHA256 哈希弱密码爆破（常见口令字典）",
-  "input_spec": "params = {'hash': '目标哈希值', 'hashtype': 'md5|sha1|sha256（可选，自动检测）'}",
-  "output_spec": "破解出的明文或 None",
-  "categories": ["crypto", "misc"],
-  "version": "1.0"
-}

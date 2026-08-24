@@ -1,9 +1,0 @@
-{
-  "name": "php_unserialize_pop",
-  "purpose": "PHP反序列化POP链构造：解析源码提取类/魔术方法，自动构造序列化payload",
-  "input_spec": "php_source: PHP源码字符串, file_path: 源码文件路径(二选一)",
-  "output_spec": "payload: 序列化字符串, payload_b64: base64编码, evidence: 分析证据",
-  "safety_risk": "low",
-  "category": "web",
-  "keywords": ["unserialize", "pop", "php", "deserialization", "__destruct", "__wakeup"]
-}

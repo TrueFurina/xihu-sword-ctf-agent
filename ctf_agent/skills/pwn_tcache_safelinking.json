@@ -1,8 +1,0 @@
-{
-  "name": "pwn_tcache_safelinking",
-  "purpose": "pwn tcache 2.31+ safe-linking 知识卡片（正式赛高难题——决赛堆题必然出现，2026-08-21 实弹化）：tcache 新特性（safe-linking 异或保护/双链表检测）+ 利用链构造指引",
-  "input_spec": "params = {'libc_version': libc 版本(可选), 'scenario': 场景描述(可选)}",
-  "output_spec": "safe-linking 绕过步骤 + 利用链构造流程",
-  "categories": ["pwn"],
-  "version": "1.0"
-}

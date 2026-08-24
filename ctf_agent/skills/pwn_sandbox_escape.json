@@ -1,8 +1,0 @@
-{
-  "name": "pwn_sandbox_escape",
-  "purpose": "pwn 沙盒逃逸范式（seccomp 过滤规则解析 + 逃逸路径）：openat/read 白名单绕过、ORW（open-read-write）shellcode、ret2syscall——正式赛 pwn 升级方向",
-  "input_spec": "params = {'binary': ELF 路径, 'sandbox_rules': seccomp 规则或留空自动检测}",
-  "output_spec": "逃逸 payload 构造建议",
-  "categories": ["pwn"],
-  "version": "1.0"
-}

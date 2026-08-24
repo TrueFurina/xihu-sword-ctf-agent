@@ -1,8 +1,0 @@
-{
-  "name": "misc_disk_forensics",
-  "purpose": "磁盘取证 skill（RAID0 恢复 + 镜像分析）：RAID0 排列爆破（最多 n! 种）→ 按块交错重组 → 搜分区特征（ext4/NTFS 超级块）→ 字符串搜索 flag/key 文件——misc-006『糟糕的磁盘』题型",
-  "input_spec": "params = {'disks': [镜像文件路径列表], 'block_size': 512*1024, 'expected': 期望的文件特征}",
-  "output_spec": "恢复的 RAID 卷/找到的 flag 或关键文件",
-  "categories": ["misc"],
-  "version": "1.0"
-}

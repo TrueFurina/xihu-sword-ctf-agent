@@ -1,1 +1,0 @@
-{"name": "misc_bigfile_traffic", "purpose": "大文件/流量题快速解析（正式赛 MISC-01/02 沉淀——2026-08-21 0 解出根因④工具链补强）：16MB pcapng/449MB zip/9.7MB 附件包——mmap 分块 + 中央目录直读——不再超时", "input_spec": "params = {'path': 大文件路径, 'kind': 'pcapng|zip|attachment'}", "output_spec": "flag（DASCTF{} 内内容）或关键线索", "categories": ["misc"], "version": "1.0"}
