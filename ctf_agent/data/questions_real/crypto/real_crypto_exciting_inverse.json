@@ -1,0 +1,15 @@
+{
+  "id": "real_crypto_exciting_inverse",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "玄盾杯 ExcitingInverse",
+  "description": "附件 problem.py 是 RSA 加密脚本，output 文件给出了加密参数 e、phi(n)、c 以及 p 对 q 的模逆 pinv、q 对 p 的模逆 qinv。解密还原明文 flag。",
+  "flag": "4b84616cccbe84a99256c23152a4fd226e87e9da64e92689063046251cc251c5",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-ExcitingInverse/problem.py",
+    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-ExcitingInverse/output"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "4b84616cccbe84a99256c23152a4fd226e87e9da64e92689063046251cc251c5"
+}

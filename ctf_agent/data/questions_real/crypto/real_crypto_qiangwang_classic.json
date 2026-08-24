@@ -1,0 +1,14 @@
+{
+  "id": "real_crypto_qiangwang_classic",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "强网杯青少年 classicCrypto（A/B摩斯+单表替换）",
+  "description": "classicCrypto.txt 是 A/B 字符序列：A=划/B=点 转摩斯电码 → 单表替换密文 → flag 在密文中间的 UUID 结构中。",
+  "flag": "f4adf0d868f5b0ac513b4dde37c3516860b67a5a4d410f4cadf43d99428cf5fc",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "E:/Program/Cybersecurity/比赛真题/2022强网杯青少年/crypto/classicCrypto_1daf735ddc6529e047b065a678422f5d/classicCrypto.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "f4adf0d868f5b0ac513b4dde37c3516860b67a5a4d410f4cadf43d99428cf5fc"
+}

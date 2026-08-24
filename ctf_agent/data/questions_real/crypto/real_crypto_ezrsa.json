@@ -1,0 +1,15 @@
+{
+  "id": "real_crypto_ezrsa",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "玄盾杯 ezRSA",
+  "description": "附件 task.py 是加密脚本：同一明文 m 用多组不同模数 n 加密得到多组密文 c。output 文件给出了各组的 n 和 c。解密还原明文 flag。",
+  "flag": "93be5f3ad422c43e99e705f52df3ad974548dc558714e48162d3939787bdfdbf",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-ezRSA/task.py",
+    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-ezRSA/output"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "93be5f3ad422c43e99e705f52df3ad974548dc558714e48162d3939787bdfdbf"
+}

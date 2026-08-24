@@ -1,0 +1,15 @@
+{
+  "id": "real_crypto_simplelegendre",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "玄盾杯 SimpleLegendre",
+  "description": "附件 task.py 是加密脚本：将明文的每个二进制位逐位加密为一个密文 c。output 文件给出了 phi(n)、模数 N 和密文列表。解密还原明文 flag。",
+  "flag": "75e6aa4de894faf2a760a91aa74d93e9f3b971377012f81bfb95806902ba0002",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-SimpleLegendre/task.py",
+    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-SimpleLegendre/output"
+  ],
+  "difficulty": "HARD",
+  "flag_sha256": "75e6aa4de894faf2a760a91aa74d93e9f3b971377012f81bfb95806902ba0002"
+}

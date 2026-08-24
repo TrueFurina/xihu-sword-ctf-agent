@@ -1,0 +1,14 @@
+{
+  "id": "real_crypto_filterrandom",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "西湖论剑2021 FilterRandom",
+  "description": "附件 FilterRandom.py 是加密脚本：两个 64 位 LFSR（l1/l2）各自以 mask 生成比特流，输出序列按 90% 概率取 l1、10% 概率取 l2 混合。脚本注释给出了 mask1、mask2 和 2048 位混合输出。flag 格式为 DASCTF{init1-init2}，其中 init1/init2 是两个 LFSR 的初始状态。恢复 init1 与 init2。",
+  "flag": "768a21b901963eb9818c0e0775d5a6b476773c550e004fc4c50b9a59350177b5",
+  "flag_pattern": "DASCTF\\{[^}]+\\}",
+  "attachments": [
+    "E:/Program/Cybersecurity/比赛真题/西湖论剑2021中国杭州网络安全技能大赛/CRYPTO/FilterRandom.py"
+  ],
+  "difficulty": "HARD",
+  "flag_sha256": "768a21b901963eb9818c0e0775d5a6b476773c550e004fc4c50b9a59350177b5"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "real_crypto_specialcurve2",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "西湖论剑2021 SpecialCurve2",
+  "description": "附件 SpecialCurve2.py 是加密脚本：在复数乘法群（点加定义 x3=x1*x2-y1*y2, y3=x1*y2+x2*y1）上进行类 RSA 加密。n 是三个强素数乘积（p=2q+1），G=(1,1)，HINT=mul(G,e)，明文 M=(x,y)（flag 拆两半），C=mul(M,e)。脚本注释给出了 n、HINT、C。flag 格式 DASCTF{...}。",
+  "flag": "cd7e815f4a5a378b8a856ee518a1d7277f306221ce6d68d56dd6f27da2571c4f",
+  "flag_pattern": "DASCTF\\{[^}]+\\}",
+  "attachments": [
+    "E:/Program/Cybersecurity/比赛真题/西湖论剑2021中国杭州网络安全技能大赛/CRYPTO/SpecialCurve2.py"
+  ],
+  "difficulty": "HARD",
+  "flag_sha256": "cd7e815f4a5a378b8a856ee518a1d7277f306221ce6d68d56dd6f27da2571c4f"
+}

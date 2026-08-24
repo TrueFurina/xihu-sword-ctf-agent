@@ -104,7 +104,9 @@ data/attachments/platform_archive/tmp_fate/
 .atomcode/
 
 # 重建仓库（2026-08-22）：运行时数据整体排除，防再次膨胀（13G 附件/解压/手工产物均本地保留）
-/data/
+/data/*
+!data/questions_real/
+!data/questions_real/**
 !/data/results/.gitkeep
 
 # 根目录临时解密产物（赛时手工解题输出，非源码）
