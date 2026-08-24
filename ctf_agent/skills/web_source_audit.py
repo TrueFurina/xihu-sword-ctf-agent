@@ -167,16 +167,6 @@ def _scan_flags(root: str, budget: "_Budget | None" = None) -> list:
                     for dec in _norm_flag(m.group(0)):
                         if re.search(r"(?i)flag|d3ctf|xctf|ctf", dec):
                             found.append({"file": fp, "match": f"base64→{dec[:100]}", "type": "base64编码flag"})
-            # 裸 hex 摘要型 flag（MD5 32 / SHA256 64），仅当同行含 flag/secret/hash
-            # 等关键字时才认，避免把源码普通 hex 误报成 flag。
-            for line in text.splitlines():
-                if not re.search(r"(?i)\b(flag|secret|hash|md5|sha|key)\b", line):
-                    continue
-                for hm in re.finditer(r"\b[a-f0-9]{32}\b|\b[a-f0-9]{64}\b", line):
-                    h = hm.group(0)
-                    if re.search(r"(?i)flag|secret|hash|md5|sha|key", h):
-                        continue
-                    found.append({"file": fp, "match": h, "type": f"裸hex摘要flag({len(h)}位)"})
     return found
 
 
