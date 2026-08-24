@@ -83,4 +83,3 @@ Thumbs.db
 # ---------- 9. 日志 / 大输出 ----------
 *.log
 data/results/*.jsonl
-!ctf_agent/data/results/benchmark_report.json
