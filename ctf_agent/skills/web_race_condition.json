@@ -1,0 +1,8 @@
+{
+  "name": "web_race_condition",
+  "purpose": "web 条件竞争利用（Race Condition）：上传校验与移动之间竞态、双花（余额/库存）、校验绕过（先校验后落盘）——正式赛 web 升级方向",
+  "input_spec": "params = {'target_url': 目标端点, 'kind': 'upload_race|balance_race|check_race', 'concurrency': 并发数}",
+  "output_spec": "利用结果/flag",
+  "categories": ["web"],
+  "version": "1.0"
+}

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# pre-merge-commit —— 合并闸门（阶段3，2026-08-24）
+# git 2.24+ 支持：真正 merge commit（--no-ff / 自动 merge）在生成 commit 前触发本钩子。
+# 失败 exit 1 → 中止合并（fail-closed）。squash-merge 不触发本钩子，由 pre-commit 第⑧道
+# （MERGE_HEAD 检测）调用 scripts/_merge_gate.py 兜底。
+#
+# 安装：cp scripts/hooks/pre-merge-commit git_hooks/pre-merge-commit（core.hooksPath=git_hooks）
+set -e
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+PY="$ROOT/.venv/Scripts/python.exe"
+if [ ! -x "$PY" ] && [ ! -f "$PY" ]; then
+    PY="python"
+fi
+
+cd "$ROOT"
+"$PY" scripts/_merge_gate.py

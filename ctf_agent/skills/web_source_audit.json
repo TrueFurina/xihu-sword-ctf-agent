@@ -1,0 +1,9 @@
+{
+  "name": "web_source_audit",
+  "purpose": "CMS/Web服务器源码审计确定性流程（2026-08-21 分类回归：正式赛 23/32 题为 web 源码审计类——joomla/wordpress/drupal/cmsms/ghost + nginx/httpd/caddy/openresty/postgresql/redis 官方源码包）。① 自动递归解压 zip/tar.gz；② 全库 flag 特征扫描（flag{/DASCTF{/xctf{ 及 rot13 变体 QNFPGS{、base64 编码 flag、拆分片段）；③ 后门/危险函数检测（eval+base64_decode、命令执行参数注入、assert/动态调用等 10 类）；④ 敏感文件清单（.env/config/db.sql/备份/上传目录等）；⑤ 版本号提取→CVE 检索候选。输出结构化审计报告，定位攻击面供靶机交互攻破。",
+  "input_spec": "params = {'path': 附件或源码目录路径(可传 zip/tar.gz, 自动解压), 'name': 题目名(可选, 用于版本-CVE 提示)}",
+  "output_spec": "dict: {name, found_flags: [{file, match, type}], backdoors: [{file, type}], sensitive_files: [相对路径], cve_candidates: [{software, version, hint}], report: 人类可读报告文本}",
+  "categories": ["web"],
+  "version": "1.0",
+  "verified": "2026-08-21 joomla-6.1.2 源码包实测（135M 全量扫描，无明文 flag=预期，动态题需靶机交互）"
+}

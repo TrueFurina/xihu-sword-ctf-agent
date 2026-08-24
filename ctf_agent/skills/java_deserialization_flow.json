@@ -1,0 +1,9 @@
+{
+  "name": "java_deserialization_flow",
+  "purpose": "Java 反序列化题标准流程：javap MethodParameters 找参数名（注意大小写）→ 识别 ObjectInputStream.readObject 入口 → 找 classpath gadget（commons-collections）→ 无回显外带（Nashorn 改响应/XXE/写文件）",
+  "input_spec": "jar/class 附件 + 靶机 URL",
+  "output_spec": "flag",
+  "categories": ["web"],
+  "version": "1.0",
+  "prompt_paradigm": true
+}

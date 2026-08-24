@@ -1,0 +1,8 @@
+{
+  "name": "pyc_decompile",
+  "purpose": "reverse pyc 反编译（正式赛高难题实弹化——2026-08-21）：Python 字节码题一键反编译。uncompyle6 反编译源码（完整还原），失败则提取 co_consts 字符串/常量（flag 常藏在字节码常量里）。",
+  "input_spec": "params = {'path': pyc 文件路径}",
+  "output_spec": "反编译源码或提取的字符串/常量列表",
+  "categories": ["reverse"],
+  "version": "1.0"
+}

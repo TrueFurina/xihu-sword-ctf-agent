@@ -1,0 +1,8 @@
+{
+  "name": "pwn_libc_fingerprint",
+  "purpose": "pwn libc 指纹库（无 gdb 补深度）：解析 libc.so.6 附件 → 关键符号偏移表（__libc_start_main_ret/system/free/puts/read/malloc/one_gadget）+ libc 版本识别 + 泄露地址 → libc base 计算——决赛 pwn 升级（2.2）",
+  "input_spec": "params = {'libc_path': libc.so.6 路径, 'leaked_addr': 泄露地址(可选), 'leaked_symbol': 泄露符号名(可选)}",
+  "output_spec": "符号偏移表 + libc 版本 + base 地址",
+  "categories": ["pwn"],
+  "version": "1.0"
+}

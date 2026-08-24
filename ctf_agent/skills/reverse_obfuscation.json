@@ -1,0 +1,8 @@
+{
+  "name": "reverse_obfuscation",
+  "purpose": "reverse 混淆处理范式（ollvm 平坦化/反调试/VM 壳）：控制流分析、反调试绕过（ptrace 检测/时间戳）、字符串解密定位——正式赛 reverse 升级方向",
+  "input_spec": "params = {'binary': ELF/APK 路径, 'kind': 'ollvm|antidebug|vm|strings'}",
+  "output_spec": "关键逻辑定位/flag",
+  "categories": ["reverse"],
+  "version": "1.0"
+}

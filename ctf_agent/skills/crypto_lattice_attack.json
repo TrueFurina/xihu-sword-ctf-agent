@@ -1,0 +1,8 @@
+{
+  "name": "crypto_lattice_attack",
+  "purpose": "crypto 格攻击模板（LLL 格基约减）：HNP/隐藏数问题、小未知数方程（如 small e 明文过短）、DSA 部分私钥泄露等——正式赛 crypto 升级方向",
+  "input_spec": "params = {'kind': 'hnp|small_msg|dsa_partial|generic', 'mod': 模数, 'known': 已知量列表}",
+  "output_spec": "恢复的未知量（flag 相关私钥/明文）",
+  "categories": ["crypto"],
+  "version": "1.0"
+}

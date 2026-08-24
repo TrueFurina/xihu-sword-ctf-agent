@@ -1,0 +1,8 @@
+{
+  "name": "misc_traffic_analysis",
+  "purpose": "misc 流量包分析流程（pcap 解析/协议识别/数据提取）：DNS 隧道、HTTP 文件、USB/键盘流量、蓝牙——正式赛 misc 升级方向。⚠️第一步必须先用 file_analyze 读取题目附件的 pcap 路径（路径从题面 attachments 获取），禁止无路径空转。",
+  "input_spec": "params = {'pcap_path': pcap 文件路径（从题目 attachments 获取，先 file_analyze 确认文件存在与类型）}",
+  "output_spec": "提取的 flag/数据",
+  "categories": ["misc"],
+  "version": "1.1"
+}

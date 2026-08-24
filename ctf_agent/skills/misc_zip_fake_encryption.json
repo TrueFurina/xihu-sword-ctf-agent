@@ -1,0 +1,8 @@
+{
+  "name": "misc_zip_fake_encryption",
+  "purpose": "ZIP 伪加密检测与修复（免密解压）：清掉加密标志位（通用位字段 bit0）后免密解压出 flag——misc-002『压缩包伪加密』题型。纯字节操作，不依赖被沙盒拦截的 shutil/os/subprocess。",
+  "input_spec": "params = {'path': zip 文件路径}",
+  "output_spec": "{'ok': bool, 'fixed_path': str, 'fixed': int, 'flag': str|None}",
+  "categories": ["misc", "zip"],
+  "version": "1.0"
+}
