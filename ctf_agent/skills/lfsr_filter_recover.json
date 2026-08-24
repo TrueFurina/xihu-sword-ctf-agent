@@ -1,0 +1,10 @@
+{
+  "name": "lfsr_filter_recover",
+  "purpose": "西湖论剑2021 FilterRandom 类题：90/10 噪声混合双 64-bit LFSR 恢复 init1/init2（单位向量系数矩阵 + F2 线性基 + 随机重排 + 差异位定位 l2）",
+  "input_spec": "solve_lfsr_filter(mask1: int, mask2: int, out: str) —— mask 为 LFSR 掩码，out 为 2048 位 01 混合输出串；返回 'DASCTF{init1-init2}'",
+  "output_spec": "含 init1/init2 的 flag 字符串或 None（flag 格式 DASCTF{init1-init2}，init 为 LFSR 初始状态十进制）",
+  "categories": [
+    "crypto"
+  ],
+  "version": "1.0"
+}

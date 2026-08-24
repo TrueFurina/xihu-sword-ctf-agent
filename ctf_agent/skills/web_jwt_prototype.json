@@ -1,0 +1,8 @@
+{
+  "name": "web_jwt_prototype",
+  "purpose": "web JWT 确定性攻击链（命中即秒解）+ 原型链污染知识卡片（正式赛高难题——决赛 web 高频新题型，2026-08-21 实弹化）：JWT alg=none 伪造 / HS256 弱密钥爆破（内置字典）/ RS256→HS256 算法混淆 + JS 原型链污染（__proto__/constructor.prototype 注入）检测与利用流程",
+  "input_spec": "params = {'token': JWT(可选，给定即自动拆解并执行确定性伪造/爆破), 'words': 弱密钥字典列表(可选), 'public_key': 公钥字符串(可选，算法混淆用), 'url': 靶机 URL(可选), 'scenario': 场景描述(可选)}",
+  "output_spec": "JWT 确定性攻击结果（forge_none/hs256_secret/forge_hs256/forge_alg_confusion）+ 原型链利用步骤 + payload 模板",
+  "categories": ["web"],
+  "version": "1.1"
+}

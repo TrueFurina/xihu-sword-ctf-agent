@@ -1,0 +1,8 @@
+{
+  "name": "zip_filename_chain_decode",
+  "purpose": "多层嵌套 zip 文件名链编码破解（base32/64/58/62/36/hex/摩斯自动探测，注意反转方向坑）",
+  "input_spec": "params = {'zip_path': 附件 zip 路径, 'max_layers': 最大解压层数}",
+  "output_spec": "最终解压出的 flag（含文件名链解码结果）",
+  "categories": ["misc"],
+  "version": "1.0"
+}

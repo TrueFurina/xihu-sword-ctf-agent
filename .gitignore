@@ -1,0 +1,86 @@
+# ============================================================
+# xihu-sword-ctf-agent 开源仓库根 .gitignore
+# 原则：源码/文档/架构可公开；密钥/真 flag/内部资源/运行产物/备份 一律不入库
+# ============================================================
+
+# ---------- 1. WorkBuddy 内部（含 memory 明文真 flag，绝对不传） ----------
+.workbuddy/
+.wb_*/
+.bak_sprint/
+.workbuddy_cleanup_backup/
+.atomcode/
+.wt_p1_vnctf/
+.wt-*/
+.tools/
+*.wt_*
+
+# ---------- 2. 临时/备份/恢复目录（项目开发期产物，非项目本身） ----------
+_backup/
+_git_backup/
+_git_corrupt_backup_*/
+_restore_tmp/
+_upload_stage/
+_archive_defense/
+_misc/
+wt-test/
+_ARCHIVE_*/
+*_temp/
+tmp_*/
+_INDEX.md
+deliverables/archive_禁用引用/
+
+# ---------- 3. 真实赛事内部资源（平台私有，含附件 URL/签名，不公开） ----------
+ctf_agent/data/race_details/
+ctf_agent/data/results/goal_log.jsonl
+ctf_agent/data/results/submitted_flags.json
+ctf_agent/data/results/category_regression.json
+ctf_agent/data/results/_10735_unrar/
+ctf_agent/data/questions_real_llm_only/
+
+# ---------- 4. 真 flag / 解题台账（含明文真 flag，不公开） ----------
+ctf_agent/REAL_SOLVES_LEDGER.md
+ctf_agent/data/results/verified_flags.json
+ctf_agent/solutions/
+ctf_agent/docs/DLP_独立性声明.md
+ctf_agent/docs/archive/root_docs/独立赛前评估-代码核验版-20260821.md
+ctf_agent/docs/archive/root_docs/赛前手雷手册-20260821.md
+ctf_agent/deliverables/archive_禁用引用/
+ctf_agent/deliverables/赛时手册/
+协同任务总账-TOP0.md
+solutions/
+wt-web-target/
+
+# ---------- 5. 题库真值（档 B：真值留 gitignored，仓库只留占位结构） ----------
+ctf_agent/data/questions_real/**/verified_flags*.json
+
+# ---------- 6. Python 运行产物 ----------
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# ---------- 7. 环境变量 / 密钥文件 ----------
+.env
+.env.*
+*.env
+secrets.json
+credentials.json
+config.local.py
+
+# ---------- 8. 编辑器 / OS ----------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ---------- 9. 日志 / 大输出 ----------
+*.log
+data/results/*.jsonl
+!ctf_agent/data/results/benchmark_report.json

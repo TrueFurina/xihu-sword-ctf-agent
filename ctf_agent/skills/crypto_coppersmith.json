@@ -1,0 +1,8 @@
+{
+  "name": "crypto_coppersmith",
+  "purpose": "Coppersmith 攻击模板（小根方程求解）：低指数明文 m^e<n 部分已知、RSA 已知部分私钥/因子、多项式小根——决赛 crypto 难度升级方向（与格攻击 LLL 互补）",
+  "input_spec": "params = {'kind': 'small_roots|partial_p|related_message', 'mod': 模数, 'known_bits': 已知信息}",
+  "output_spec": "恢复的根/因子（flag 相关）",
+  "categories": ["crypto"],
+  "version": "1.0"
+}

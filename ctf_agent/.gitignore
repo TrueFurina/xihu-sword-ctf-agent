@@ -1,0 +1,123 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 环境与密钥
+.env
+*.env
+.env.local
+
+# 测试与报告产物
+data/results/*.json
+data/results/*.jsonl
+data/results/_archive_mock/
+!data/results/.gitkeep
+
+# Java 调试遗迹（2026-08-20 锐评 P2 整改：解题 payload 由 solutions/ 动态生成，根目录 .java/.class 是手动编译遗迹）
+/*.java
+/*.class
+
+# 调试输出 txt（env_out/final_out/flag_out 等）
+/*_out.txt
+
+# 运行时解压目录（Fate 题 jar 解压产物，不进 git）
+tmp_fate/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 运行日志（赛后调试产物，本地保留不进 git）
+*.log
+race.log
+logs/
+data/results/race_clean*.log
+
+# 一次性解题/调试脚本（复盘 P2 清理：未纳入解题流水线的临时文件）
+_tmp/
+_tmp_*.py
+_solve_crypto*.py
+
+# 平台附件下载产物（80+ 文件，本地保留不进 git）
+data/platform_downloads/
+data/det_downloads/
+data/driver_*.json
+
+# 赛时运行数据（2026-08-21 赛后整理：附件解压/手工产物/临时区，体积大且无版本价值，本地保留不进 git）
+data/race_extract/
+data/race_tmp/
+data/handwork/
+data/temp_crypto03/
+
+# P0 安全（2026-08-21 安全审计）：平台 AccessKey/API Key/凭证清单/运行产物绝不入库
+# 历史已误入库文件通过 git rm --cached 移除（本地文件保留），此后任何 *_backup 快照
+# 目录、交接文档、环境变量清单均不跟踪，防止密钥随仓库外泄。
+data/results_backup*/
+**/平台接入交接文档.md
+**/环境变量对照清单-*.md
+data/results/*.md
+# 真实解出台账含真 flag 明文(DASCTF{)，禁止入库（运行产物）
+REAL_SOLVES_LEDGER.md
+_sec_*.txt
+# 一次性 diff/诊断输出（可能含 setx 注入的 sk- API Key 明文，如 _p0_diff.txt）
+/_p0_diff.txt
+# 密钥历史重写备份（含 filter-repo 前完整旧历史，含密钥泄露 commit 1715a15；已移出仓库至 _misc/）
+_backup_pre_cleanup.bundle
+*.bundle
+/*_diff.txt
+
+# P0 仓库瘦身（2026-08-21 gstack-investigator）：赛时附件/解压/手工产物，体积大且无版本价值
+data/race_attachments/
+data/**/*.zip
+!data/attachments/**
+!data/results/ezip_solve/**/*.zip
+data/*.bin
+data/10793_*
+/tempdir*/
+/tmp_*/
+/extract_*/
+/pwn02_extract/
+/*.zip
+*.bak*
+.bak_sprint/
+
+# 赛后遗留：赛时手工解题产物（gstack 收口 2026-08-21）
+data/results/crypto01.enc
+data/results/reverse0*/
+
+# 锐评 B3（2026-08-22）：超大解压/工作产物出 git（本地保留）
+# work_web=1.7G/19827 文件（CMS 源码包解压）、tmp_dryrun=60M（dry-run 解压残骸）
+data/work_web/
+data/tmp_dryrun/
+.git-rewrite/
+
+# P0 瘦身补充（2026-08-21 gstack-investigator）：超大解压产物/附件备份不进 git（本地保留）
+data/MISC02_extract/
+data/attachments/**/10680_Fate*
+data/attachments/**/*Fate-0.0.1-SNAPSHOT.jar
+data/attachments/platform_archive/tmp_fate/
+
+# CTDE 执法层（2026-08-22 锐评 B6）：写租约协调文件（运行时状态，不进版本库）
+.atomcode/
+
+# 重建仓库（2026-08-22）：运行时数据整体排除，防再次膨胀（13G 附件/解压/手工产物均本地保留）
+/data/
+!/data/results/.gitkeep
+
+# 根目录临时解密产物（赛时手工解题输出，非源码）
+/*.bin
+
+# 清理备份（gstack 一次性脚本备份，非源码）
+.workbuddy_cleanup_backup/
+
+
+# 损坏旧 git 对象库隔离备份（不入库）
+.git.broken_*/
+
+# 本地下载的二进制工具（7-Zip / PARI / 内部 tools 缓存，非源码，不进 git）
+.tools/
+tools/_7z/
+tools/pari/

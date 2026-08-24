@@ -1,0 +1,8 @@
+{
+  "name": "web_second_order_injection",
+  "purpose": "web 二次注入利用（Second-Order Injection）：先存储恶意数据（转义后入库），后触发点二次拼接未转义执行——SQL/命令/模板二次注入",
+  "input_spec": "params = {'store_url': 存储端点, 'trigger_url': 触发端点, 'payload_type': 'sql|cmd|ssti'}",
+  "output_spec": "利用结果/flag",
+  "categories": ["web"],
+  "version": "1.0"
+}

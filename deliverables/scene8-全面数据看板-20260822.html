@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>西湖论剑 CTF-Agent · 全面数据分析看板 (scene#8)</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; background:#f1f5f9; color:#0f172a; line-height:1.6; }
+.wrap { max-width:1100px; margin:0 auto; padding:24px 20px 60px; }
+header { background:linear-gradient(135deg,#1e3a8a,#2563eb 60%,#3b82f6); color:#fff; border-radius:16px; padding:32px 36px; margin-bottom:28px; }
+header h1 { font-size:26px; font-weight:700; letter-spacing:.5px; }
+header .sub { margin-top:6px; font-size:14px; opacity:.85; }
+header .meta { margin-top:14px; font-size:12px; opacity:.7; }
+.badge { display:inline-block; background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3); padding:2px 10px; border-radius:20px; font-size:12px; margin-right:8px; }
+.panel { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:24px 28px; margin-bottom:22px; box-shadow:0 1px 3px rgba(15,23,42,.05); }
+.panel h2 { font-size:17px; color:#1e293b; margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+.panel h2 .num { background:#2563eb; color:#fff; font-size:12px; border-radius:6px; padding:2px 8px; }
+.panel .desc { font-size:13px; color:#64748b; margin-bottom:16px; }
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-bottom:22px; }
+.kpi { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; text-align:center; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+.kpi-v { font-size:26px; font-weight:700; color:#1d4ed8; }
+.kpi-l { font-size:12px; color:#475569; margin-top:4px; }
+.kruep-sub { font-size:11px; color:#94a3b8; margin-top:2px; }
+.hbar { display:flex; flex-direction:column; gap:8px; }
+.bar-row { display:flex; align-items:center; gap:10px; font-size:12px; }
+.bar-label { width:110px; text-align:right; color:#334155; flex-shrink:0; }
+.bar-track { flex:1; background:#f1f5f9; border-radius:5px; height:20px; min-width:200px; }
+.bar-fill { height:20px; border-radius:5px; min-width:2px; }
+.bar-val { width:40px; color:#0f172a; font-weight:600; }
+.bar-desc { color:#64748b; font-size:11px; width:200px; }
+.donut-wrap { display:flex; align-items:center; gap:28px; flex-wrap:wrap; }
+.donut-legend { display:flex; flex-direction:column; gap:6px; font-size:13px; }
+.lg-item { display:flex; align-items:center; gap:8px; }
+.lg-item i { width:12px; height:12px; border-radius:3px; display:inline-block; }
+.d-center1 { font-size:20px; font-weight:700; fill:#0f172a; }
+.d-center2 { font-size:10px; fill:#64748b; }
+.vb-val { font-size:10px; fill:#475569; }
+.vb-lbl { font-size:10px; fill:#64748b; }
+.heat-t { width:100%; border-collapse:collapse; font-size:13px; }
+.heat-t th { background:#f8fafc; padding:8px 6px; border:1px solid #e2e8f0; font-size:12px; color:#475569; }
+.heat-t td { padding:8px 6px; border:1px solid #e2e8f0; text-align:center; }
+.heat-t .cat { text-align:left; font-weight:600; }
+.heat-t .sum { font-weight:700; background:#f8fafc; }
+.dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+@media (max-width:800px) { .grid2 { grid-template-columns:1fr; } }
+.tl { border-left:3px solid #cbd5e1; margin-left:8px; padding-left:20px; display:flex; flex-direction:column; gap:14px; }
+.tl-item { position:relative; }
+.tl-item::before { content:""; position:absolute; left:-27px; top:4px; width:11px; height:11px; border-radius:50%; background:#2563eb; border:2px solid #fff; box-shadow:0 0 0 2px #2563eb; }
+.tl-time { font-size:12px; color:#2563eb; font-weight:700; }
+.tl-t { font-size:13px; font-weight:600; color:#1e293b; }
+.tl-d { font-size:12px; color:#64748b; }
+.tl-item.red::before { background:#dc2626; box-shadow:0 0 0 2px #dc2626; }
+.tl-item.green::before { background:#059669; box-shadow:0 0 0 2px #059669; }
+.tl-item.purple::before { background:#7c3aed; box-shadow:0 0 0 2px #7c3aed; }
+.insight { background:#eff6ff; border-left:4px solid #2563eb; padding:12px 16px; border-radius:0 8px 8px 0; margin:10px 0; font-size:13px; }
+.insight.red { background:#fef2f2; border-left-color:#dc2626; }
+.insight.green { background:#f0fdf4; border-left-color:#059669; }
+footer { text-align:center; color:#94a3b8; font-size:12px; margin-top:30px; }
+.tag { display:inline-block; background:#eef2ff; color:#4338ca; font-size:11px; border-radius:4px; padding:1px 6px; margin:0 3px 4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>🔍 西湖论剑 CTF-Agent · 全面数据分析看板</h1>
+  <div class="sub">scene#8 数据分析及可视化 — 对项目做彻彻底底的数据盘点与可视化</div>
+  <div class="meta">
+    <span class="badge">数据采集 2026-08-22 12:34:08</span>
+    <span class="badge">数据源 13 类</span>
+    <span class="badge">代码基线 393 文件 / 60,614 行</span>
+    <span class="badge">正式赛 2026-08-21 14:00-17:00</span>
+  </div>
+</header>
+
+<div class="kpis"><div class="kpi"><div class="kpi-v">393</div><div class="kpi-l">代码文件</div><div class=kruep-sub>60,614 行文本</div></div><div class="kpi"><div class="kpi-v">43</div><div class="kpi-l">解题技能库</div><div class=kruep-sub>确定性 skill</div></div><div class="kpi"><div class="kpi-v">32</div><div class="kpi-l">真题清单</div><div class=kruep-sub>全站 47 题已建档</div></div><div class="kpi"><div class="kpi-v">14</div><div class="kpi-l">回归已解</div><div class=kruep-sub>47 题中 15 题有附件</div></div><div class="kpi"><div class="kpi-v">310</div><div class="kpi-l">goal_log 记录</div><div class=kruep-sub>33 条成功</div></div><div class="kpi"><div class="kpi-v">31</div><div class="kpi-l">测试用例文件</div></div></div>
+
+<div class="panel">
+  <h2><span class="num">①</span> 代码仓库全景</h2>
+  <div class="desc">ctf_agent 核心仓库（排除 data/logs/.venv/.git），按模块与文件类型统计</div>
+  <div class="grid2">
+    <div>
+      <div class="desc" style="margin-top:0"><b>模块文件规模</b>（共 517 个文件）</div>
+      <div class="hbar"><div class="bar-row"><span class="bar-label">skills</span>
+<div class="bar-track"><div class="bar-fill" style="width:125.5px;background:#1d4ed8"></div></div>
+<span class="bar-val">141</span></div>
+<div class="bar-row"><span class="bar-label">solutions</span>
+<div class="bar-track"><div class="bar-fill" style="width:100.5px;background:#1d4ed8"></div></div>
+<span class="bar-val">113</span></div>
+<div class="bar-row"><span class="bar-label">tests</span>
+<div class="bar-track"><div class="bar-fill" style="width:80.1px;background:#1d4ed8"></div></div>
+<span class="bar-val">90</span></div>
+<div class="bar-row"><span class="bar-label">scripts</span>
+<div class="bar-track"><div class="bar-fill" style="width:70.3px;background:#1d4ed8"></div></div>
+<span class="bar-val">79</span></div>
+<div class="bar-row"><span class="bar-label">docs</span>
+<div class="bar-track"><div class="bar-fill" style="width:40.9px;background:#1d4ed8"></div></div>
+<span class="bar-val">46</span></div>
+<div class="bar-row"><span class="bar-label">core</span>
+<div class="bar-track"><div class="bar-fill" style="width:24.9px;background:#1d4ed8"></div></div>
+<span class="bar-val">28</span></div>
+<div class="bar-row"><span class="bar-label">agents</span>
+<div class="bar-track"><div class="bar-fill" style="width:10.7px;background:#1d4ed8"></div></div>
+<span class="bar-val">12</span></div>
+<div class="bar-row"><span class="bar-label">ctfplatform</span>
+<div class="bar-track"><div class="bar-fill" style="width:7.1px;background:#1d4ed8"></div></div>
+<span class="bar-val">8</span></div></div>
+    </div>
+    <div>
+      <div class="desc" style="margin-top:0"><b>文件类型分布</b>（Top 8）</div>
+      <div class="hbar"><div class="bar-row"><span class="bar-label">.py</span>
+<div class="bar-track"><div class="bar-fill" style="width:289.6px;background:#64748b"></div></div>
+<span class="bar-val">226</span></div>
+<div class="bar-row"><span class="bar-label">.json</span>
+<div class="bar-track"><div class="bar-fill" style="width:61.5px;background:#64748b"></div></div>
+<span class="bar-val">48</span></div>
+<div class="bar-row"><span class="bar-label">.md</span>
+<div class="bar-track"><div class="bar-fill" style="width:50.0px;background:#64748b"></div></div>
+<span class="bar-val">39</span></div>
+<div class="bar-row"><span class="bar-label">.b64</span>
+<div class="bar-track"><div class="bar-fill" style="width:26.9px;background:#64748b"></div></div>
+<span class="bar-val">21</span></div>
+<div class="bar-row"><span class="bar-label">.java</span>
+<div class="bar-track"><div class="bar-fill" style="width:11.5px;background:#64748b"></div></div>
+<span class="bar-val">9</span></div>
+<div class="bar-row"><span class="bar-label">.zip</span>
+<div class="bar-track"><div class="bar-fill" style="width:10.3px;background:#64748b"></div></div>
+<span class="bar-val">8</span></div>
+<div class="bar-row"><span class="bar-label">.sh</span>
+<div class="bar-track"><div class="bar-fill" style="width:5.1px;background:#64748b"></div></div>
+<span class="bar-val">4</span></div>
+<div class="bar-row"><span class="bar-label">.html</span>
+<div class="bar-track"><div class="bar-fill" style="width:5.1px;background:#64748b"></div></div>
+<span class="bar-val">4</span></div></div>
+    </div>
+  </div>
+  <div class="insight">Python 226 个文件构成核心（agents/skills/core/scripts 四层），skill 目录承载 141 个文件——技能库是最大的资产模块；文本总行数 60,614 行。</div>
+</div>
+
+<div class="panel">
+  <h2><span class="num">②</span> 解题技能库（43 个确定性 skill）</h2>
+  <div class="desc">覆盖 web / crypto / pwn / misc / reverse 五大领域 + java/zip 专项，全部为确定性工具（非 LLM 猜测）</div>
+  <div class="grid2">
+    <div><div class="donut-wrap">
+<div class="donut"><svg viewBox="0 0 140 140" width="150" height="150"><circle cx="70" cy="70" r="54" fill="none" stroke="#2563eb" stroke-width="20" stroke-dasharray="94.7 244.6" stroke-dashoffset="0.0" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#d97706" stroke-width="20" stroke-dasharray="47.3 291.9" stroke-dashoffset="-94.7" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#dc2626" stroke-width="20" stroke-dasharray="47.3 291.9" stroke-dashoffset="-142.0" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#7c3aed" stroke-width="20" stroke-dasharray="39.5 299.8" stroke-dashoffset="-189.4" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#059669" stroke-width="20" stroke-dasharray="23.7 315.6" stroke-dashoffset="-228.8" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#0891b2" stroke-width="20" stroke-dasharray="15.8 323.5" stroke-dashoffset="-252.5" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#ca8a04" stroke-width="20" stroke-dasharray="15.8 323.5" stroke-dashoffset="-268.3" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#64748b" stroke-width="20" stroke-dasharray="7.9 331.4" stroke-dashoffset="-284.1" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#64748b" stroke-width="20" stroke-dasharray="7.9 331.4" stroke-dashoffset="-291.9" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#64748b" stroke-width="20" stroke-dasharray="7.9 331.4" stroke-dashoffset="-299.8" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#64748b" stroke-width="20" stroke-dasharray="7.9 331.4" stroke-dashoffset="-307.7" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#64748b" stroke-width="20" stroke-dasharray="7.9 331.4" stroke-dashoffset="-315.6" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#64748b" stroke-width="20" stroke-dasharray="7.9 331.4" stroke-dashoffset="-323.5" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#64748b" stroke-width="20" stroke-dasharray="7.9 331.4" stroke-dashoffset="-331.4" transform="rotate(-90 70 70)"/>
+<text x="70" y="68" text-anchor="middle" class="d-center1">43</text>
+<text x="70" y="86" text-anchor="middle" class="d-center2">技能</text></svg></div>
+<div class="donut-legend"><span class="lg-item"><i style="background:#2563eb"></i>web 12 (28%)</span><span class="lg-item"><i style="background:#d97706"></i>crypto 6 (14%)</span><span class="lg-item"><i style="background:#dc2626"></i>pwn 6 (14%)</span><span class="lg-item"><i style="background:#7c3aed"></i>misc 5 (12%)</span><span class="lg-item"><i style="background:#059669"></i>reverse 3 (7%)</span><span class="lg-item"><i style="background:#0891b2"></i>java 2 (5%)</span><span class="lg-item"><i style="background:#ca8a04"></i>zip 2 (5%)</span><span class="lg-item"><i style="background:#64748b"></i>base64 1 (2%)</span><span class="lg-item"><i style="background:#64748b"></i>caesar 1 (2%)</span><span class="lg-item"><i style="background:#64748b"></i>hash 1 (2%)</span><span class="lg-item"><i style="background:#64748b"></i>lfsr 1 (2%)</span><span class="lg-item"><i style="background:#64748b"></i>morse 1 (2%)</span><span class="lg-item"><i style="background:#64748b"></i>pyc 1 (2%)</span><span class="lg-item"><i style="background:#64748b"></i>rsa 1 (2%)</span></div></div></div>
+    <div>
+      <div class="desc" style="margin-top:0"><b>领域分布明细</b></div>
+      <div class="hbar"><div class="bar-row"><span class="bar-label">web</span>
+<div class="bar-track"><div class="bar-fill" style="width:128.4px;background:#2563eb"></div></div>
+<span class="bar-val">12</span></div>
+<div class="bar-row"><span class="bar-label">crypto</span>
+<div class="bar-track"><div class="bar-fill" style="width:64.2px;background:#d97706"></div></div>
+<span class="bar-val">6</span></div>
+<div class="bar-row"><span class="bar-label">pwn</span>
+<div class="bar-track"><div class="bar-fill" style="width:64.2px;background:#dc2626"></div></div>
+<span class="bar-val">6</span></div>
+<div class="bar-row"><span class="bar-label">misc</span>
+<div class="bar-track"><div class="bar-fill" style="width:53.5px;background:#7c3aed"></div></div>
+<span class="bar-val">5</span></div>
+<div class="bar-row"><span class="bar-label">reverse</span>
+<div class="bar-track"><div class="bar-fill" style="width:32.1px;background:#059669"></div></div>
+<span class="bar-val">3</span></div>
+<div class="bar-row"><span class="bar-label">java</span>
+<div class="bar-track"><div class="bar-fill" style="width:21.4px;background:#0891b2"></div></div>
+<span class="bar-val">2</span></div>
+<div class="bar-row"><span class="bar-label">zip</span>
+<div class="bar-track"><div class="bar-fill" style="width:21.4px;background:#ca8a04"></div></div>
+<span class="bar-val">2</span></div>
+<div class="bar-row"><span class="bar-label">base64</span>
+<div class="bar-track"><div class="bar-fill" style="width:10.7px;background:#64748b"></div></div>
+<span class="bar-val">1</span></div>
+<div class="bar-row"><span class="bar-label">caesar</span>
+<div class="bar-track"><div class="bar-fill" style="width:10.7px;background:#64748b"></div></div>
+<span class="bar-val">1</span></div>
+<div class="bar-row"><span class="bar-label">hash</span>
+<div class="bar-track"><div class="bar-fill" style="width:10.7px;background:#64748b"></div></div>
+<span class="bar-val">1</span></div>
+<div class="bar-row"><span class="bar-label">lfsr</span>
+<div class="bar-track"><div class="bar-fill" style="width:10.7px;background:#64748b"></div></div>
+<span class="bar-val">1</span></div>
+<div class="bar-row"><span class="bar-label">morse</span>
+<div class="bar-track"><div class="bar-fill" style="width:10.7px;background:#64748b"></div></div>
+<span class="bar-val">1</span></div>
+<div class="bar-row"><span class="bar-label">pyc</span>
+<div class="bar-track"><div class="bar-fill" style="width:10.7px;background:#64748b"></div></div>
+<span class="bar-val">1</span></div>
+<div class="bar-row"><span class="bar-label">rsa</span>
+<div class="bar-track"><div class="bar-fill" style="width:10.7px;background:#64748b"></div></div>
+<span class="bar-val">1</span></div></div>
+      <div style="margin-top:12px">
+      <span class="tag">base64_multilayer</span><span class="tag">caesar_bruteforce</span><span class="tag">crypto_coppersmith</span><span class="tag">crypto_ecb_block_attack</span><span class="tag">crypto_high_exponent</span><span class="tag">crypto_lattice_attack</span><span class="tag">crypto_pkcs1_improved</span><span class="tag">crypto_pkcs1_padding_oracle</span><span class="tag">hash_crack</span><span class="tag">java_deserialization_flow</span><span class="tag">java_nashorn_response</span><span class="tag">lfsr_filter_recover</span><span class="tag">misc_bigfile_analysis</span><span class="tag">misc_bigfile_traffic</span><span class="tag">misc_disk_forensics</span><span class="tag">misc_traffic_analysis</span><span class="tag">misc_zip_fake_encryption</span><span class="tag">morse_decoder</span><span class="tag">php_unserialize_pop</span><span class="tag">pwn_exploit_flow</span><span class="tag">pwn_libc_fingerprint</span><span class="tag">pwn_nogdb_flow</span><span class="tag">pwn_ret2dlresolve</span><span class="tag">pwn_sandbox_escape</span><span class="tag">pwn_tcache_safelinking</span><span class="tag">pyc_decompile</span><span class="tag">reverse_elf_general</span><span class="tag">reverse_go_apk</span><span class="tag">reverse_obfuscation</span><span class="tag">rsa_fermat_factor</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2><span class="num">③</span> 赛题全貌：真题清单 × 赛题详情 × 回归档案</h2>
+  <div class="desc">三个数据源交叉验证：real_challenges（32 题拉取清单）→ race_details（32 题详情，含分值）→ category_regression（47 题回归档案）</div>
+  <div class="grid2">
+    <div>
+      <div class="desc" style="margin-top:0"><b>真题分类</b>（real_challenges）</div>
+      <div class="donut-wrap">
+<div class="donut"><svg viewBox="0 0 140 140" width="150" height="150"><circle cx="70" cy="70" r="54" fill="none" stroke="#7c3aed" stroke-width="20" stroke-dasharray="254.5 84.8" stroke-dashoffset="0.0" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#059669" stroke-width="20" stroke-dasharray="31.8 307.5" stroke-dashoffset="-254.5" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#d97706" stroke-width="20" stroke-dasharray="21.2 318.1" stroke-dashoffset="-286.3" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#2563eb" stroke-width="20" stroke-dasharray="21.2 318.1" stroke-dashoffset="-307.5" transform="rotate(-90 70 70)"/><circle cx="70" cy="70" r="54" fill="none" stroke="#dc2626" stroke-width="20" stroke-dasharray="10.6 328.7" stroke-dashoffset="-328.7" transform="rotate(-90 70 70)"/>
+<text x="70" y="68" text-anchor="middle" class="d-center1">32</text>
+<text x="70" y="86" text-anchor="middle" class="d-center2">真题</text></svg></div>
+<div class="donut-legend"><span class="lg-item"><i style="background:#7c3aed"></i>misc 24 (75%)</span><span class="lg-item"><i style="background:#059669"></i>reverse 3 (9%)</span><span class="lg-item"><i style="background:#d97706"></i>crypto 2 (6%)</span><span class="lg-item"><i style="background:#2563eb"></i>web 2 (6%)</span><span class="lg-item"><i style="background:#dc2626"></i>pwn 1 (3%)</span></div></div>
+    </div>
+    <div>
+      <div class="desc" style="margin-top:0"><b>赛题难度</b>（race_details，共 32 题）</div>
+      <div class="hbar"><div class="bar-row"><span class="bar-label">MEDIUM</span>
+<div class="bar-track"><div class="bar-fill" style="width:273.1px;background:#f59e0b"></div></div>
+<span class="bar-val">19</span></div>
+<div class="bar-row"><span class="bar-label">EASY</span>
+<div class="bar-track"><div class="bar-fill" style="width:129.4px;background:#22c55e"></div></div>
+<span class="bar-val">9</span></div>
+<div class="bar-row"><span class="bar-label">HARD</span>
+<div class="bar-track"><div class="bar-fill" style="width:43.1px;background:#ef4444"></div></div>
+<span class="bar-val">3</span></div>
+<div class="bar-row"><span class="bar-label">VERY_EASY</span>
+<div class="bar-track"><div class="bar-fill" style="width:14.4px;background:#10b981"></div></div>
+<span class="bar-val">1</span></div></div>
+      <div class="desc" style="margin-top:14px"><b>分值分布</b>（总分 13200 分）</div>
+      <svg viewBox="0 0 520 160" width="100%"><rect x="17.3" y="124.0" width="52.0" height="26.0" rx="3" fill="#7c3aed"/>
+<text x="43.3" y="119.0" text-anchor="middle" class="vb-val">2</text>
+<text x="43.3" y="159.0" text-anchor="middle" class="vb-lbl">0分</text>
+<rect x="104.0" y="137.0" width="52.0" height="13.0" rx="3" fill="#7c3aed"/>
+<text x="130.0" y="132.0" text-anchor="middle" class="vb-val">1</text>
+<text x="130.0" y="159.0" text-anchor="middle" class="vb-lbl">100分</text>
+<rect x="190.7" y="72.0" width="52.0" height="78.0" rx="3" fill="#7c3aed"/>
+<text x="216.7" y="67.0" text-anchor="middle" class="vb-val">6</text>
+<text x="216.7" y="159.0" text-anchor="middle" class="vb-lbl">200分</text>
+<rect x="277.3" y="46.0" width="52.0" height="104.0" rx="3" fill="#7c3aed"/>
+<text x="303.3" y="41.0" text-anchor="middle" class="vb-val">8</text>
+<text x="303.3" y="159.0" text-anchor="middle" class="vb-lbl">300分</text>
+<rect x="364.0" y="85.0" width="52.0" height="65.0" rx="3" fill="#7c3aed"/>
+<text x="390.0" y="80.0" text-anchor="middle" class="vb-val">5</text>
+<text x="390.0" y="159.0" text-anchor="middle" class="vb-lbl">500分</text>
+<rect x="450.7" y="20.0" width="52.0" height="130.0" rx="3" fill="#7c3aed"/>
+<text x="476.7" y="15.0" text-anchor="middle" class="vb-val">10</text>
+<text x="476.7" y="159.0" text-anchor="middle" class="vb-lbl">700分</text></svg>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2><span class="num">④</span> 回归档案：分类 × 难度矩阵（47 题）</h2>
+  <div class="desc">category_regression.json — 已解出 14 题 / 有本地附件 15 题。颜色越深 = 该格题目越多</div>
+  <table class="heat-t"><tr><th>分类</th><th>VERY EASY</th><th>EASY</th><th>MEDIUM</th><th>HARD</th><th>合计</th></tr>
+<tr><td class="cat"><span class="dot" style="background:#2563eb"></span>web (24)</td><td class="heat" style="background:rgba(37,99,235,0.12)">1</td><td class="heat" style="background:rgba(37,99,235,0.46)">9</td><td class="heat" style="background:rgba(37,99,235,0.63)">13</td><td class="heat" style="background:rgba(37,99,235,0.12)">1</td><td class="sum">24</td></tr>
+<tr><td class="cat"><span class="dot" style="background:#d97706"></span>crypto (11)</td><td class="heat" style="background:rgba(37,99,235,0.08)">0</td><td class="heat" style="background:rgba(37,99,235,0.25)">4</td><td class="heat" style="background:rgba(37,99,235,0.25)">4</td><td class="heat" style="background:rgba(37,99,235,0.21)">3</td><td class="sum">11</td></tr>
+<tr><td class="cat"><span class="dot" style="background:#7c3aed"></span>misc (5)</td><td class="heat" style="background:rgba(37,99,235,0.08)">0</td><td class="heat" style="background:rgba(37,99,235,0.12)">1</td><td class="heat" style="background:rgba(37,99,235,0.25)">4</td><td class="heat" style="background:rgba(37,99,235,0.08)">0</td><td class="sum">5</td></tr>
+<tr><td class="cat"><span class="dot" style="background:#dc2626"></span>pwn (1)</td><td class="heat" style="background:rgba(37,99,235,0.08)">0</td><td class="heat" style="background:rgba(37,99,235,0.08)">0</td><td class="heat" style="background:rgba(37,99,235,0.12)">1</td><td class="heat" style="background:rgba(37,99,235,0.08)">0</td><td class="sum">1</td></tr>
+<tr><td class="cat"><span class="dot" style="background:#059669"></span>reverse (6)</td><td class="heat" style="background:rgba(37,99,235,0.12)">1</td><td class="heat" style="background:rgba(37,99,235,0.16)">2</td><td class="heat" style="background:rgba(37,99,235,0.12)">1</td><td class="heat" style="background:rgba(37,99,235,0.16)">2</td><td class="sum">6</td></tr>
+<tr><td>合计</td><td class="sum">2</td><td class="sum">16</td><td class="sum">23</td><td class="sum">6</td><td class='sum'>47</td></tr></table>
+  <div class="insight red">web 类 24 题是最大题池（EASY+MEDIUM 22 题），crypto 11 题难度跨度最大（EASY→HARD 全覆盖）。0 解出发生在 EASY/VERY_EASY 就占 18 题的池子里——问题不在题难，在链路。</div>
+</div>
+
+<div class="panel">
+  <h2><span class="num">⑤</span> 战况：goal_log 推理日志（310 条）</h2>
+  <div class="desc">supervisor/main_agent 每次解题尝试的落盘记录，按小时分布 + 失败归因</div>
+  <div class="grid2">
+    <div>
+      <div class="desc" style="margin-top:0"><b>推理活跃度（按小时）</b></div>
+      <svg viewBox="0 0 520 160" width="100%"><rect x="13.0" y="72.0" width="39.0" height="78.0" rx="3" fill="#2563eb"/>
+<text x="32.5" y="67.0" text-anchor="middle" class="vb-val">54</text>
+<text x="32.5" y="159.0" text-anchor="middle" class="vb-lbl">21</text>
+<rect x="78.0" y="145.7" width="39.0" height="4.3" rx="3" fill="#2563eb"/>
+<text x="97.5" y="140.7" text-anchor="middle" class="vb-val">3</text>
+<text x="97.5" y="159.0" text-anchor="middle" class="vb-lbl">22</text>
+<rect x="143.0" y="132.7" width="39.0" height="17.3" rx="3" fill="#2563eb"/>
+<text x="162.5" y="127.7" text-anchor="middle" class="vb-val">12</text>
+<text x="162.5" y="159.0" text-anchor="middle" class="vb-lbl">00</text>
+<rect x="208.0" y="98.0" width="39.0" height="52.0" rx="3" fill="#2563eb"/>
+<text x="227.5" y="93.0" text-anchor="middle" class="vb-val">36</text>
+<text x="227.5" y="159.0" text-anchor="middle" class="vb-lbl">01</text>
+<rect x="273.0" y="20.0" width="39.0" height="130.0" rx="3" fill="#2563eb"/>
+<text x="292.5" y="15.0" text-anchor="middle" class="vb-val">90</text>
+<text x="292.5" y="159.0" text-anchor="middle" class="vb-lbl">09</text>
+<rect x="338.0" y="137.0" width="39.0" height="13.0" rx="3" fill="#2563eb"/>
+<text x="357.5" y="132.0" text-anchor="middle" class="vb-val">9</text>
+<text x="357.5" y="159.0" text-anchor="middle" class="vb-lbl">10</text>
+<rect x="403.0" y="85.0" width="39.0" height="65.0" rx="3" fill="#2563eb"/>
+<text x="422.5" y="80.0" text-anchor="middle" class="vb-val">45</text>
+<text x="422.5" y="159.0" text-anchor="middle" class="vb-lbl">11</text>
+<rect x="468.0" y="61.9" width="39.0" height="88.1" rx="3" fill="#2563eb"/>
+<text x="487.5" y="56.9" text-anchor="middle" class="vb-val">61</text>
+<text x="487.5" y="159.0" text-anchor="middle" class="vb-lbl">12</text></svg>
+    </div>
+    <div>
+      <div class="desc" style="margin-top:0"><b>失败归因（四类，共 57 次）</b></div>
+      <div class="hbar"><div class="bar-row"><span class="bar-label">决策错</span>
+<div class="bar-track"><div class="bar-fill" style="width:242.1px;background:#dc2626"></div></div>
+<span class="bar-val">30</span></div>
+<div class="bar-row"><span class="bar-label">超时</span>
+<div class="bar-track"><div class="bar-fill" style="width:137.2px;background:#f59e0b"></div></div>
+<span class="bar-val">17</span></div>
+<div class="bar-row"><span class="bar-label">提取错</span>
+<div class="bar-track"><div class="bar-fill" style="width:40.4px;background:#7c3aed"></div></div>
+<span class="bar-val">5</span></div>
+<div class="bar-row"><span class="bar-label">工具调用错</span>
+<div class="bar-track"><div class="bar-fill" style="width:40.4px;background:#2563eb"></div></div>
+<span class="bar-val">5</span></div></div>
+      <div class="desc" style="margin-top:14px"><b>失败细分类</b>（error.category）</div>
+      <div class="hbar"><div class="bar-row"><span class="bar-label">stuck_loop</span>
+<div class="bar-track"><div class="bar-fill" style="width:137.2px;background:#334155"></div></div>
+<span class="bar-val">17</span></div>
+<div class="bar-row"><span class="bar-label">wallclock_timeout</span>
+<div class="bar-track"><div class="bar-fill" style="width:137.2px;background:#334155"></div></div>
+<span class="bar-val">17</span></div>
+<div class="bar-row"><span class="bar-label">wrong_direction</span>
+<div class="bar-track"><div class="bar-fill" style="width:104.9px;background:#334155"></div></div>
+<span class="bar-val">13</span></div>
+<div class="bar-row"><span class="bar-label">extract_fail</span>
+<div class="bar-track"><div class="bar-fill" style="width:40.4px;background:#334155"></div></div>
+<span class="bar-val">5</span></div>
+<div class="bar-row"><span class="bar-label">tool_failure</span>
+<div class="bar-track"><div class="bar-fill" style="width:40.4px;background:#334155"></div></div>
+<span class="bar-val">5</span></div></div>
+    </div>
+  </div>
+  <div class="insight red"><b>决策错 30 次（55%）</b>是最大失败源：wrong_direction 13 + stuck_loop 17（监督裁决方向错误/连续失败）——即"在错误方向上反复空转"；超时 17 次（31%）为墙钟止损。工具调用错/提取错各 5 次是次要工程问题。</div>
+</div>
+
+<div class="panel">
+  <h2><span class="num">⑥</span> 提交与水位</h2>
+  <div class="desc">submitted_flags.json 提交记录 + data/answers 赛前刷题水位</div>
+  <div class="grid2">
+    <div>
+      <div class="kpis">
+<div class="kpi"><div class="kpi-v">34</div><div class="kpi-l">提交总次数</div></div>
+<div class="kpi"><div class="kpi-v">crypto 100%</div><div class="kpi-l">提交分类</div></div>
+<div class="kpi"><div class="kpi-v">21:12 → 12:33</div><div class="kpi-l">时间跨度</div></div>
+<div class="kpi"><div class="kpi-v">x2 (solve me)</div><div class="kpi-l">测试目标</div></div>
+</div>
+      <div class="insight red">提交记录 34 次全部落在测试题 x2（flag{ok}）——正式赛阶段 submit 链路虽通，但无一道真题产生有效提交。这是"链路通、解题不通"的直接证据。</div>
+    </div>
+    <div>
+      <div class="desc" style="margin-top:0"><b>赛前刷题答案库（20 个 flag）</b></div>
+      <div class="hbar"><div class="bar-row"><span class="bar-label">crypto</span>
+<div class="bar-track"><div class="bar-fill" style="width:184.0px;background:#d97706"></div></div>
+<span class="bar-val">8</span></div>
+<div class="bar-row"><span class="bar-label">pwn</span>
+<div class="bar-track"><div class="bar-fill" style="width:115.0px;background:#dc2626"></div></div>
+<span class="bar-val">5</span></div>
+<div class="bar-row"><span class="bar-label">misc</span>
+<div class="bar-track"><div class="bar-fill" style="width:92.0px;background:#7c3aed"></div></div>
+<span class="bar-val">4</span></div>
+<div class="bar-row"><span class="bar-label">reverse</span>
+<div class="bar-track"><div class="bar-fill" style="width:46.0px;background:#059669"></div></div>
+<span class="bar-val">2</span></div>
+<div class="bar-row"><span class="bar-label">flag.txt</span>
+<div class="bar-track"><div class="bar-fill" style="width:23.0px;background:#64748b"></div></div>
+<span class="bar-val">1</span></div></div>
+      <div class="insight green">赛前水位：crypto 8 题全解（含 RSA 系列），pwn 5 题、misc 4 题、reverse 2 题——本地模拟题可解，说明技能库本身有战斗力；正式赛 0 解出指向链路/环境而非技能缺失。</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2><span class="num">⑦</span> 项目演进时间线（文件活动量）</h2>
+  <div class="desc">按 ctf_agent 全仓文件修改时间聚合（活动量 = 当日修改文件数）</div>
+  <div class="hbar"><div class="bar-row"><span class="bar-label">08-06</span>
+<div class="bar-track"><div class="bar-fill" style="width:245.5px;background:#94a3b8"></div></div>
+<span class="bar-val">42,696</span><span class="bar-desc">平台源码包批量下载</span></div>
+<div class="bar-row"><span class="bar-label">08-09</span>
+<div class="bar-track"><div class="bar-fill" style="width:23.1px;background:#2563eb"></div></div>
+<span class="bar-val">4,024</span><span class="bar-desc">题库/技能框架搭建</span></div>
+<div class="bar-row"><span class="bar-label">08-11</span>
+<div class="bar-track"><div class="bar-fill" style="width:94.5px;background:#2563eb"></div></div>
+<span class="bar-val">16,428</span><span class="bar-desc">web 解题链路开发</span></div>
+<div class="bar-row"><span class="bar-label">08-18</span>
+<div class="bar-track"><div class="bar-fill" style="width:0.3px;background:#7c3aed"></div></div>
+<span class="bar-val">57</span><span class="bar-desc">赛前攻坚启动</span></div>
+<div class="bar-row"><span class="bar-label">08-19</span>
+<div class="bar-track"><div class="bar-fill" style="width:0.8px;background:#7c3aed"></div></div>
+<span class="bar-val">146</span><span class="bar-desc">测试赛/水位探测</span></div>
+<div class="bar-row"><span class="bar-label">08-20</span>
+<div class="bar-track"><div class="bar-fill" style="width:0.4px;background:#f59e0b"></div></div>
+<span class="bar-val">75</span><span class="bar-desc">赛前收敛</span></div>
+<div class="bar-row"><span class="bar-label">08-21</span>
+<div class="bar-track"><div class="bar-fill" style="width:153.2px;background:#dc2626"></div></div>
+<span class="bar-val">26,639</span><span class="bar-desc">★ 正式赛 0 解出 + 复盘</span></div>
+<div class="bar-row"><span class="bar-label">08-22</span>
+<div class="bar-track"><div class="bar-fill" style="width:460.0px;background:#059669"></div></div>
+<span class="bar-val">80,132</span><span class="bar-desc">★ 修复/回归/答辩材料</span></div></div>
+  <div class="tl" style="margin-top:20px">
+    <div class="tl-item purple"><div class="tl-time">08-18 ~ 08-20</div><div class="tl-t">赛前攻坚：水位 8/9 · 技能库 25+ · 手雷手册</div><div class="tl-d">测试赛刷题验证 → 修复 RSA fallback → 冻结功能只修 P0</div></div>
+    <div class="tl-item red"><div class="tl-time">08-21 14:00-17:00</div><div class="tl-t">★ 正式赛：3 小时 0 解出</div><div class="tl-d">平台 HTTP 550 反复刷屏 → 32 题详情拉取失败 → 决策链路在无附件/无描述下空转</div></div>
+    <div class="tl-item"><div class="tl-time">08-21 17:00-24:00</div><div class="tl-t">赛后复盘：0 解出根因链四层故障</div><div class="tl-d">监督死锁修复（P0-A）· 配置陷阱修复（P0-B）· RSA fallback（P0-C）· 7/7 测试绿</div></div>
+    <div class="tl-item green"><div class="tl-time">08-22 09:00-12:30</div><div class="tl-t">回归验证：真跑 dryrun 解出 ezRSA flag</div><div class="tl-d">real_crypto_ezrsa 0.56s 解出 flag{S0_G00d_J0B_RUA} · 31 个测试文件 · 答辩三件套</div></div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2><span class="num">⑧</span> 日志规模（18 个运行日志，共 5.1 MB）</h2>
+  <div class="desc">赛时/赛后全部运行日志，Top 12 按大小排序（KB）</div>
+  <div class="hbar"><div class="bar-row"><span class="bar-label">compete_stdout_142854.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:138.2px;background:#475569"></div></div>
+<span class="bar-val">1619</span></div>
+<div class="bar-row"><span class="bar-label">race_live_1657.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:57.4px;background:#475569"></div></div>
+<span class="bar-val">672</span></div>
+<div class="bar-row"><span class="bar-label">race_20260821.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:32.9px;background:#475569"></div></div>
+<span class="bar-val">385</span></div>
+<div class="bar-row"><span class="bar-label">race_full_141300.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:32.9px;background:#475569"></div></div>
+<span class="bar-val">385</span></div>
+<div class="bar-row"><span class="bar-label">compete_143836.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:30.1px;background:#475569"></div></div>
+<span class="bar-val">353</span></div>
+<div class="bar-row"><span class="bar-label">worker_144644.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:20.3px;background:#475569"></div></div>
+<span class="bar-val">238</span></div>
+<div class="bar-row"><span class="bar-label">race_full_141625.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:15.6px;background:#475569"></div></div>
+<span class="bar-val">183</span></div>
+<div class="bar-row"><span class="bar-label">compete_stdout_143208.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:15.5px;background:#475569"></div></div>
+<span class="bar-val">182</span></div>
+<div class="bar-row"><span class="bar-label">race_sprint_1649.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:14.7px;background:#475569"></div></div>
+<span class="bar-val">172</span></div>
+<div class="bar-row"><span class="bar-label">compete_clean_144048.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:14.4px;background:#475569"></div></div>
+<span class="bar-val">169</span></div>
+<div class="bar-row"><span class="bar-label">race_ms_1656.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:14.0px;background:#475569"></div></div>
+<span class="bar-val">164</span></div>
+<div class="bar-row"><span class="bar-label">compete_fixed_144952.log</span>
+<div class="bar-track"><div class="bar-fill" style="width:13.9px;background:#475569"></div></div>
+<span class="bar-val">163</span></div></div>
+</div>
+
+<div class="panel">
+  <h2><span class="num">⑨</span> 关键结论 — 数据说了什么</h2>
+  <div class="insight red"><b>结论 1 · 0 解出不是技能问题，是链路问题。</b>赛前水位 20 题可解 + 技能库 43 个 + 本地 dryrun 0.56s 解出 = 战斗力真实存在；正式赛 0 解出根因在平台对接（HTTP 550 刷屏）、附件/描述缺失下的决策空转（决策错 30 次）。</div>
+  <div class="insight"><b>结论 2 · 失败归因高度集中。</b>goal_log 中"决策错"（方向错误+stuck）占 55%——修复方向应是 supervisor 的止损/换向机制，而不是堆更多 skill。工具调用错/提取错仅各 5 次，工程面已基本稳定。</div>
+  <div class="insight green"><b>结论 3 · 修复已被数据验证。</b>08-22 测试文件从 7 个扩到 31 个；dryrun 真跑解出 ezRSA（presolve 0.56s）；supervise 死锁 3/3 测试绿。赛前夜"只修 P0 不加功能"纪律正确。</div>
+  <div class="insight"><b>结论 4 · 最大资产是技能库 + 真题档案。</b>43 个确定性 skill（web 12 / crypto 6 / pwn 6）+ 47 题回归档案，是决赛可复用的确定性资本；决赛重点 = 平台对接稳定性 + 决策止损，而非新技能。</div>
+</div>
+
+<footer>西湖论剑 CTF-Agent · scene#8 全面数据看板 · 数据采集于 2026-08-22 12:34:08 · 纯静态自包含（无外部依赖）</footer>
+</div>
+</body>
+</html>

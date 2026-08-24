@@ -1,0 +1,500 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent解题夺旗赛（AI CTF）专项工具大全</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #FFFFFF;
+        }
+        .card {
+            background-color: white;
+            border: 1px solid #E5E7EB;
+            border-radius: 1.25rem; /* 20px */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            overflow: hidden;
+            position: relative;
+        }
+        .card:hover {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+            transform: translateY(-2px);
+        }
+        .highlight-gradient-blue { background: linear-gradient(135deg, rgba(59, 130, 246, 0), rgba(59, 130, 246, 0.05)); }
+        .highlight-gradient-green { background: linear-gradient(135deg, rgba(16, 185, 129, 0), rgba(16, 185, 129, 0.05)); }
+        .highlight-gradient-purple { background: linear-gradient(135deg, rgba(139, 92, 246, 0), rgba(139, 92, 246, 0.05)); }
+        .highlight-gradient-orange { background: linear-gradient(135deg, rgba(249, 115, 22, 0), rgba(249, 115, 22, 0.05)); }
+        .highlight-gradient-red { background: linear-gradient(135deg, rgba(239, 68, 68, 0), rgba(239, 68, 68, 0.05)); }
+        .highlight-gradient-teal { background: linear-gradient(135deg, rgba(20, 184, 166, 0), rgba(20, 184, 166, 0.05)); }
+    </style>
+</head>
+<body class="bg-white">
+    <div class="max-w-7xl mx-auto p-4 md:p-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6">
+            <!-- Title Card -->
+            <div class="card md:col-span-4 p-8 flex flex-col justify-center relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-blue"></div>
+                <div class="relative">
+                    <div class="flex items-center space-x-4 mb-4">
+                        <i class="fa-solid fa-flag-checkered text-4xl text-blue-500"></i>
+                        <h1 class="text-4xl md:text-5xl font-bold text-gray-800">AI Agent解题夺旗赛</h1>
+                    </div>
+                    <h2 class="text-2xl md:text-3xl font-bold text-blue-600 mb-4">专项工具大全</h2>
+                    <p class="text-lg text-gray-600 max-w-3xl">聚焦“人机协同解题”核心场景，覆盖从架构编排、模型调度、CTF工具适配到训练评测的全链路技术支撑工具，所有选型均以提升AI自主解题能力、放大人类战略规划价值为核心导向。</p>
+                </div>
+            </div>
+
+            <!-- Core Architecture Overview -->
+            <div class="card md:col-span-4 p-6 relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-green"></div>
+                <div class="relative">
+                    <h3 class="text-2xl font-bold text-green-700 mb-4 flex items-center"><i class="fa-solid fa-sitemap mr-3"></i>核心架构概览</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-green-50 rounded-lg p-4 text-center border border-green-200">
+                            <i class="fa-solid fa-cogs text-3xl text-green-600 mb-2"></i>
+                            <h4 class="font-bold text-gray-700">架构编排</h4>
+                            <p class="text-sm text-gray-500">Agent解题引擎中枢</p>
+                        </div>
+                        <div class="bg-blue-50 rounded-lg p-4 text-center border border-blue-200">
+                            <i class="fa-solid fa-brain text-3xl text-blue-600 mb-2"></i>
+                            <h4 class="font-bold text-gray-700">模型调度</h4>
+                            <p class="text-sm text-gray-500">解题核心驱动支撑</p>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-4 text-center border border-purple-200">
+                            <i class="fa-solid fa-wrench text-3xl text-purple-600 mb-2"></i>
+                            <h4 class="font-bold text-gray-700">工具链</h4>
+                            <p class="text-sm text-gray-500">CTF题型专属能力</p>
+                        </div>
+                        <div class="bg-orange-50 rounded-lg p-4 text-center border border-orange-200">
+                            <i class="fa-solid fa-vial-circle-check text-3xl text-orange-600 mb-2"></i>
+                            <h4 class="font-bold text-gray-700">训练评测</h4>
+                            <p class="text-sm text-gray-500">能力提升与验证</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Key Tools Chart -->
+            <div class="card md:col-span-2 p-6 flex flex-col relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-purple"></div>
+                <div class="relative flex-grow flex flex-col">
+                    <h3 class="text-xl font-bold text-purple-700 mb-4 flex items-center"><i class="fa-solid fa-chart-pie mr-3"></i>主流工具分类统计</h3>
+                    <div class="flex-grow h-64">
+                        <canvas id="toolsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Open Source Project -->
+            <div class="card md:col-span-2 p-6 relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-red"></div>
+                <div class="relative">
+                    <h3 class="text-xl font-bold text-red-700 mb-4 flex items-center"><i class="fa-solid fa-star mr-3"></i>顶尖开源项目</h3>
+                    <div class="bg-red-50 rounded-lg p-4 border border-red-200">
+                        <div class="flex items-start space-x-3">
+                            <i class="fa-brands fa-github text-2xl text-red-600 mt-1"></i>
+                            <div>
+                                <h4 class="font-bold text-gray-800">verialabs/ctf-agent</h4>
+                                <p class="text-sm text-gray-600 mb-2">面向真实CTF竞赛的全功能AI解题调度引擎，是目前公开赛道验证数据最充分的开源项目。</p>
+                                <div class="flex items-center space-x-4 text-xs text-gray-500">
+                                    <span><i class="fa-solid fa-trophy mr-1"></i>BSidesSF CTF 2026 冠军</span>
+                                    <span><i class="fa-solid fa-check-circle mr-1"></i>100% 解出率 (52/52)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Architecture Section -->
+            <div class="card md:col-span-4 p-6 relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-blue"></div>
+                <div class="relative">
+                    <h3 class="text-2xl font-bold text-blue-700 mb-4 flex items-center"><i class="fa-solid fa-layer-group mr-3"></i>一、核心架构类（AI Agent解题引擎中枢）</h3>
+                    <p class="text-gray-600 mb-6">这类工具是AI解题的核心调度中枢，负责连接AI模型、传统CTF工具与靶场平台，实现任务规划、工具调用、闭环反思、人机协同等核心能力。</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Tool 1 -->
+                        <div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-start mb-3">
+                                <h4 class="text-lg font-bold text-gray-800">verialabs/ctf-agent</h4>
+                                <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">生产级</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-3">采用 <code class="bg-gray-100 px-1 py-0.5 rounded">Coordinator调度器 + Solver蜂群</code> 分层架构，中央协调Agent负责任务全局分配。</p>
+                            <div class="flex flex-wrap gap-2 mb-3">
+                                <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">多模型竞速</span>
+                                <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">原生CTFd对接</span>
+                                <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">企业级隔离沙箱</span>
+                            </div>
+                            <div class="flex items-center text-xs text-gray-500">
+                                <i class="fa-solid fa-link mr-1"></i>
+                                <a href="https://github.com/verialabs/ctf-agent" class="hover:text-blue-600">github.com/verialabs/ctf-agent</a>
+                            </div>
+                        </div>
+
+                        <!-- Tool 2 -->
+                        <div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-start mb-3">
+                                <h4 class="text-lg font-bold text-gray-800">NUSGreyhats/ctf-agent-orchestrator</h4>
+                                <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">竞赛验证级</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-3">兼顾GUI易用性与云原生扩展能力的CTF解题工作站，平衡AI自主解题能力与人工深度干预需求。</p>
+                            <div class="flex flex-wrap gap-2 mb-3">
+                                <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">双模型编排</span>
+                                <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">精细化人机协同</span>
+                                <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">全平台覆盖</span>
+                            </div>
+                            <div class="flex items-center text-xs text-gray-500">
+                                <i class="fa-solid fa-link mr-1"></i>
+                                <a href="https://github.com/NUSGreyhats/ctf-agent-orchestrator" class="hover:text-blue-600">github.com/NUSGreyhats/ctf-agent-orchestrator</a>
+                            </div>
+                        </div>
+
+                        <!-- Tool 3 -->
+                        <div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-start mb-3">
+                                <h4 class="text-lg font-bold text-gray-800">CyberStrikeAI</h4>
+                                <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">云原生</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-3">云原生AI安全测试调度中枢，不仅覆盖全自动化解题能力，更侧重AI与人类选手的深度协同编排。</p>
+                            <div class="flex flex-wrap gap-2 mb-3">
+                                <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">多样化多Agent编排</span>
+                                <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">标准化工生工具调用</span>
+                                <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">可复用技能库</span>
+                            </div>
+                            <div class="flex items-center text-xs text-gray-500">
+                                <i class="fa-solid fa-link mr-1"></i>
+                                <a href="https://github.com/noah314/CyberStrikeAI" class="hover:text-blue-600">github.com/noah314/CyberStrikeAI</a>
+                            </div>
+                        </div>
+
+                        <!-- Tool 4 -->
+                        <div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                            <div class="flex justify-between items-start mb-3">
+                                <h4 class="text-lg font-bold text-gray-800">CTF-Buster</h4>
+                                <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">轻量化</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-3">轻量化但能力完整的CTF Agent调度工具箱，核心设计目标是无缝衔接主流AI模型与CTF靶场平台。</p>
+                            <div class="flex flex-wrap gap-2 mb-3">
+                                <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Rust轻量CLI</span>
+                                <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">标准MCP服务</span>
+                                <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">工具链预集成</span>
+                            </div>
+                            <div class="flex items-center text-xs text-gray-500">
+                                <i class="fa-solid fa-link mr-1"></i>
+                                <a href="https://github.com/agentfanclub/ctf-buster" class="hover:text-blue-600">github.com/agentfanclub/ctf-buster</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model & Scheduling Section -->
+            <div class="card md:col-span-4 p-6 relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-purple"></div>
+                <div class="relative">
+                    <h3 class="text-2xl font-bold text-purple-700 mb-4 flex items-center"><i class="fa-solid fa-brain mr-3"></i>二、模型与调度层（AI解题核心驱动支撑）</h3>
+                    <p class="text-gray-600 mb-6">这类工具负责连接核心Agent架构与各类大模型API，是决定解题稳定性的关键中间层。</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Built-in Scheduling -->
+                        <div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                            <h4 class="text-lg font-bold text-gray-800 mb-3 flex items-center"><i class="fa-solid fa-layer-group text-purple-600 mr-2"></i>内置调度能力的推荐架构</h4>
+                            <ul class="space-y-2 text-sm text-gray-600">
+                                <li class="flex items-start"><i class="fa-solid fa-check-circle text-green-500 mt-1 mr-2"></i><span><strong>verialabs/ctf-agent</strong>: 多模型混合调度，自动选择适配模型</span></li>
+                                <li class="flex items-start"><i class="fa-solid fa-check-circle text-green-500 mt-1 mr-2"></i><span><strong>NUSGreyhats/ctf-agent-orchestrator</strong>: 多维度模型配置，Web UI实时切换</span></li>
+                                <li class="flex items-start"><i class="fa-solid fa-check-circle text-green-500 mt-1 mr-2"></i><span><strong>CyberStrikeAI</strong>: 多级降级优先级，完善的故障转移机制</span></li>
+                            </ul>
+                        </div>
+
+                        <!-- Dedicated Tools -->
+                        <div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                            <h4 class="text-lg font-bold text-gray-800 mb-3 flex items-center"><i class="fa-solid fa-cogs text-purple-600 mr-2"></i>专用模型适配/调度工具</h4>
+                            <ul class="space-y-2 text-sm text-gray-600">
+                                <li class="flex items-start"><i class="fa-solid fa-wrench text-blue-500 mt-1 mr-2"></i><span><strong>CTF-Buster</strong>: 轻量化模型与平台适配层</span></li>
+                                <li class="flex items-start"><i class="fa-solid fa-wrench text-blue-500 mt-1 mr-2"></i><span><strong>AlterPwn</strong>: 二进制类题型工具适配层</span></li>
+                                <li class="flex items-start"><i class="fa-solid fa-wrench text-blue-500 mt-1 mr-2"></i><span><strong>ctf-agent-orchestrator</strong>: 多模型编排调度层</span></li>
+                            </ul>
+                        </div>
+
+                        <!-- Enterprise Solutions -->
+                        <div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                            <h4 class="text-lg font-bold text-gray-800 mb-3 flex items-center"><i class="fa-solid fa-building text-purple-600 mr-2"></i>企业级商业方案</h4>
+                            <ul class="space-y-2 text-sm text-gray-600">
+                                <li class="flex items-start"><i class="fa-solid fa-cloud text-orange-500 mt-1 mr-2"></i><span><strong>Dreadnode</strong>: 攻击性ML+CTF端到端全链路平台</span></li>
+                                <li class="flex items-start"><i class="fa-solid fa-cloud text-orange-500 mt-1 mr-2"></i><span><strong>Mindgard</strong>: 完善的多模型流量路由与安全防护</span></li>
+                                <li class="flex items-start"><i class="fa-solid fa-cloud text-orange-500 mt-1 mr-2"></i><span><strong>阿里云Agentic BAS</strong>: 国内网络环境优化适配</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toolchain Section -->
+            <div class="card md:col-span-4 p-6 relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-green"></div>
+                <div class="relative">
+                    <h3 class="text-2xl font-bold text-green-700 mb-4 flex items-center"><i class="fa-solid fa-wrench mr-3"></i>三、工具链层（CTF题型专属能力支撑）</h3>
+                    <p class="text-gray-600 mb-6">AI Agent的核心是 <code class="bg-gray-100 px-1 py-0.5 rounded">模型规划推理 + 工具执行解题</code>，成熟的原生CTF工具链支撑，是决定解题成功率的关键。</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Full Toolchain Solutions -->
+                        <div>
+                            <h4 class="text-lg font-bold text-gray-800 mb-3">全品类工具集成方案</h4>
+                            <div class="space-y-4">
+                                <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                                    <h5 class="font-bold text-gray-700 mb-2">verialabs/ctf-agent 沙箱工具链</h5>
+                                    <p class="text-sm text-gray-600">为每个解题Solver提供预装完整、经过适配封装CTF工具链的独立Docker沙箱，完全覆盖六类主流CTF题型。</p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                                    <h5 class="font-bold text-gray-700 mb-2">CyberStrikeAI</h5>
+                                    <p class="text-sm text-gray-600">内置100余种经过适配封装的主流安全工具，支持工具链自定义编排，将多个工具按解题逻辑串联成自动化执行流。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Per-Category Tools -->
+                        <div>
+                            <h4 class="text-lg font-bold text-gray-800 mb-3">单题型/专项工具适配方案</h4>
+                            <div class="space-y-3">
+                                <div class="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                                    <h5 class="font-bold text-blue-800 text-sm">Web题型</h5>
+                                    <p class="text-xs text-gray-600 mt-1">sqlmap, curl, nmap, xsser</p>
+                                </div>
+                                <div class="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                                    <h5 class="font-bold text-purple-800 text-sm">Crypto题型</h5>
+                                    <p class="text-xs text-gray-600 mt-1">RsaCtfTool, hashcat, john, z3-solver</p>
+                                </div>
+                                <div class="bg-green-50 rounded-lg p-3 border border-green-200">
+                                    <h5 class="font-bold text-green-800 text-sm">Misc题型</h5>
+                                    <p class="text-xs text-gray-600 mt-1">binwalk, steghide, zsteg, volatility3</p>
+                                </div>
+                                <div class="bg-red-50 rounded-lg p-3 border border-red-200">
+                                    <h5 class="font-bold text-red-800 text-sm">Pwn题型</h5>
+                                    <p class="text-xs text-gray-600 mt-1">pwntools, ROPgadget, angr, radare2</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sandbox & Platform Integration -->
+            <div class="card md:col-span-2 p-6 relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-orange"></div>
+                <div class="relative">
+                    <h3 class="text-xl font-bold text-orange-700 mb-4 flex items-center"><i class="fa-solid fa-shield-halved mr-3"></i>四、沙箱/执行环境层</h3>
+                    <p class="text-gray-600 mb-4 text-sm">CTF解题过程中，AI Agent会执行大量来自互联网的未知恶意代码，必须采用隔离技术，将执行环境与宿主机隔离。</p>
+                    <div class="space-y-3">
+                        <div class="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
+                            <h5 class="font-bold text-gray-700 text-sm">容器化隔离方案</h5>
+                            <p class="text-xs text-gray-600 mt-1">Docker容器化技术实现，为每个解题Solver分配独立的隔离容器实例。</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
+                            <h5 class="font-bold text-gray-700 text-sm">轻量化/虚拟化隔离方案</h5>
+                            <p class="text-xs text-gray-600 mt-1">基于KVM底层虚拟化技术实现，提供硬件级虚拟化隔离，隔离强度远高于Docker。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card md:col-span-2 p-6 relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-teal"></div>
+                <div class="relative">
+                    <h3 class="text-xl font-bold text-teal-700 mb-4 flex items-center"><i class="fa-solid fa-plug-circle-check mr-3"></i>五、平台对接层</h3>
+                    <p class="text-gray-600 mb-4 text-sm">AI Agent需要与竞赛所用的CTF靶场平台对接，实现自动化拉取题目、获取附件、提交Flag、验证答案等核心操作。</p>
+                    <div class="space-y-3">
+                        <div class="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
+                            <h5 class="font-bold text-gray-700 text-sm">原生支持主流平台</h5>
+                            <p class="text-xs text-gray-600 mt-1">CTFd, rCTF, Hack The Box CTF等主流靶场平台。</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
+                            <h5 class="font-bold text-gray-700 text-sm">定制化开发适配</h5>
+                            <p class="text-xs text-gray-600 mt-1">基于开源项目的标准能力代码示例，快速定制开发适配模块。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Human-AI Collaboration -->
+            <div class="card md:col-span-4 p-6 relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-red"></div>
+                <div class="relative">
+                    <h3 class="text-2xl font-bold text-red-700 mb-4 flex items-center"><i class="fa-solid fa-users-gear mr-3"></i>六、人机协同与编排层（竞赛效率提升）</h3>
+                    <p class="text-gray-600 mb-6">完全自动化的Agent稳定性和解题覆盖率往往达不到竞赛级要求，必须加入人类专家的战略级引导，才能达到最优的解题效果。</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Visual Orchestration -->
+                        <div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                            <h4 class="text-lg font-bold text-gray-800 mb-3 flex items-center"><i class="fa-solid fa-desktop text-red-600 mr-2"></i>可视化编排与人机交互方案</h4>
+                            <ul class="space-y-2 text-sm text-gray-600">
+                                <li class="flex items-start"><i class="fa-solid fa-check-circle text-green-500 mt-1 mr-2"></i><span><strong>ctf-agent-orchestrator</strong>: 功能完整的Web UI，实时展示模型推理过程</span></li>
+                                <li class="flex items-start"><i class="fa-solid fa-check-circle text-green-500 mt-1 mr-2"></i><span><strong>CyberStrikeAI</strong>: 实时展示任务编排拓扑图、攻击链图谱</span></li>
+                                <li class="flex items-start"><i class="fa-solid fa-check-circle text-green-500 mt-1 mr-2"></i><span><strong>CTF-Buster</strong>: 轻量化Web UI，实时展示模型推理日志</span></li>
+                            </ul>
+                        </div>
+
+                        <!-- Multi-Agent Orchestration -->
+                        <div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                            <h4 class="text-lg font-bold text-gray-800 mb-3 flex items-center"><i class="fa-solid fa-sitemap text-red-600 mr-2"></i>多智能体编排协作方案</h4>
+                            <ul class="space-y-2 text-sm text-gray-600">
+                                <li class="flex items-start"><i class="fa-solid fa-check-circle text-green-500 mt-1 mr-2"></i><span><strong>verialabs/ctf-agent</strong>: <code class="bg-gray-100 px-1 py-0.5 rounded">Coordinator调度器 + Solver蜂群</code> 模式</span></li>
+                                <li class="flex items-start"><i class="fa-solid fa-check-circle text-green-500 mt-1 mr-2"></i><span><strong>CyberStrikeAI</strong>: Deep、Plan-Execute、Supervisor三类成熟多Agent编排模式</span></li>
+                                <li class="flex items-start"><i class="fa-solid fa-check-circle text-green-500 mt-1 mr-2"></i><span><strong>ctf-agent-orchestrator</strong>: 支持多模型竞速、多题并行混合编排</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Training & Evaluation -->
+            <div class="card md:col-span-4 p-6 relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-blue"></div>
+                <div class="relative">
+                    <h3 class="text-2xl font-bold text-blue-700 mb-4 flex items-center"><i class="fa-solid fa-vial-circle-check mr-3"></i>七、训练与评测层（提升AI解题能力的支撑工具）</h3>
+                    <p class="text-gray-600 mb-6">这类工具用于训练、评测AI Agent的解题能力，提升竞赛时的实际表现。</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Training Data Generation -->
+                        <div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                            <h4 class="text-lg font-bold text-gray-800 mb-3 flex items-center"><i class="fa-solid fa-database text-blue-600 mr-2"></i>训练数据生成/Agent训练方案</h4>
+                            <div class="space-y-3">
+                                <div class="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                                    <h5 class="font-bold text-blue-800">CTF-Dojo</h5>
+                                    <p class="text-sm text-gray-600 mt-1">面向LLM Agent安全场景的大规模训练环境自动化构建工具，内置658道全品类CTF训练题目。</p>
+                                </div>
+                                <div class="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                                    <h5 class="font-bold text-blue-800">Cyber-Zero</h5>
+                                    <p class="text-sm text-gray-600 mt-1">无运行时依赖的LLM Agent训练轨迹生成工具，通过逆向工程从公开CTF Writeup中合成大量高质量模拟训练轨迹。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Evaluation Metrics -->
+                        <div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                            <h4 class="text-lg font-bold text-gray-800 mb-3 flex items-center"><i class="fa-solid fa-chart-line text-blue-600 mr-2"></i>关键评估指标</h4>
+                            <div class="flex-grow h-64">
+                                <canvas id="metricsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conclusion -->
+            <div class="card md:col-span-4 p-8 flex flex-col justify-center items-center text-center relative">
+                <div class="absolute top-0 left-0 w-full h-full highlight-gradient-green"></div>
+                <div class="relative">
+                    <i class="fa-solid fa-flag-checkered text-5xl text-green-500 mb-4"></i>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">选型建议</h3>
+                    <p class="text-lg text-gray-600 max-w-3xl">
+                        备战AI CTF竞赛，建议优先选择经过大规模赛事实战验证的成熟架构（如 <code class="bg-gray-100 px-1 py-0.5 rounded">verialabs/ctf-agent</code>）作为核心框架，结合团队自身技术栈和资源情况，补充适配模型调度、工具链和人机协同模块。
+                        同时，建立完善的训练与评测体系，持续迭代优化AI解题能力，是在激烈竞争中脱颖而出的关键。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    // Tools Category Chart
+    const toolsCtx = document.getElementById('toolsChart').getContext('2d');
+    new Chart(toolsCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['架构编排', '模型调度', '工具链', '沙箱隔离', '平台对接', '人机协同', '训练评测'],
+            datasets: [{
+                label: '工具数量',
+                data: [12, 8, 45, 6, 5, 9, 7],
+                backgroundColor: [
+                    'rgba(59, 130, 246, 0.7)',
+                    'rgba(139, 92, 246, 0.7)',
+                    'rgba(16, 185, 129, 0.7)',
+                    'rgba(249, 115, 22, 0.7)',
+                    'rgba(20, 184, 166, 0.7)',
+                    'rgba(239, 68, 68, 0.7)',
+                    'rgba(107, 114, 128, 0.7)'
+                ],
+                borderColor: [
+                    'rgba(59, 130, 246, 1)',
+                    'rgba(139, 92, 246, 1)',
+                    'rgba(16, 185, 129, 1)',
+                    'rgba(249, 115, 22, 1)',
+                    'rgba(20, 184, 166, 1)',
+                    'rgba(239, 68, 68, 1)',
+                    'rgba(107, 114, 128, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        font: {
+                            size: 12
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Evaluation Metrics Chart
+    const metricsCtx = document.getElementById('metricsChart').getContext('2d');
+    new Chart(metricsCtx, {
+        type: 'radar',
+        data: {
+            labels: ['解出率', '平均耗时', '工具调用准确率', 'Flag提交准确率', '故障恢复能力', '人机协同效率'],
+            datasets: [{
+                label: 'verialabs/ctf-agent',
+                data: [95, 85, 90, 98, 88, 80],
+                fill: true,
+                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                borderColor: 'rgba(59, 130, 246, 1)',
+                pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(59, 130, 246, 1)'
+            }, {
+                label: '自研Agent (基准)',
+                data: [60, 50, 70, 85, 65, 75],
+                fill: true,
+                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                borderColor: 'rgba(16, 185, 129, 1)',
+                pointBackgroundColor: 'rgba(16, 185, 129, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(16, 185, 129, 1)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            elements: {
+                line: {
+                    borderWidth: 3
+                }
+            },
+            scales: {
+                r: {
+                    angleLines: {
+                        display: true
+                    },
+                    suggestedMin: 0,
+                    suggestedMax: 100
+                }
+            }
+        }
+    });
+</script>
+</html>

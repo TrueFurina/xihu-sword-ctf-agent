@@ -1,0 +1,8 @@
+{
+  "name": "morse_decoder",
+  "purpose": "摩斯密码解码（点划序列→明文），适用于 IOT blink / 通信类 misc 题",
+  "input_spec": "params = {'text': '摩斯点划序列字符串'} 或 {'path': '文件路径'}",
+  "output_spec": "解码后的明文字符串",
+  "categories": ["misc", "crypto"],
+  "version": "1.0"
+}

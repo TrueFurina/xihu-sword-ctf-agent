@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# commit-msg 钩子：commit message 假水位拦截（2026-08-23，堵 99fb169 类）
+#   git 传 $1 = commit message 文件路径（机制上可靠，不靠猜 COMMIT_EDITMSG 位置）
+#   message 命中假水位（解出数递增 / 真实解出 flag / +N 真实解出）→ exit 1 拒绝提交
+#
+# 安装：cp scripts/hooks/commit-msg git_hooks/commit-msg（core.hooksPath=git_hooks）
+# 与 pre-commit 门禁分工：本钩子只管 message 文本；文件/密钥/租约/身份/测试在 pre-commit。
+set -e
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+PY="$ROOT/.venv/Scripts/python.exe"
+if [ ! -x "$PY" ] && [ ! -f "$PY" ]; then
+    PY="python"
+fi
+
+cd "$ROOT"
+"$PY" scripts/_honesty_scan.py --commit-msg-file "$1"
+
+# ── ⑨ 任务板登记闸（2026-08-24 并发有序化闸1，堵"裸奔提交"）──
+# commit message 必须含 T-xx（TASK_BOARD 认领的任务 id）或显式 [无任务] 标注
+# （治理/文档/门禁类，不挂任务板）。两者皆无 → 裸奔提交，拒绝。
+# 说明：gu 全域长租约 + 任务板零登记是"并发裸奔"实证（2026-08-24 监管取证），
+# 本闸把"认领即承诺"从自觉变成机器强制。
+MSG_FILE="$1"
+if ! grep -qE 'T-[0-9]+|\[无任务\]' "$MSG_FILE"; then
+    echo "❌ 任务板登记缺失：commit message 须含 T-xx（TASK_BOARD 认领的任务 id）或 [无任务]（治理/文档类）"
+    echo "   先看 deliverables/协同协议/TASK_BOARD.md 认领任务，或显式标注 [无任务]"
+    echo "   （否则就是裸奔提交——2026-08-24 闸1）"
+    exit 1
+fi

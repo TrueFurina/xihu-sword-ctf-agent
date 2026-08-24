@@ -1,0 +1,12 @@
+diff --git a/skills/crypto_complex_mult_group.json b/skills/crypto_complex_mult_group.json
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/skills/crypto_complex_mult_group.json
+@@ -0,0 +1,6 @@
++{
++  "purpose": "复数乘法群类 RSA 解密（西湖论剑2021 SpecialCurve2 等）：factordb 分解 n + PARI znlog 解 e + 复数快速幂恢复明文 M=(x,y) → DASCTF{...}",
++  "input_spec": "n(int 必填), hint(tuple), c(tuple), e(可选, 缺省走 PARI znlog), factors(可选, 缺省走 factordb)",
++  "output_spec": "flag(DASCTF{...}) 或 error(含'缺 DLP 引擎'语义)",
++  "categories": ["crypto"]
++}
