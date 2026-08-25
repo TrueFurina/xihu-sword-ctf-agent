@@ -357,7 +357,7 @@ footer {{ text-align:center; color:#94a3b8; font-size:12px; margin-top:30px; }}
     <div class="tl-item purple"><div class="tl-time">08-18 ~ 08-20</div><div class="tl-t">赛前攻坚：水位 8/9 · 技能库 25+ · 手雷手册</div><div class="tl-d">测试赛刷题验证 → 修复 RSA fallback → 冻结功能只修 P0</div></div>
     <div class="tl-item red"><div class="tl-time">08-21 14:00-17:00</div><div class="tl-t">★ 正式赛：3 小时 0 解出</div><div class="tl-d">平台 HTTP 550 反复刷屏 → 32 题详情拉取失败 → 决策链路在无附件/无描述下空转</div></div>
     <div class="tl-item"><div class="tl-time">08-21 17:00-24:00</div><div class="tl-t">赛后复盘：0 解出根因链四层故障</div><div class="tl-d">监督死锁修复（P0-A）· 配置陷阱修复（P0-B）· RSA fallback（P0-C）· 7/7 测试绿</div></div>
-    <div class="tl-item green"><div class="tl-time">08-22 09:00-12:30</div><div class="tl-t">回归验证：真跑 dryrun 解出 ezRSA flag</div><div class="tl-d">real_crypto_ezrsa 0.56s 解出 flag{{S0_G00d_J0B_RUA}} · 31 个测试文件 · 答辩三件套</div></div>
+    <div class="tl-item green"><div class="tl-time">08-22 09:00-12:30</div><div class="tl-t">回归验证：真跑 dryrun 解出 ezRSA flag</div><div class="tl-d">real_crypto_ezrsa 0.56s 解出 flag{{<redacted>}} · 31 个测试文件 · 答辩三件套</div></div>
   </div>
 </div>
 

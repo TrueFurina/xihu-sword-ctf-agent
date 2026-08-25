@@ -5,5 +5,5 @@
   "output_spec": "恢复的明文 m、flag 字节、ROT 编码时的 rot13/rot18 变体；factor 时返回分解出的 p/q",
   "categories": ["crypto"],
   "version": "1.1",
-  "verified": "2026-08-21 10733 真题端到端：hint+c+e+n 输入 → 自动分解 → 明文 QNFPGS{enoovgf...} + rot13/rot18 flag"
+  "verified": "2026-08-21 10733 真题端到端：hint+c+e+n 输入 → 自动分解 → 明文 QNFPGS{<redacted>} + rot13/rot18 flag"
 }
