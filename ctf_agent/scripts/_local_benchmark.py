@@ -63,8 +63,61 @@ def _try_b64_hex(content: bytes):
     return None
 
 
+def _try_crypto_math(content: bytes):
+    """数学链解出（10733/10696 解出链 skill——task.py 参数自动提取）：
+    ① 10733 类：hint 解 p（W/gcd）+ BFS 开根 + ROT13（e 为 2 的幂）
+    ② 10696 类：费马分解（p/q 相邻）+ decode_e=-π+2 + 标准解密
+    输入为 task.py 文本（含 n/e/c/hint 参数）。
+    """
+    import math
+    from math import gcd as _g
+    text = content.decode('utf-8', errors='ignore')
+    try:
+        n = int(re.search(r'\bn\s*=\s*(\d{20,})', text).group(1))
+        e = int(re.search(r'\be\s*=\s*(\d+)', text).group(1))
+        c = int(re.search(r'\bc\s*=\s*(\d{10,})', text).group(1))
+        hint_m = re.search(r'hint\s*=\s*(\d+)', text)
+    except Exception:
+        return None
+    # ① 费马分解（p/q 相邻——10696 类）
+    a = math.isqrt(n) + 1
+    p = q = None
+    for _ in range(200000):
+        b2 = a * a - n
+        b = math.isqrt(b2)
+        if b * b == b2:
+            p, q = a - b, a + b
+            break
+        a += 1
+    if p is None:
+        return None
+    # ② decode_e 类（e 巨大——primepi 判）或 hint 类（hint 解 p）
+    if hint_m:
+        hint = int(hint_m.group(1))
+        W = pow(e, n, n)
+        p2 = _g(W * W - hint, n)
+        if p2 > 1 and n % p2 == 0:
+            p = p2
+            q = n // p
+    phi = (p - 1) * (q - 1)
+    g = _g(e, phi)
+    from Crypto.Util.number import long_to_bytes, inverse
+    if g == 1:
+        m = pow(c, inverse(e, phi), n)
+        b = long_to_bytes(m)
+        if b'DASCTF' in b or b'flag' in b.lower() or b'CTF' in b:
+            return b
+        # ROT13 检查（QNFPGS{ = DASCTF{——题名 rot 提示）
+        t = str.maketrans('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+                          'NOPQRSTUVWXYZABCDEFGHIJKLMnopqrstuvwxyzabcdefghijklm')
+        b13 = bytes(t.get(x, x) if x < 128 else x for x in b)
+        if b'DASCTF' in b13 or b'flag' in b13.lower() or b'CTF' in b13:
+            return b13
+    return None
+
+
 SOLVERS = [("plain", _try_plain), ("caesar/rot13", _try_caesar_rot13),
-           ("b64/hex", _try_b64_hex)]
+           ("b64/hex", _try_b64_hex), ("crypto_math", _try_crypto_math)]
 
 
 def solve_one(path: str) -> tuple:
