@@ -25,7 +25,7 @@ set -e
 # （core.hooksPath=git_hooks 时钩子在 <root>/git_hooks/；旧式 .git/hooks 时深两级——
 #  硬编码 ../.. 会在 git_hooks 模式下把 ROOT 算到仓库父目录，导致扫描脚本找不到文件、
 #  误杀所有提交。2026-08-22 修。）
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)/ctf_agent" || ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PY="$ROOT/.venv/Scripts/python.exe"
 if [ ! -x "$PY" ] && [ ! -f "$PY" ]; then
     PY="python"

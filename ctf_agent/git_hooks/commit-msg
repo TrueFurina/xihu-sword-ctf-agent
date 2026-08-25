@@ -7,21 +7,30 @@
 # 与 pre-commit 门禁分工：本钩子只管 message 文本；文件/密钥/租约/身份/测试在 pre-commit。
 set -e
 
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)/ctf_agent"
 PY="$ROOT/.venv/Scripts/python.exe"
 if [ ! -x "$PY" ] && [ ! -f "$PY" ]; then
     PY="python"
 fi
 
+# git 传 $1 为相对仓库根的 commit message 路径；cd 到 ctf_agent 子目录后会失效，先转绝对路径
+GIT_TOP="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ -n "$1" ]; then
+    MSG_ABS="$GIT_TOP/$1"
+    [ -f "$MSG_ABS" ] || MSG_ABS="$1"
+else
+    MSG_ABS=""
+fi
+
 cd "$ROOT"
-"$PY" scripts/_honesty_scan.py --commit-msg-file "$1"
+"$PY" scripts/_honesty_scan.py --commit-msg-file "$MSG_ABS"
 
 # ── ⑨ 任务板登记闸（2026-08-24 并发有序化闸1，堵"裸奔提交"）──
 # commit message 必须含 T-xx（TASK_BOARD 认领的任务 id）或显式 [无任务] 标注
 # （治理/文档/门禁类，不挂任务板）。两者皆无 → 裸奔提交，拒绝。
 # 说明：gu 全域长租约 + 任务板零登记是"并发裸奔"实证（2026-08-24 监管取证），
 # 本闸把"认领即承诺"从自觉变成机器强制。
-MSG_FILE="$1"
+MSG_FILE="$MSG_ABS"
 if ! grep -qE 'T-[0-9]+|\[无任务\]' "$MSG_FILE"; then
     echo "❌ 任务板登记缺失：commit message 须含 T-xx（TASK_BOARD 认领的任务 id）或 [无任务]（治理/文档类）"
     echo "   先看 deliverables/协同协议/TASK_BOARD.md 认领任务，或显式标注 [无任务]"
