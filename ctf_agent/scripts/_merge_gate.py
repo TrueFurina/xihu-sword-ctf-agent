@@ -52,13 +52,23 @@ REGRESSION_CHECKS = [
         "cmd": [sys.executable, "scripts/verify_10733.py"],
         "flag_contains": "DASCTF{rabbits6sc5mpl",
     },
+    {
+        "id": "real_crypto_specialcurve2",
+        "cmd": [sys.executable, "scripts/verify_specialcurve2.py"],
+        "flag_contains": "VERIFIED",
+    },
+    {
+        "id": "real_misc_vnctf_flag",
+        "cmd": [sys.executable, "scripts/verify_vnctf_flag.py"],
+        "flag_contains": "sha256 与台账承诺一致",
+    },
 ]
 
 KNOWN_GAP = [
     {"id": "10732",
-     "reason": "可复现脚本待固化（台账 2026-08-24 声明）"},
-    {"id": "real_crypto_specialcurve2",
-     "reason": "台账可复现命令不可用：skill 为无 __main__ 的库模块，python -m 无输出（2026-08-24 实测）"},
+     "reason": "可复现脚本待固化（台账 2026-08-24 声明；攻击链清晰但 _solve_10732.py 散落待固化）"},
+    {"id": "10735",
+     "reason": "logbool pcap→RAR5→7z 解密链待固化为 verify 脚本（台账 offline_verified，无独立 verifier）"},
 ]
 
 
@@ -80,13 +90,18 @@ def dirty_check() -> bool:
 
 
 def count_offline_verified() -> int:
-    """统计台账中 offline_verified 标记数（KPI 计数通道 a）。"""
+    """统计台账中 offline_verified 题级解出数（KPI 计数通道 a）。
+
+    只数「状态：✅ offline_verified」的题级行（严格 5 道），
+    排除口径定义行(第8行)与前向引用行(第149行)的误命中——
+    否则会把计数虚高到 7，使 fail-closed 棘轮基于注水数字。
+    """
     if not os.path.isfile(LEDGER):
         print(f"❌ 台账缺失：{LEDGER}")
         return -1
     try:
         with open(LEDGER, encoding="utf-8") as f:
-            return sum("offline_verified" in line for line in f)
+            return sum("✅ offline_verified" in line for line in f)
     except OSError as exc:
         print(f"❌ 台账读取失败：{exc}")
         return -1
