@@ -106,4 +106,5 @@ ctf_agent/solutions/
 ctf_agent/docs/DLP_独立性声明.md
 ctf_agent/Readme.txt
 ctf_agent/data/results/
-ctf_agent/docs/
+ctf_agent/docs/*
+!ctf_agent/docs/internal/
