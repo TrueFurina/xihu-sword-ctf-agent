@@ -1,0 +1,28 @@
+[project]
+name = "ctf-agent"
+version = "0.1.0"
+description = "西湖论剑 AI-Agent 自动解 CTF 系统（1主1监架构，解出率优先）"
+requires-python = ">=3.13"
+dependencies = [
+    "aiohttp>=3.9",
+    "fastapi>=0.110",
+    "httpx>=0.27",
+    "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-timeout>=2.2",
+]
+
+[tool.setuptools]
+packages = [
+    "ctf_agent",
+    "ctf_agent.llm",
+    "ctf_agent.eval",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

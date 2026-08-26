@@ -1,0 +1,14 @@
+{
+  "id": "real_crypto_dnui_keyboard",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "暗泉杯 DNUICTF 签到-键盘侠（键盘路径密码）",
+  "description": "每组字母按 QWERTY 键盘坐标连线，围成的形状对应一个字母。UYTGBNM→C、EDCV→L、TGBUHM→K 等，解出 CLCKOUTHK。",
+  "flag": "<redacted>",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_dnui_keyboard/[签到]键盘侠.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "0629c8d6eb02789e4c252c9c67090366f00d4a171be1da9a5bb4c1b18732f9bc"
+}

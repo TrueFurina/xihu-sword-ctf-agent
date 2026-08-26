@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTF-Agent 作战看板</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
+  h1 { font-size: 22px; margin-bottom: 16px; color: #58a6ff; }
+  .stats { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px 20px; min-width: 130px; }
+  .stat-card .label { font-size: 12px; color: #8b949e; }
+  .stat-card .value { font-size: 24px; font-weight: bold; margin-top: 4px; }
+  .value.solved { color: #3fb950; }
+  .value.rate { color: #d29922; }
+  .value.countdown { color: #58a6ff; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .value.countdown.stale { color: #f85149; }
+  .controls { margin-bottom: 16px; }
+  .controls button { background: #238636; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-right: 8px; }
+  .controls button:hover { background: #2ea043; }
+  .controls button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .controls select { background: #161b22; color: #e6edf3; border: 1px solid #30363d; padding: 8px; border-radius: 6px; margin-right: 8px; }
+  /* 断连横幅：fetch 连续失败时亮起 */
+  .conn-banner { display: none; background: #f8514926; border: 1px solid #f85149; color: #ff7b72; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+  /* 运行模式横幅：真实 LLM=绿 / MOCK 假解=红（修复项#4：消除演示自欺） */
+  .mode-banner { display: none; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; line-height: 1.5; }
+  .mode-banner.real { display: block; background: #23863626; border: 1px solid #3fb950; color: #3fb950; }
+  .mode-banner.mock { display: block; background: #f8514926; border: 1px solid #f85149; color: #ff7b72; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #21262d; }
+  th { background: #161b22; color: #8b949e; position: sticky; top: 0; }
+  .status { padding: 3px 10px; border-radius: 12px; font-size: 12px; }
+  .status.pending { background: #30363d; color: #8b949e; }
+  .status.running { background: #1f6feb22; color: #58a6ff; animation: status-breathe 1.6s ease-in-out infinite; }
+  .status.solved { background: #23863622; color: #3fb950; }
+  .status.failed { background: #f8514922; color: #f85149; }
+  .status.human { background: #d2992222; color: #d29922; }
+  @keyframes status-breathe { 0%, 100% { background: #1f6feb22; } 50% { background: #1f6feb66; } }
+  /* 状态变化行高亮：solved/failed 翻转时背景短暂闪一下 */
+  @keyframes row-flash-solved { from { background: #23863655; } to { background: transparent; } }
+  @keyframes row-flash-failed { from { background: #f8514955; } to { background: transparent; } }
+  tr.flash-solved { animation: row-flash-solved 2s ease-out; }
+  tr.flash-failed { animation: row-flash-failed 2s ease-out; }
+  .flag { color: #d29922; font-family: monospace; word-break: break-all; }
+  .flag-err { color: #f85149; font-size: 12px; }
+  .flag-dim { color: #8b949e; }
+  .intervene { font-size: 12px; }
+  .intervene input { background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 4px; padding: 4px 6px; width: 180px; margin-right: 4px; }
+  .intervene button { background: #1f6feb; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+  .intervene button:hover { background: #388bfd; }
+  .intervene button.ghost { background: #30363d; }
+  .intervene .reason { color: #d29922; margin-bottom: 4px; }
+  .refresh-note { color: #8b949e; font-size: 12px; margin-top: 8px; }
+  #last-updated { color: #8b949e; }
+  #last-updated.stale { color: #f85149; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>🎯 CTF-Agent 作战看板</h1>
+
+<div id="mode-banner" class="mode-banner">加载中…</div>
+
+<div id="conn-banner" class="conn-banner">⚠️ 与服务器连接断开，自动重试中…（看板数据可能已过期）</div>
+
+<div class="stats">
+  <div class="stat-card"><div class="label">总题数</div><div class="value" id="st-total">0</div></div>
+  <div class="stat-card"><div class="label">已解出</div><div class="value solved" id="st-solved">0</div></div>
+  <div class="stat-card"><div class="label">解出率</div><div class="value rate" id="st-rate">0%</div></div>
+  <div class="stat-card"><div class="label">距结束</div><div class="value countdown" id="st-countdown">--:--:--</div></div>
+</div>
+
+<div class="controls">
+  <select id="cat-select">
+    <option value="">全部题型</option>
+    <option value="web">Web</option>
+    <option value="crypto">Crypto</option>
+    <option value="misc">Misc</option>
+    <option value="reverse">Reverse</option>
+    <option value="pwn">Pwn</option>
+  </select>
+  <button id="btn-start" onclick="startTasks()">🚀 开始解题</button>
+  <button onclick="refresh()">🔄 刷新</button>
+</div>
+
+<table>
+  <thead>
+    <tr><th>题目</th><th>题型</th><th>状态</th><th>Flag</th><th>耗时(ms)</th><th>重试</th><th>干预</th></tr>
+  </thead>
+  <tbody id="task-body">
+    <tr><td colspan="7" style="text-align:center;color:#8b949e;">点击「开始解题」加载任务</td></tr>
+  </tbody>
+</table>
+
+<div class="refresh-note">自动刷新间隔 2s（断连自动退避 1s→2s→4s→8s）｜ 数据源 GET /api/tasks ｜ <span id="last-updated">尚未刷新</span></div>
+
+<script>
+let filterCat = "";
+let prevStatus = {};      // task_id -> 上一轮状态（用于 solved/failed 变化行高亮）
+let localRunStart = {};   // task_id -> 首次观测为 running 的本地时间戳（单题已跑时长）
+let pollTimer = null;
+let failStreak = 0;       // 连续失败次数 → 指数退避
+let lastOkAt = null;      // 最后一次成功刷新的时间
+let raceStart = null;     // 点击「开始解题」记为赛时起点（占位：无后端总时长配置时用本地常量）
+
+const BASE_INTERVAL = 2000;
+const BACKOFFS = [1000, 2000, 4000, 8000];          // 指数退避序列（上限 8s）
+const RACE_DURATION_MS = 3 * 60 * 60 * 1000;        // 赛时总时长占位：3 小时
+
+const startBtn = document.getElementById("btn-start");
+
+async function api(url, options) {
+  const resp = await fetch(url, options);
+  if (!resp.ok) throw new Error("HTTP " + resp.status);
+  return resp.json();
+}
+
+async function startTasks() {
+  if (startBtn.disabled) return;                    // 防双击/连点
+  const category = document.getElementById("cat-select").value;
+  const scope = category ? `（${category}）` : "（全部题库）";
+  if (!confirm(`确定开始解题${scope}？\n将重置当前全部任务状态并启动并发求解，此操作不可撤销。`)) return;
+  startBtn.disabled = true;
+  startBtn.textContent = "⏳ 解体中…";
+  try {
+    await api("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(category ? { category } : {}),
+    });
+    raceStart = Date.now();
+    failStreak = 0;
+    updateHeartbeat(true);
+    refresh();
+  } catch (e) {
+    console.error("启动失败", e);
+    alert("启动失败：" + (e.message || e));
+  } finally {
+    startBtn.disabled = false;
+    startBtn.textContent = "🚀 开始解题";
+  }
+}
+
+function nextDelay() {
+  if (failStreak <= 0) return BASE_INTERVAL;
+  return BACKOFFS[Math.min(failStreak - 1, BACKOFFS.length - 1)];
+}
+function armTimer() {
+  if (pollTimer) clearTimeout(pollTimer);
+  pollTimer = setTimeout(refresh, nextDelay());
+}
+
+function updateHeartbeat(ok) {
+  const el = document.getElementById("last-updated");
+  const banner = document.getElementById("conn-banner");
+  if (ok) {
+    lastOkAt = new Date();
+    el.textContent = "最后刷新 " + lastOkAt.toLocaleTimeString("zh-CN", { hour12: false });
+    el.classList.remove("stale");
+    banner.style.display = "none";
+  } else {
+    el.textContent = (lastOkAt
+      ? "最后刷新 " + lastOkAt.toLocaleTimeString("zh-CN", { hour12: false })
+      : "尚未成功刷新") + "（连接异常）";
+    el.classList.add("stale");
+    banner.style.display = "block";
+  }
+}
+
+async function refresh() {
+  try {
+    const [tasks, metrics] = await Promise.all([api("/api/tasks"), api("/api/metrics")]);
+    failStreak = 0;
+    updateHeartbeat(true);
+    document.getElementById("st-total").textContent = metrics.total || 0;
+    document.getElementById("st-solved").textContent = metrics.solved || 0;
+    document.getElementById("st-rate").textContent =
+      metrics.total ? Math.round((metrics.solve_rate || 0) * 100) + "%" : "0%";
+    renderTasks(tasks);
+  } catch (e) {
+    console.error("刷新失败", e);
+    failStreak += 1;
+    updateHeartbeat(false);
+  } finally {
+    armTimer();
+  }
+}
+
+// 运行模式横幅：真实 LLM=绿 / MOCK 假解=红（修复项#4：消除演示自欺）
+async function refreshMode() {
+  try {
+    const m = await api("/api/mode");
+    const el = document.getElementById("mode-banner");
+    if (m.use_mock) {
+      el.className = "mode-banner mock";
+      el.textContent = "⚠️ " + (m.note || "当前为 MOCK 演示模式，解出的 flag 为预置假解，不代表真实解题能力！");
+    } else {
+      el.className = "mode-banner real";
+      const wl = m.whitelist_enforced ? "白名单已强制" : "白名单未强制";
+      el.textContent = `✅ 真实 LLM 模式 ｜ 模型：${m.llm_provider || "未知"} ｜ ${wl}`;
+    }
+  } catch (e) {
+    // 取不到 mode 不影响主流程
+  }
+}
+
+function renderTasks(tasks) {
+  const body = document.getElementById("task-body");
+  if (!tasks || tasks.length === 0) {
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#8b949e;">暂无任务</td></tr>';
+    return;
+  }
+  const filtered = tasks.filter(t => !filterCat || t.category === filterCat);
+  body.innerHTML = filtered.map(t => {
+    const prev = prevStatus[t.task_id];
+    const flash = (prev && prev !== t.status)
+      ? (t.status === "solved" ? "flash-solved" : t.status === "failed" ? "flash-failed" : "")
+      : "";
+    prevStatus[t.task_id] = t.status;
+    if (t.status === "running") {
+      if (!localRunStart[t.task_id]) localRunStart[t.task_id] = Date.now();
+    } else {
+      delete localRunStart[t.task_id];
+    }
+    return `
+      <tr class="${flash}">
+        <td>${escapeHtml(t.title)}<br><small style="color:#8b949e;">${escapeHtml(t.task_id)}</small></td>
+        <td>${escapeHtml(t.category)}</td>
+        <td><span class="status ${escapeHtml(t.status)}">${statusText(t.status)}</span></td>
+        <td>${flagCell(t)}</td>
+        <td>${durationCell(t)}</td>
+        <td>${t.retries || 0}</td>
+        <td class="intervene">${interveneCell(t)}</td>
+      </tr>`;
+  }).join("");
+  // 状态变化高亮：动画结束后清除类名，避免残留闪烁
+  body.querySelectorAll("tr.flash-solved, tr.flash-failed").forEach(tr => {
+    tr.addEventListener("animationend", () => tr.classList.remove("flash-solved", "flash-failed"), { once: true });
+  });
+}
+
+function statusText(s) {
+  return { pending: "排队中", running: "解题中", solved: "已解出", failed: "失败", human: "待人工" }[s] || s;
+}
+
+function flagCell(t) {
+  if (t.flag) return `<span class="flag">${escapeHtml(t.flag)}</span>`;
+  if (t.error) {
+    const short = t.error.length > 28 ? t.error.slice(0, 28) + "…" : t.error;
+    return `<span class="flag-err" title="${escapeHtml(t.error)}">⚠ ${escapeHtml(short)}</span>`;
+  }
+  if (t.status === "failed") return '<span class="flag-err">未解出</span>';
+  return '<span class="flag-dim">…</span>';
+}
+
+function durationCell(t) {
+  if (t.status === "running") {
+    const start = localRunStart[t.task_id] || (localRunStart[t.task_id] = Date.now());
+    return `<td class="dur-cell" data-task-id="${escapeHtml(t.task_id)}" data-start="${start}">${Date.now() - start}</td>`;
+  }
+  return `<td>${t.duration_ms > 0 ? t.duration_ms : "—"}</td>`;
+}
+
+function interveneCell(t) {
+  if (t.status === "solved") return '<span style="color:#8b949e;">—</span>';
+  if (t.need_human) {
+    return `<div class="reason">🔴 待人工: ${escapeHtml(t.human_reason || "卡壳")}</div>
+            <input id="hint-${escapeHtml(t.task_id)}" placeholder="注入解题提示…" onkeydown="if(event.key==='Enter')injectHint('${escapeHtml(t.task_id)}')">
+            <button onclick="injectHint('${escapeHtml(t.task_id)}')">注入</button>
+            <button class="ghost" onclick="resolveTask('${escapeHtml(t.task_id)}')">解除</button>`;
+  }
+  return '<span style="color:#8b949e;">—</span>';
+}
+
+async function injectHint(taskId) {
+  const input = document.getElementById("hint-" + taskId);
+  const hint = input ? input.value.trim() : "";
+  if (!hint) { alert("请输入提示内容"); return; }
+  try {
+    await api("/api/tasks/" + encodeURIComponent(taskId) + "/hint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hint }),
+    });
+    if (input) input.value = "";
+    refresh();
+  } catch (e) {
+    console.error("注入失败", e);
+    alert("注入失败：" + (e.message || e));
+  }
+}
+
+async function resolveTask(taskId) {
+  try {
+    await api("/api/tasks/" + encodeURIComponent(taskId) + "/resolve", { method: "POST" });
+    refresh();
+  } catch (e) {
+    console.error("解除失败", e);
+    alert("解除失败：" + (e.message || e));
+  }
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+// 距结束倒计时（本地 1s 心跳；未开始显示占位）
+function updateCountdown() {
+  const el = document.getElementById("st-countdown");
+  if (!el) return;
+  if (raceStart == null) { el.textContent = "--:--:--"; return; }
+  const remain = RACE_DURATION_MS - (Date.now() - raceStart);
+  if (remain <= 0) { el.textContent = "已结束"; el.classList.add("stale"); return; }
+  el.classList.remove("stale");
+  el.textContent = fmtClock(remain);
+}
+function fmtClock(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = String(Math.floor(s / 3600)).padStart(2, "0");
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  const sec = String(s % 60).padStart(2, "0");
+  return `${h}:${m}:${sec}`;
+}
+
+// 1s 心跳：更新倒计时 + 运行中题目的本地已跑时长
+function tick() {
+  updateCountdown();
+  document.querySelectorAll("td.dur-cell[data-start]").forEach(td => {
+    td.textContent = (Date.now() - Number(td.dataset.start));
+  });
+}
+
+document.getElementById("cat-select").addEventListener("change", e => { filterCat = e.target.value; refresh(); });
+setInterval(tick, 1000);
+refresh();
+refreshMode();
+</script>
+</body>
+</html>

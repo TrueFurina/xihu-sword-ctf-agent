@@ -1,0 +1,8 @@
+{
+  "name": "web_multi_step_chain",
+  "purpose": "web 多步利用链（上传→包含→反序列化 / SSRF→内网→RCE / 任意文件写→getshell 等组合链）——决赛 web 难度升级方向",
+  "input_spec": "params = {'chain': [step_dict,...] 或 'auto': 根据题目描述识别可组合的漏洞点}",
+  "output_spec": "完整利用链步骤 + payload",
+  "categories": ["web"],
+  "version": "1.0"
+}

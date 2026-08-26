@@ -1,0 +1,8 @@
+{
+  "name": "base64_multilayer",
+  "purpose": "自动检测并解码多层 Base64/32/16 编码",
+  "input_spec": "params = {'text': '编码后的字符串'}",
+  "output_spec": "解码后的明文",
+  "categories": ["misc", "crypto"],
+  "version": "1.0"
+}

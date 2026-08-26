@@ -1,0 +1,14 @@
+{
+  "id": "real_crypto_ezmult",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "玄盾杯 ezmult",
+  "description": "附件 s1.txt 是一段编码后的字符串，解码还原出 flag。",
+  "flag": "<redacted>",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_ezmult/s1.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "60b6c2c15e658b879ff1f1d8619ab71728b021299b879a508bd7f7ac89c5bb29"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "real_crypto_anwang_crypto1",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "2022安网杯 crypto1（八进制+Vigenère）",
+  "description": "flag.txt 是八进制 ASCII 序列，解码得 key:FLagDecodeKeey + data:kwam{...}。用 key 做 Vigenère（key 字符当移位，仅字母位推进）解密 data 得 flag。",
+  "flag": "<redacted>",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_anwang_crypto1/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "2e9f80ef4619805caf4ae07ee11c4bc3d71e8563fa8ab0131fe8028273fcda0d"
+}

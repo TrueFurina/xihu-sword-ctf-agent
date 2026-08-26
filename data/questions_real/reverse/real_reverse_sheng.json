@@ -1,0 +1,14 @@
+{
+  "id": "real_reverse_sheng",
+  "provenance": "real_past_ctf",
+  "category": "reverse",
+  "title": "省赛 reverse_2",
+  "description": "附件是一个 ELF 可执行文件，程序读入一个字符串并与某个目标串比较。分析二进制，找出正确输入（flag）。",
+  "flag": "<redacted>",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/reverse/real_reverse_sheng/reverse_2"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "d65b30ccdac4d74ee529ffb1d287aa5cc0f35c5201a8030e85d9eb3e72d84f82"
+}

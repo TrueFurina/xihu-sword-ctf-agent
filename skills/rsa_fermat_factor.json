@@ -1,0 +1,10 @@
+{
+  "name": "rsa_fermat_factor",
+  "purpose": "RSA 攻击全套：费马分解/小指数开方(含跨模k爆破)/Wiener连分数/共模攻击/Hastad广播(任意组数≥2)/共享素数GCD分解/已知phi直接解密/已知phi+逆元恢复n（ExcitingInverse 玄盾杯真题）/已知d直接解密/已知n+phi二次方程分解p/q（phi_factor）",
+  "input_spec": "params = {'n': int, 'e': int, 'c': int, 'phi': int, 'd': int, 'pinv': int(可选), 'qinv': int(可选), 'n1'/'c1'/'n2'/'c2'/...: 多组模数密文（Hastad/共享素数，任意组数≥2）, 'e1'/'c1'/'e2'/'c2': 共模, 'attack': 'd_known|phi_known|phi_factor|phi_known_inv|fermat|small_e|wiener|common_modulus|hastad|common_factor|multi_n（可选，自动检测）'}——已知 d 用 d_known：m=c^d mod n；已知 phi 用 phi_known：d=invert(e,phi) 后 pow(c,d,n)；已知 n+phi 用 phi_factor：p+q=n-phi+1 二次方程分解 p/q 再解密（gcd(e,phi)!=1 时也先恢复素因子）；多组(n,c)用 common_factor 先试共享素数 gcd 再用 hastad；已知 phi+pinv/qinv 无 n 用 phi_known_inv：由 k=p-qinv 推导二次方程恢复 p,q,n 再解密（2026-08-21 人工推导验证 flag{QUITE_S1mpLe_TAsk}）",
+  "output_spec": "解出的明文（bytes）或 None",
+  "categories": [
+    "crypto"
+  ],
+  "version": "1.4"
+}

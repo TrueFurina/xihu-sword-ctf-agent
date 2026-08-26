@@ -1,0 +1,100 @@
+#!/bin/sh
+# post-commit / post-merge hook —— 自动把每次提交追记进「协同任务总账 TOP-0」
+# 机器强制：任何会话（含人类）commit/merge 都会触发，无需自觉。
+# 写入位置：总账文件「五、实时变更流（自动记录）」段，按时间倒序插入最新行。
+# 用 python 处理（中文/特殊字符/路径归一化零问题），sh 仅做转发。
+# 安装方式：bash setup.sh 会自动用 core.hooksPath 指向本目录，无需手动复制。
+
+# 定位仓库根（本 hook 在 <repo>/git_hooks/ 下）
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$HOOK_DIR/.." && pwd)"
+
+# 优先用仓库 venv 的 python，否则回退系统 python3
+if [ -x "$REPO_ROOT/.venv/Scripts/python.exe" ]; then
+  PY="$REPO_ROOT/.venv/Scripts/python.exe"
+elif command -v python3 >/dev/null 2>&1; then
+  PY="python3"
+else
+  PY="python"
+fi
+
+export CT_AGENT_SESSION="${CT_AGENT_SESSION:-}"
+
+"$PY" - "$REPO_ROOT" <<'PYEOF'
+import sys, subprocess, os, re
+
+repo_root = sys.argv[1]
+session = os.environ.get("CT_AGENT_SESSION") or ""
+
+# ── 路径归一化（关键）：Git Bash 把 Windows 路径转成 MSYS 形式 /e/Program/...，
+#    传给 Windows Python 后 os.path.abspath 会解析成 E:\e\Program\...（盘符重复）。
+#    这里手动把 /x/... 转回 x:/... 再 abspath，保证命中真实文件。
+def to_win(p: str) -> str:
+    p = p.replace("\\", "/")
+    if re.match(r"^/[a-zA-Z]/", p):
+        p = p[1] + ":" + p[2:]          # /e/Program -> e:/Program
+    return p
+
+root_win = to_win(repo_root)
+top0 = os.path.abspath(os.path.normpath(os.path.join(root_win, "..", "协同任务总账-TOP0.md")))
+
+def g(cmd):
+    try:
+        return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()
+    except Exception:
+        return ""
+
+short   = g(["git", "rev-parse", "--short", "HEAD"])
+author  = g(["git", "log", "-1", "--format=%an"])
+when    = g(["git", "log", "-1", "--format=%ad", "--date=format:%Y-%m-%d %H:%M"])
+subject = g(["git", "log", "-1", "--format=%s"])
+files   = g(["git", "show", "--stat", "--oneline", "HEAD"])  # 多行
+
+fl = []
+for ln in files.splitlines():
+    m = re.match(r'\s+(\S.*?)\s+\|\s+\d+', ln)
+    if m:
+        fl.append(m.group(1))
+files_str = " ".join(fl[:12])
+if len(fl) > 12:
+    files_str += f" …(+{len(fl)-12})"
+
+if not short:
+    sys.exit(0)
+
+sess = session if session else author
+line = f"| {when} | {sess} | `{short}` | {subject} | {files_str} |"
+
+if not os.path.exists(top0):
+    sys.stderr.write(f"[TOP0] 总账不存在: {top0}\n")
+    sys.exit(0)
+
+with open(top0, encoding="utf-8") as f:
+    content = f.read()
+
+head_marker = "| 时间 | 会话 | commit | 主题 | 改动文件 |"
+sep_re = re.compile(r'^\|[-: ]+\|[-: ]+\|[-: ]+\|[-: ]+\|[-: ]+\|$')
+
+if head_marker not in content:
+    content = content.rstrip() + "\n\n## 五、实时变更流（自动记录）\n\n> 本段由 git post-commit / post-merge hook 自动追记，**任何会话 commit 或 merge 即落账**，用于打破多智能体黑盒。非 commit 的手动改动请会话自觉登记（见 AGENTS.md 三次修订 / 总账「〇、使用守则」）。人工勿手改本段（除非补登非 commit 改动）。\n\n" + head_marker + "\n|---|---|---|---|---|\n" + line + "\n"
+else:
+    lines = content.split("\n")
+    out = []
+    inserted = False
+    for i, l in enumerate(lines):
+        out.append(l)
+        if l.strip() == head_marker and not inserted:
+            if i + 1 < len(lines) and sep_re.match(lines[i+1].strip()):
+                out.append(lines[i+1])
+                out.append(line)
+                inserted = True
+    if not inserted:
+        out.append(line)
+    content = "\n".join(out)
+
+with open(top0, "w", encoding="utf-8") as f:
+    f.write(content)
+
+print(f"[TOP0] ✅ 已自动记录 commit {short} 到任务总账（会话={sess}）")
+PYEOF
+exit 0

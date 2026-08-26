@@ -1,0 +1,9 @@
+{
+  "name": "web_upload_bypass",
+  "purpose": "文件上传绕过：自动探测扩展名/Content-Type/双扩展名/空字节/图片马等绕过方式上传webshell提取flag",
+  "input_spec": "target_url: 上传URL, field_name: 文件字段名(默认file)",
+  "output_spec": "flag: 提取的flag, evidence: 绕过证据, webshell_url: webshell访问地址",
+  "safety_risk": "low",
+  "category": "web",
+  "keywords": ["upload", "bypass", "webshell", "rce", "file", "mime", "extension"]
+}

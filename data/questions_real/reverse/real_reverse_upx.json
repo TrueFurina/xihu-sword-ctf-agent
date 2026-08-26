@@ -1,0 +1,14 @@
+{
+  "id": "real_reverse_upx",
+  "provenance": "real_past_ctf",
+  "category": "reverse",
+  "title": "helloupx11",
+  "description": "附件是一个 UPX 加壳的 ELF 可执行文件。分析二进制，找出 flag。",
+  "flag": "<redacted>",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/reverse/real_reverse_upx/helloupx11"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "7130218010da8eea66d88b56a779817c0fca75707897285f104370bf1ed99842"
+}
