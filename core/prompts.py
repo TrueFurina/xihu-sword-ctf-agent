@@ -78,7 +78,8 @@ def build_plan_prompt(ctx, attempt: int) -> str:
     # 抄 NUS Advisor：监督定向建议注入（AI 卡壳/走偏时修正路径）
     if ctx.advisor_hint:
         parts.append(f"⚠️ 监督建议: {ctx.advisor_hint}")
-    parts.append(f"flag 格式: {getattr(q, 'flag_pattern', r'flag\\{[^}]+\\}')}")
+    default_flag_pattern = r'flag\{[^}]+\}'
+    parts.append(f"flag 格式: {getattr(q, 'flag_pattern', default_flag_pattern)}")
     # 结构化修正指令（v2.0 错误归因：明确告诉模型错在哪、关键信息、往哪改）
     if ctx.correction:
         corr = ctx.correction
