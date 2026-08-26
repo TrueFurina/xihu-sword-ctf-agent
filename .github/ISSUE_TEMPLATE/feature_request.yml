@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose a new skill, agent capability, or framework improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What gap or limitation motivates this?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What should change, and why is deterministic-first preserved?
+    validations:
+      required: true
+  - type: textarea
+    id: benchmark
+    attributes:
+      label: Benchmark impact
+      description: Will this change the KPI on data/questions_real? If so, show eval.benchmark output.
+    validations:
+      required: false
