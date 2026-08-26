@@ -68,6 +68,10 @@ class TestEvalGuard(unittest.TestCase):
     """B. 评测护栏。"""
 
     def test_answer_disclosed_excluded_by_default(self):
+        if not QUESTIONS_DIR.exists():
+            self.skipTest(
+                f"题库目录缺失（公开仓不含内部 data/questions）：{QUESTIONS_DIR}"
+            )
         default = {q.id for q in load_questions(str(QUESTIONS_DIR))}
         allq = {q.id for q in load_questions(str(QUESTIONS_DIR), include_disclosed=True)}
         disclosed = allq - default

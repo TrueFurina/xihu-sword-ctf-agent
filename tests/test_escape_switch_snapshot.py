@@ -78,7 +78,7 @@ def test_snapshot_warns_on_residue_base_url():
 
 def test_snapshot_masks_api_key():
     """API Key 打码：不泄漏完整 key。"""
-    os.environ["QIANFAN_API_KEY"] = "<redacted>"
+    os.environ["QIANFAN_API_KEY"] = "sk-super-secret-key-123456"
     snap = print_effective_config_snapshot(provider="baidu")
-    assert "<redacted>" not in snap["api_key_masked"]
+    assert "sk-super-secret-key-123456" not in snap["api_key_masked"]
     assert snap["api_key_masked"].startswith("sk-s")
