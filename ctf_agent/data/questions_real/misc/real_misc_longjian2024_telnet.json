@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_longjian2024_telnet",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "陇剑杯2024 数据分析-telnet 被入侵主机口令",
+  "description": "入侵协议为 telnet, 追踪流得被入侵主机(192.168.246.28)的口令。",
+  "flag": "7d9b97f0c5b7c0672b9a9f9511f2e6bf45206e61287f48c41920529083eea66a",
+  "flag_pattern": "^[a-z]+$",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_longjian2024_telnet/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "7d9b97f0c5b7c0672b9a9f9511f2e6bf45206e61287f48c41920529083eea66a",
+  "verified_solver": false,
+  "source": "第二届陇剑杯2024 初赛WP(博客)"
+}

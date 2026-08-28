@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_gkctf2020_pokemon",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "GKCTF2020 0x1 Pokémon",
+  "description": "MISC 怀旧 Pokémon 题(103号道路)；PDF 原文 flag 用连字 ﬂ 书写。",
+  "flag": "937246de7789fab0aa6f5ad9ed0ec132e1102e113026c0a8bc260240a574ba9b",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_gkctf2020_pokemon/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "937246de7789fab0aa6f5ad9ed0ec132e1102e113026c0a8bc260240a574ba9b",
+  "verified_solver": false,
+  "source": "GKCTF2020_官方WriteUp.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/GKCTF2020_官方WriteUp.pdf)"
+}

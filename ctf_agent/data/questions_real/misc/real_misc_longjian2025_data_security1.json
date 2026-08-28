@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_longjian2025_data_security1",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "陇剑杯2025 决赛 数据安全1 身份证md5",
+  "description": "流量大量 HTTP 对象泄露身份证号, 按数据被窃取时间排序后合并计算 md5 提交。",
+  "flag": "d7e730c091c76a810dd18ea5f150b4f22fe5bd9df96d95c8d50fa5c5cdcd0c5a",
+  "flag_pattern": "flag\\{[0-9a-f]{32}\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_longjian2025_data_security1/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "d7e730c091c76a810dd18ea5f150b4f22fe5bd9df96d95c8d50fa5c5cdcd0c5a",
+  "verified_solver": false,
+  "source": "第四届陇剑杯2025 决赛WP(博客)"
+}

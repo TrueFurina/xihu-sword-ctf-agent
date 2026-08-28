@@ -1,0 +1,16 @@
+{
+  "id": "real_web_longjian2025_which_sql",
+  "provenance": "real_past_ctf",
+  "category": "web",
+  "title": "陇剑杯2025 决赛 which_sql SQL盲注flag",
+  "description": "数据库被 SQL 盲注, 日志中每字段某字符以 != 结束, 用 cyberchef 过滤 ctf_flags 表 第二列得真 flag(ctfplus{} 格式; 另有等价变体 flag{wwwWow_u_2re_sql_master})。",
+  "flag": "3038d6fe45d417582fabf6218644d30b8b1c4909e4361047e64a32b42629eed0",
+  "flag_pattern": "ctfplus\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/web/real_web_longjian2025_which_sql/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "3038d6fe45d417582fabf6218644d30b8b1c4909e4361047e64a32b42629eed0",
+  "verified_solver": false,
+  "source": "第四届陇剑杯2025 决赛WP(博客)"
+}

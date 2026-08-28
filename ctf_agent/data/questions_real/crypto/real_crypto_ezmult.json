@@ -7,7 +7,7 @@
   "flag": "60b6c2c15e658b879ff1f1d8619ab71728b021299b879a508bd7f7ac89c5bb29",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-ezmult/s1.txt"
+    "data/questions_real/_attachments/crypto/real_crypto_ezmult/s1.txt"
   ],
   "difficulty": "EASY",
   "flag_sha256": "60b6c2c15e658b879ff1f1d8619ab71728b021299b879a508bd7f7ac89c5bb29"

@@ -1,0 +1,16 @@
+{
+  "id": "real_reverse_anxun2020_notright",
+  "provenance": "real_past_ctf",
+  "category": "reverse",
+  "title": "安洵杯 2020 (reverse: i_am_not_right)",
+  "description": "Reverse/crypto challenge. The program uses a hash/quicksort-based transform on a string (flag{i_am_not_right_but_i_believe_you_can_find_out_what_happened}) and compares against a target; recover the flag by analyzing the sort+hash ordering. Reconstructed from 安洵杯官方wp (local PDF). Flag from official writeup.",
+  "flag": "fae681a2f211c54a8cd1e626f8876fc659789c0825eee0ce7066c61227208d75",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "recovered_external/wp_text/anxun2020_official.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "fae681a2f211c54a8cd1e626f8876fc659789c0825eee0ce7066c61227208d75",
+  "verified_solver": false,
+  "source": "安洵杯官方wp (E:/Program/Cybersecurity/1.考研计算机408资料大全/安洵杯官方wp(1).pdf)"
+}

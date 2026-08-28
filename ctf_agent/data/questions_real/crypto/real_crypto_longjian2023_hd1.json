@@ -1,0 +1,16 @@
+{
+  "id": "real_crypto_longjian2023_hd1",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "陇剑杯2023 HD1 AES解密",
+  "description": "追踪tcp找到key, AES解密得flag。",
+  "flag": "80659615f477a5369b69fcd071a9281d846d6216cca2893a272efc1778e9b1bd",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_longjian2023_hd1/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "80659615f477a5369b69fcd071a9281d846d6216cca2893a272efc1778e9b1bd",
+  "verified_solver": false,
+  "source": "2023陇剑杯WP(腾讯云开发者)"
+}

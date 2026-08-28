@@ -1,0 +1,16 @@
+{
+  "id": "real_web_udomctf2022_cmdinj",
+  "provenance": "real_past_ctf",
+  "category": "web",
+  "title": "UDOMCTF2022 command injection (Web)",
+  "description": "UDOMCTF2022 web 题: 删除输入中某段过滤逻辑后改参数为 id 触发命令注入读 flag。writeup 明文给出真 flag。",
+  "flag": "73c07e35e026f5c31a6ac90e9c38b3e57bc8b2407cd87a57e6505440ac438c54",
+  "flag_pattern": "UDOM\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/web/real_web_udomctf2022_cmdinj/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "73c07e35e026f5c31a6ac90e9c38b3e57bc8b2407cd87a57e6505440ac438c54",
+  "verified_solver": false,
+  "source": "UDOMCTF 2022/2023 Writeup (engineering.zooz.com): 删除过滤片段改 id 触发命令注入"
+}

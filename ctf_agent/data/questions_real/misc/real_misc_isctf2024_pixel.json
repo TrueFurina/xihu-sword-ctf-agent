@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_isctf2024_pixel",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "ISCTF2024 数字迷雾",
+  "description": "像素中寻找线索(隐写)。",
+  "flag": "8c18b1122278c9846cd9aa11671a264d592033e719514adb4ac4a41d2f425192",
+  "flag_pattern": "ISCTF\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_isctf2024_pixel/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "8c18b1122278c9846cd9aa11671a264d592033e719514adb4ac4a41d2f425192",
+  "verified_solver": false,
+  "source": "ISCTF2024WP.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/ISCTF2024WP.pdf)"
+}

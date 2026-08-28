@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_longjian2024_smallsword1",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "陇剑杯2024 SmallSword_1 蚁剑连接密码",
+  "description": "流量分析 SQL 联合注入写入 webshell, 追踪 HTTP 流在 $_POST 中找到蚁剑连接密码。",
+  "flag": "81bf4b26d52dd4c51f6ddd6bb58a9ed7d3883246ae5ffd6922fa6d17782c5149",
+  "flag_pattern": "^[0-9a-f]{32}$",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_longjian2024_smallsword1/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "81bf4b26d52dd4c51f6ddd6bb58a9ed7d3883246ae5ffd6922fa6d17782c5149",
+  "verified_solver": false,
+  "source": "第二届陇剑杯2024 初赛WP(博客)"
+}

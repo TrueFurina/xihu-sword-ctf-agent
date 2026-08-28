@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_longjian2023_smallsword3",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "陇剑杯2023 SmallSword_3 流量取证flag",
+  "description": "http导出info1.php,文件头与huorong相关,改宽高得flag。",
+  "flag": "2415582719bf1598005e6cd6cc844b75ff64193312f7dc27695a7533f13f5477",
+  "flag_pattern": "flag3\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_longjian2023_smallsword3/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "2415582719bf1598005e6cd6cc844b75ff64193312f7dc27695a7533f13f5477",
+  "verified_solver": false,
+  "source": "2023陇剑杯WP"
+}

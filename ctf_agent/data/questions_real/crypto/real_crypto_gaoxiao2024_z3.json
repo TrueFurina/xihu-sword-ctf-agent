@@ -1,0 +1,16 @@
+{
+  "id": "real_crypto_gaoxiao2024_z3",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "2024高校运维赛 约束求解",
+  "description": "z3 约束求解还原 flag。",
+  "flag": "cb03e9c867d239c92183e46dab1b66b86ccbf0e3f38b5a4a72c2ce7bece3a75e",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_gaoxiao2024_z3/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "cb03e9c867d239c92183e46dab1b66b86ccbf0e3f38b5a4a72c2ce7bece3a75e",
+  "verified_solver": false,
+  "source": "2024 高校网络安全管理运维赛 Writeup.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/2024 高校网络安全管理运维赛 Writeup.pdf)"
+}

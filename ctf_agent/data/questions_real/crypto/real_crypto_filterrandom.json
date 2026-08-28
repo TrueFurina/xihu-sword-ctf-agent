@@ -7,7 +7,7 @@
   "flag": "768a21b901963eb9818c0e0775d5a6b476773c550e004fc4c50b9a59350177b5",
   "flag_pattern": "DASCTF\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/比赛真题/西湖论剑2021中国杭州网络安全技能大赛/CRYPTO/FilterRandom.py"
+    "data/questions_real/_attachments/crypto/real_crypto_filterrandom/FilterRandom.py"
   ],
   "difficulty": "HARD",
   "flag_sha256": "768a21b901963eb9818c0e0775d5a6b476773c550e004fc4c50b9a59350177b5"

@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_isctf2024_checkin02",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "ISCTF2024 小蓝鲨签到02/游园地1",
+  "description": "地理定位签到题。",
+  "flag": "1fedad704d70a2a904eb5dde4f4e85dc53b5be3115914e11ead7f990afab631f",
+  "flag_pattern": "ISCTF\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_isctf2024_checkin02/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "1fedad704d70a2a904eb5dde4f4e85dc53b5be3115914e11ead7f990afab631f",
+  "verified_solver": false,
+  "source": "ISCTF2024WP.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/ISCTF2024WP.pdf)"
+}

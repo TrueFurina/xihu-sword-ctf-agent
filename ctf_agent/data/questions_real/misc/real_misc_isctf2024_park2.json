@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_isctf2024_park2",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "ISCTF2024 游园地2",
+  "description": "地理定位题。",
+  "flag": "13934ba22677b78d1a868a70dad78ec0b1e8071487bc18886d7a395bbd26ece0",
+  "flag_pattern": "ISCTF\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_isctf2024_park2/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "13934ba22677b78d1a868a70dad78ec0b1e8071487bc18886d7a395bbd26ece0",
+  "verified_solver": false,
+  "source": "ISCTF2024WP.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/ISCTF2024WP.pdf)"
+}

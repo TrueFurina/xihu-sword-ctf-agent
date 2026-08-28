@@ -7,8 +7,8 @@
   "flag": "93be5f3ad422c43e99e705f52df3ad974548dc558714e48162d3939787bdfdbf",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-ezRSA/task.py",
-    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-ezRSA/output"
+    "data/questions_real/_attachments/crypto/real_crypto_ezrsa/task.py",
+    "data/questions_real/_attachments/crypto/real_crypto_ezrsa/output"
   ],
   "difficulty": "MEDIUM",
   "flag_sha256": "93be5f3ad422c43e99e705f52df3ad974548dc558714e48162d3939787bdfdbf"

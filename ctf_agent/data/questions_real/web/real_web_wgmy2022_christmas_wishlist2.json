@@ -1,0 +1,16 @@
+{
+  "id": "real_web_wgmy2022_christmas_wishlist2",
+  "provenance": "real_past_ctf",
+  "category": "web",
+  "title": "WGMY2022 Christmas Wishlist 2 (file -b 输出 SSTI)",
+  "description": "WGMY2022 web 题: SSTI 只出现在 /bin/file -b 命令输出中, 改造 magic testfile 注入模板 payload 触发 RCE 读 /flag。writeup 明文给出真 flag。",
+  "flag": "a47ad91fbba5480d80bdd8a72d6b2ea4365037093a581eb355efa0f5147762e6",
+  "flag_pattern": "wgmy\\{[0-9a-f]{32}\\}",
+  "attachments": [
+    "data/questions_real/_attachments/web/real_web_wgmy2022_christmas_wishlist2/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "a47ad91fbba5480d80bdd8a72d6b2ea4365037093a581eb355efa0f5147762e6",
+  "verified_solver": false,
+  "source": "WGMY 2022 Writeup (hong5489.github.io) 官方解: 利用 /bin/file -b 输出触发 SSTI"
+}

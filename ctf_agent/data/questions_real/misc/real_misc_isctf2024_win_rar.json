@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_isctf2024_win_rar",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "ISCTF2024 赢!rar",
+  "description": "rar 密码破解：搜索 flag，对比前后数据块将 3->2，password 解压。",
+  "flag": "aea4237b7bcd259e47cb03a7c4f28fbd643bf355f131b64c7281951694825599",
+  "flag_pattern": "ISCTF\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_isctf2024_win_rar/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "aea4237b7bcd259e47cb03a7c4f28fbd643bf355f131b64c7281951694825599",
+  "verified_solver": false,
+  "source": "ISCTF2024WP.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/ISCTF2024WP.pdf)"
+}

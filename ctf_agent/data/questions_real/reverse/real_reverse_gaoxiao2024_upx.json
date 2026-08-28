@@ -1,0 +1,16 @@
+{
+  "id": "real_reverse_gaoxiao2024_upx",
+  "provenance": "real_past_ctf",
+  "category": "reverse",
+  "title": "2024高校运维赛 UPX脱壳逆向",
+  "description": "UPX 脱壳 + 异或混合布尔运算逆向 + md5 算法识别。",
+  "flag": "710f317623fcfacb6019a356f336582a9b1158d390a74e46cbdf1e3b9a8289dc",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/reverse/real_reverse_gaoxiao2024_upx/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "710f317623fcfacb6019a356f336582a9b1158d390a74e46cbdf1e3b9a8289dc",
+  "verified_solver": false,
+  "source": "2024 高校网络安全管理运维赛 Writeup.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/2024 高校网络安全管理运维赛 Writeup.pdf)"
+}

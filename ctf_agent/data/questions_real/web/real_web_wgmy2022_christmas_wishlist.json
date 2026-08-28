@@ -1,0 +1,16 @@
+{
+  "id": "real_web_wgmy2022_christmas_wishlist",
+  "provenance": "real_past_ctf",
+  "category": "web",
+  "title": "WGMY2022 Christmas Wishlist (Flask SSTI RCE)",
+  "description": "WGMY2022 web 题: 服务端将输出传入 render_template_string, 存在 SSTI, 上传含 {{...popen('cat /flag')...}} 的文件即得 flag。writeup 明文给出真 flag。",
+  "flag": "76add0f3b533b3e6d79998587353bb0e1379073584d541e17878b633e7cbc2fe",
+  "flag_pattern": "wgmy\\{[0-9a-f]{32}\\}",
+  "attachments": [
+    "data/questions_real/_attachments/web/real_web_wgmy2022_christmas_wishlist/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "76add0f3b533b3e6d79998587353bb0e1379073584d541e17878b633e7cbc2fe",
+  "verified_solver": false,
+  "source": "WGMY 2022 Writeup (hong5489.github.io) 官方解: render_template_string SSTI 读 /flag"
+}

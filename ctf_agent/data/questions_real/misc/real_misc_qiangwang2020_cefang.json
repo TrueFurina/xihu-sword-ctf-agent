@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_qiangwang2020_cefang",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "强网杯2020 侧防 (流量/防御方向)",
+  "description": "强网杯2020 侧防题: 防御/流量分析方向, 提交答案即 flag。writeup 明文给出真 flag。",
+  "flag": "279351e645239166ebbfdda049b803ae57e6657da906573b3d78ba2e8512600b",
+  "flag_pattern": "flag\\{QWB_[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_qiangwang2020_cefang/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "279351e645239166ebbfdda049b803ae57e6657da906573b3d78ba2e8512600b",
+  "verified_solver": false,
+  "source": "强网杯2020 Writeup (cloud.tencent.com/developer/article/1813450) 0x06 侧防"
+}

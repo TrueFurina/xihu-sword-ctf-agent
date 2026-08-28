@@ -1,0 +1,12 @@
+{
+  "id": "real_anxun2020_BeCare4",
+  "provenance": "real_past_ctf",
+  "recovered_from": "https://github.com/D0g3-Lab/i-SOON_CTF_2020 (公开仓库，误删后外网重建)",
+  "category": "misc",
+  "title": "安洵杯2020 MISC BeCare4（零宽隐写+SilentEye）",
+  "description": "npmtxt 含零宽度字符隐写，解出压缩包密码 RealV1siBle，解 flag.7z 得图片，SilentEye 解码得 flag。二进制原题见官方仓库。",
+  "flag": "D0g3{1nV1sible_flag_Can_You_find?!}",
+  "flag_pattern": "D0g3\\{[^}]+\\}",
+  "attachments": ["data/questions_real/_attachments/anxun2020/misc/BeCare4.md"],
+  "difficulty": "MEDIUM"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "real_web_dicectf2022_point",
+  "provenance": "real_past_ctf",
+  "category": "web",
+  "title": "DiceCTF2022 point (Golang JSON 大小写不敏感绕过)",
+  "description": "DiceCTF2022 web 题: 服务端过滤 what_point 字段, 但 Go 的 json.Unmarshal 对 key 大小写不敏感, 改用 What_point 提交即绕过过滤拿到 flag。writeup 明文给出真 flag。",
+  "flag": "fc993d4940162b339b6ad8904cbc895ef1d1d2dccbc48b106c3b05036d9f5fac",
+  "flag_pattern": "hope\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/web/real_web_dicectf2022_point/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "fc993d4940162b339b6ad8904cbc895ef1d1d2dccbc48b106c3b05036d9f5fac",
+  "verified_solver": false,
+  "source": "DiceCTF 2022 Writeup (lactea.kr): json.Unmarshal 大小写不敏感匹配 -> 用 What_point 绕过 what_point 过滤"
+}

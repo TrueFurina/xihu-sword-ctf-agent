@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_longjian2025_app_part2",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "陇剑杯2025 决赛 app_part2 webshell流量秘密",
+  "description": "webshell 流量(php 一句话 XOR 加密), 解码得工作目录/输出内容/黑客找到的秘密。",
+  "flag": "e93f142a43a43511deec4a20e3865d975aa6f2d366e12fce18e1dd4d88da0070",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_longjian2025_app_part2/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "e93f142a43a43511deec4a20e3865d975aa6f2d366e12fce18e1dd4d88da0070",
+  "verified_solver": false,
+  "source": "第四届陇剑杯2025 决赛WP(博客)"
+}

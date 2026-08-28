@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_sheng2022_traffic_ftp_port",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "某省赛 路由器流量分析 题6 首次数据连接端口",
+  "description": "ftp 登录后第一次使用数据连接的端口号; writeup 明确给出 80。flag{端口}。",
+  "flag": "48449a14a4ff7d79bb7a1b6f3d488eba397c36ef25634c111b49baf362511afc",
+  "flag_pattern": "^\\d+$",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_sheng2022_traffic_ftp_port/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "48449a14a4ff7d79bb7a1b6f3d488eba397c36ef25634c111b49baf362511afc",
+  "verified_solver": false,
+  "source": "CTF隐写题目/赛题与题解.pdf(leadlife 某省赛流量分析)"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "real_reverse_vnctf_babymaze",
+  "provenance": "real_past_ctf",
+  "category": "reverse",
+  "title": "VNCTF 2022 BabyMaze",
+  "description": "Python3.8 pyc reverse. A 31x31 maze; solve by DFS (s/w/d/a moves) to recover the flag. Reconstructed from VNCTF 2022 Official WriteUp (local PDF). Flag taken from the official writeup's solved output. (Original BabyMaze.pyc needed for a fully automated re-solve; maze map + DFS technique are in the source writeup.)",
+  "flag": "25f6112642aa21ac767425d264b7d95690feee4e245860580895e452e970ac28",
+  "flag_pattern": "VNCTF\\{[^}]+\\}",
+  "attachments": [
+    "recovered_external/wp_text/vnctf2022.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "25f6112642aa21ac767425d264b7d95690feee4e245860580895e452e970ac28",
+  "verified_solver": false,
+  "source": "VNCTF 2022 Official WriteUp (E:/Program/Cybersecurity/1.考研计算机408资料大全/VNCTF 2022 Official WriteUp.pdf)"
+}

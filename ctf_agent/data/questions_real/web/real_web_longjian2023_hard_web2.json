@@ -1,0 +1,16 @@
+{
+  "id": "real_web_longjian2023_hard_web2",
+  "provenance": "real_past_ctf",
+  "category": "web",
+  "title": "陇剑杯2023 hard_web_2 根目录flag",
+  "description": "哥斯拉webshell AES密钥748007e861908c03解密响应得根目录flag。",
+  "flag": "67e6629dd56fd4924f4021cd03c6b19fc953a2b87f8c24a08ad59b529f8d1a89",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/web/real_web_longjian2023_hard_web2/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "67e6629dd56fd4924f4021cd03c6b19fc953a2b87f8c24a08ad59b529f8d1a89",
+  "verified_solver": false,
+  "source": "2023陇剑杯WP(gkjzjh146.github.io / cnblogs SpuerCh3nry)"
+}

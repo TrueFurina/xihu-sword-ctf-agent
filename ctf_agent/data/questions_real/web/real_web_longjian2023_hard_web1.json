@@ -1,0 +1,16 @@
+{
+  "id": "real_web_longjian2023_hard_web1",
+  "provenance": "real_past_ctf",
+  "category": "web",
+  "title": "陇剑杯2023 hard_web_1 开放端口",
+  "description": "tcp.connection.synack 过滤得服务器开放端口。",
+  "flag": "df19fd0b5e6a924dfbe3b74d202e41e9b6bf3f98405acb063421b2914c327a0e",
+  "flag_pattern": "NSSCTF\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/web/real_web_longjian2023_hard_web1/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "df19fd0b5e6a924dfbe3b74d202e41e9b6bf3f98405acb063421b2914c327a0e",
+  "verified_solver": false,
+  "source": "2023陇剑杯WP"
+}

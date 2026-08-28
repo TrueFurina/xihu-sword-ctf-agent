@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_mjuctf_speak",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "MJUCTF中级赛 音频隐写/语言题",
+  "description": "MJUCTF中级赛部分赛题(本地PDF)其一。",
+  "flag": "c67bcf59d2400031dccdb16083956516c683b58f0dca190b9b0a95c01761610e",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_mjuctf_speak/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "c67bcf59d2400031dccdb16083956516c683b58f0dca190b9b0a95c01761610e",
+  "verified_solver": false,
+  "source": "MJUCTF中级赛部分赛题.pdf(本地Cybersecurity)"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_gaoxiao2024_phish_sender",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "2024高校运维赛 钓鱼邮件-发件人域名",
+  "description": "分析钓鱼邮件，发件人域名可疑。base64(ZmxhZ3tXZWxjT01lVE99) 解码得 flag。",
+  "flag": "f8510e717fcdfa4d0b3e6342ada8d0e726e46610bbe1d169be826610f889b949",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_gaoxiao2024_phish_sender/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "f8510e717fcdfa4d0b3e6342ada8d0e726e46610bbe1d169be826610f889b949",
+  "verified_solver": false,
+  "source": "2024 高校网络安全管理运维赛 Writeup.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/2024 高校网络安全管理运维赛 Writeup.pdf)"
+}

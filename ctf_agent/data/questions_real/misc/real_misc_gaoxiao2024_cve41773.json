@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_gaoxiao2024_cve41773",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "2024高校运维赛 CVE-2021-41773 路径穿越",
+  "description": "httpd:2.4.49-buster 路径穿越；curl.exe 版本回退/升级 patch 绕过。注：PDF 原文 flag 含换行空格，此处已归一化。",
+  "flag": "f9961e049a8d05a222a34577220e34d73c8d684a7a9ae4f1de24d59b1e3be230",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_gaoxiao2024_cve41773/flag.txt"
+  ],
+  "difficulty": "HARD",
+  "flag_sha256": "f9961e049a8d05a222a34577220e34d73c8d684a7a9ae4f1de24d59b1e3be230",
+  "verified_solver": false,
+  "source": "2024 高校网络安全管理运维赛 Writeup.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/2024 高校网络安全管理运维赛 Writeup.pdf)"
+}

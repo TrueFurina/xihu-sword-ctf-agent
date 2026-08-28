@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_chunqiu2022_checkin",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "春秋杯2022 勇者山峰 MISC签到",
+  "description": "关注公众号回复'上课铃声',按钢琴数字得flag。",
+  "flag": "b1ecd2fb216a148f0d45783e3a8b6c41538064f550a9449f0e8df19e93744da2",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_chunqiu2022_checkin/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "b1ecd2fb216a148f0d45783e3a8b6c41538064f550a9449f0e8df19e93744da2",
+  "verified_solver": false,
+  "source": "2022春秋杯勇者山峰WP(CSDN)"
+}

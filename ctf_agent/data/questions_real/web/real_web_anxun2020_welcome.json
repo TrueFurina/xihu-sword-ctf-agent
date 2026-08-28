@@ -1,0 +1,16 @@
+{
+  "id": "real_web_anxun2020_welcome",
+  "provenance": "real_past_ctf",
+  "category": "web",
+  "title": "安洵杯 2020 (web: 原型链污染 Welcome)",
+  "description": "Nodejs web. express-validator 6.6.0 depends on lodash < 4.17.17, which is vulnerable to prototype pollution (CVE-style). By polluting the prototype (e.g. value/options) the sanitizer/filter logic is bypassed to achieve RCE / read the flag. Reconstructed from 安洵杯官方wp (local PDF). Flag from official writeup.",
+  "flag": "64811b6ef98f537a2eaa72690c9bf259b4fee534c5aeeb16bb7e00e9a3d9dca8",
+  "flag_pattern": "D0g3\\{[^}]+\\}",
+  "attachments": [
+    "recovered_external/wp_text/anxun2020_official.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "64811b6ef98f537a2eaa72690c9bf259b4fee534c5aeeb16bb7e00e9a3d9dca8",
+  "verified_solver": false,
+  "source": "安洵杯官方wp (E:/Program/Cybersecurity/1.考研计算机408资料大全/安洵杯官方wp(1).pdf)"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "real_crypto_changan2021_ezpy",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "长安杯2021 Crypto ezpy (进制+NumPy溢出)",
+  "description": "20进制字符(0-9A-J)编码, 模233逆元还原; sha256 官方给定 f7494167..., solver 校验一致。",
+  "flag": "f7494167e4c3fc8e6b36525c5c12a5c73077b5f6fdd6f75dd205903b0779b181",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_changan2021_ezpy/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "f7494167e4c3fc8e6b36525c5c12a5c73077b5f6fdd6f75dd205903b0779b181",
+  "verified_solver": true,
+  "source": "长安杯2021 PWN&Reverse wp 合集(博客)",
+  "solver": "scripts/_solve_changan_ezpy.py"
+}

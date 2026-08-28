@@ -1,0 +1,12 @@
+{
+  "id": "real_taishan2021_crypto_cgroup",
+  "provenance": "real_past_ctf",
+  "recovered_from": "泰山杯2021 公开 writeup 重建（误删后外网恢复）",
+  "category": "crypto",
+  "title": "泰山杯2021 crypto C组题（RSA 公因数/开方恢复 + 512bit 双模）",
+  "description": "flag 分两段：第一段 n1=p1*q1(1024bit) 给 hint=pow(1024*p1-197*q1, n1-p1-q1, n1)，开方配对恢复 p1,q1 解 RSA 得 flag1；第二段 n2=p2*q2(512bit) 给 c2=pow(flag2,p2,n2), c3=pow(flag2,q2,n2)，小因子/Coppersmith 恢复 flag2。原题脚本与实例参数见附件。",
+  "flag": "(实例相关，需跑原题脚本恢复；本题为恢复题面，非已解题)",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": ["data/questions_real/_attachments/taishan2021/crypto_c_group.py"],
+  "difficulty": "HARD"
+}

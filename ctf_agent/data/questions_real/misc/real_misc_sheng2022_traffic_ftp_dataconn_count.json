@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_sheng2022_traffic_ftp_dataconn_count",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "某省赛 路由器流量分析 题5 FTP数据连接次数",
+  "description": "ftp 传输结束后建立的数据连接次数; writeup 明确给出 1。flag{次数}。",
+  "flag": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+  "flag_pattern": "^\\d+$",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_sheng2022_traffic_ftp_dataconn_count/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+  "verified_solver": false,
+  "source": "CTF隐写题目/赛题与题解.pdf(leadlife 某省赛流量分析)"
+}

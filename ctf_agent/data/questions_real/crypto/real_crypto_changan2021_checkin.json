@@ -1,0 +1,17 @@
+{
+  "id": "real_crypto_changan2021_checkin",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "长安杯2021 Crypto checkin (2^e-a 分解+阶乘Wilson)",
+  "description": "e=1049, a 给大整数; 2**e-a 在 factordb 分解得 p,q; 用阶乘+威尔逊定理还原 flag。solver 实跑复现。",
+  "flag": "75fa5daa8c308268c569fcb77a01d15576bee2ee6569e7e45d1445f2f1ae2426",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_changan2021_checkin/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "75fa5daa8c308268c569fcb77a01d15576bee2ee6569e7e45d1445f2f1ae2426",
+  "verified_solver": true,
+  "source": "长安杯2021 PWN&Reverse wp 合集(博客, 本地长安wp.docx仅占位)",
+  "solver": "scripts/_solve_changan_checkin.py"
+}

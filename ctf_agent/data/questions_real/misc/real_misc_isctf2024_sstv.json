@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_isctf2024_sstv",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "ISCTF2024 SSTV音频",
+  "description": "提取单声道音频 ffmpeg atempo=20 加速得 SSTV，微信解码。",
+  "flag": "53c1442be01cd3faf03f2d80cfb97d87f386bc78d6a91f165d075905993ba214",
+  "flag_pattern": "ISCTF\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_isctf2024_sstv/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "53c1442be01cd3faf03f2d80cfb97d87f386bc78d6a91f165d075905993ba214",
+  "verified_solver": false,
+  "source": "ISCTF2024WP.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/ISCTF2024WP.pdf)"
+}

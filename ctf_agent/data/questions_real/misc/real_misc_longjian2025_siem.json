@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_longjian2025_siem",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "陇剑杯2025 决赛 siem-加密 综合取证flag",
+  "description": "wazuh 日志分析 app 被爆破, 提取攻击者IP/会话数/后门用户/url/事件ID/工具/删除文件名, md5 组合提交: 192.168.41.143-13-hacker-http://192.168.41.136/.back.php?pass=id-1734511987.34749419-mimikatz-ossec.conf。",
+  "flag": "ced419973bb619c029e6eaa4967bb8037e5c01c5e8f056f3ac0209a3c153d219",
+  "flag_pattern": "flag\\{[0-9a-f]{32}\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_longjian2025_siem/flag.txt"
+  ],
+  "difficulty": "HARD",
+  "flag_sha256": "ced419973bb619c029e6eaa4967bb8037e5c01c5e8f056f3ac0209a3c153d219",
+  "verified_solver": false,
+  "source": "第四届陇剑杯2025 决赛WP(博客)"
+}

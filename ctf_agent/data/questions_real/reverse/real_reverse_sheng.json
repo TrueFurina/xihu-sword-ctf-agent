@@ -7,7 +7,7 @@
   "flag": "d65b30ccdac4d74ee529ffb1d287aa5cc0f35c5201a8030e85d9eb3e72d84f82",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/9.CTF Reverse/某省赛 Reverse 环境/reverse2/reverse_2"
+    "data/questions_real/_attachments/reverse/real_reverse_sheng/reverse_2"
   ],
   "difficulty": "EASY",
   "flag_sha256": "d65b30ccdac4d74ee529ffb1d287aa5cc0f35c5201a8030e85d9eb3e72d84f82"

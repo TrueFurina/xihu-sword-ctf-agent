@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_gaoxiao2024_phish_link",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "2024高校运维赛 钓鱼邮件-钓鱼链接",
+  "description": "伪造链接中嵌入第二个 flag。",
+  "flag": "4204e09d956aa156350c59ead15b0c6ec8f683d0590769c2725c45774dcfa648",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_gaoxiao2024_phish_link/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "4204e09d956aa156350c59ead15b0c6ec8f683d0590769c2725c45774dcfa648",
+  "verified_solver": false,
+  "source": "2024 高校网络安全管理运维赛 Writeup.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/2024 高校网络安全管理运维赛 Writeup.pdf)"
+}

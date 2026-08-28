@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_nactf2020_zip_madness",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "NACTF2020 Zip Madness (递归解压找flag.txt)",
+  "description": "附件为多层嵌套zip, 递归解压所有层级后在 flag.txt 得到 flag。writeup 直接给出真 flag。",
+  "flag": "5ba05e190682878b6a1b30561bc3ad315466b8613a7bcc054c6387db1de5f1f3",
+  "flag_pattern": "nactf\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_nactf2020_zip_madness/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "5ba05e190682878b6a1b30561bc3ad315466b8613a7bcc054c6387db1de5f1f3",
+  "verified_solver": false,
+  "source": "NACTF2020 Zip Madness writeup(mrnoobot.com)"
+}

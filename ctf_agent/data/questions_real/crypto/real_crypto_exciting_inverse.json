@@ -7,8 +7,8 @@
   "flag": "4b84616cccbe84a99256c23152a4fd226e87e9da64e92689063046251cc251c5",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-ExcitingInverse/problem.py",
-    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-ExcitingInverse/output"
+    "data/questions_real/_attachments/crypto/real_crypto_exciting_inverse/problem.py",
+    "data/questions_real/_attachments/crypto/real_crypto_exciting_inverse/output"
   ],
   "difficulty": "MEDIUM",
   "flag_sha256": "4b84616cccbe84a99256c23152a4fd226e87e9da64e92689063046251cc251c5"

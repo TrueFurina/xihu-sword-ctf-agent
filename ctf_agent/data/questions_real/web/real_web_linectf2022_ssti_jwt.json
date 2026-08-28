@@ -1,0 +1,16 @@
+{
+  "id": "real_web_linectf2022_ssti_jwt",
+  "provenance": "real_past_ctf",
+  "category": "web",
+  "title": "LINE CTF2022 (Go template SSTI 泄露密钥 + JWT 提权)",
+  "description": "LINE CTF2022 web 题: Go 的 template.Parse('Logged in as '+acc.id) 存在 SSTI, 注册 id={{ . }} 泄露 secret key, 改 JWT is_admin=true 后访问 /flag。writeup 明文给出真 flag。",
+  "flag": "50d32d18a93927b6d3283e15459aa5d8f5841aa1227b8fd41dc772a8a911c0ab",
+  "flag_pattern": "LINECTF\\{[a-z_]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/web/real_web_linectf2022_ssti_jwt/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "50d32d18a93927b6d3283e15459aa5d8f5841aa1227b8fd41dc772a8a911c0ab",
+  "verified_solver": false,
+  "source": "LINE CTF2022 Writeup (hong5489.github.io): Go html/template SSTI 泄露 secret key -> 改 JWT is_admin"
+}

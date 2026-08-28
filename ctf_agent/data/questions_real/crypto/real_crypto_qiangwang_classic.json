@@ -7,7 +7,7 @@
   "flag": "f4adf0d868f5b0ac513b4dde37c3516860b67a5a4d410f4cadf43d99428cf5fc",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/比赛真题/2022强网杯青少年/crypto/classicCrypto_1daf735ddc6529e047b065a678422f5d/classicCrypto.txt"
+    "data/questions_real/_attachments/crypto/real_crypto_qiangwang_classic/classicCrypto.txt"
   ],
   "difficulty": "EASY",
   "flag_sha256": "f4adf0d868f5b0ac513b4dde37c3516860b67a5a4d410f4cadf43d99428cf5fc"

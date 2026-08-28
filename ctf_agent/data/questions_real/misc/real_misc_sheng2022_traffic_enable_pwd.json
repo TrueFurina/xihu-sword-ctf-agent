@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_sheng2022_traffic_enable_pwd",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "某省赛 路由器流量分析 题2 enable特权密码",
+  "description": "同上 pcap, telnet 设备 enable 特权密码; writeup 明确给出 cisco123。flag{密码}。",
+  "flag": "0fc5ec3ed9da5f88024a9e1b08d2ea1e480458c26cf65eafd9a5e2ac2bc62b62",
+  "flag_pattern": "^[A-Za-z0-9]+$",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_sheng2022_traffic_enable_pwd/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "0fc5ec3ed9da5f88024a9e1b08d2ea1e480458c26cf65eafd9a5e2ac2bc62b62",
+  "verified_solver": false,
+  "source": "CTF隐写题目/赛题与题解.pdf(leadlife 某省赛流量分析)"
+}

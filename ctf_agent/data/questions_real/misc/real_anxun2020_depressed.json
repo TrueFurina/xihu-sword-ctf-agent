@@ -1,0 +1,12 @@
+{
+  "id": "real_anxun2020_depressed",
+  "provenance": "real_past_ctf",
+  "recovered_from": "https://github.com/D0g3-Lab/i-SOON_CTF_2020 (公开仓库，误删后外网重建)",
+  "category": "misc",
+  "title": "安洵杯2020 MISC 开始抑郁（图片混合+Brainfuck+跳舞的人+宽高修改）",
+  "description": "图片混合 zip，IHDR 修复后得 Brainfuck→JsFuck→时间戳密码；嵌套压缩包内 flag.png 宽高被改，修正后按格式填《你的名字》时间片段得 flag。二进制原题见官方仓库。",
+  "flag": "flag{1200-2016-GRANDMENU-RCHITECTURE-1335}",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": ["data/questions_real/_attachments/anxun2020/misc/depressed.md"],
+  "difficulty": "HARD"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "real_misc_hws2022_badpdf",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "HWS DASCTF 2022 Jan MISC badPDF (hex xor1)",
+  "description": "lnk 释放 base64 壳, 去混淆后的 hex 串每字节 xor1 得 flag。solver 解码复现。",
+  "flag": "e98521f8688ac9aa195f7a6e53b60031dfccffa413e4da1e0cc325f8ae253ffa",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_hws2022_badpdf/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "e98521f8688ac9aa195f7a6e53b60031dfccffa413e4da1e0cc325f8ae253ffa",
+  "verified_solver": true,
+  "source": "2022HWS硬件安全冬令营 X DASCTF Jan Writeup(CSDN/cnblogs)",
+  "solver": "scripts/_solve_hws_badpdf.py"
+}

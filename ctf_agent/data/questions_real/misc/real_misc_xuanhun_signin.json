@@ -7,7 +7,7 @@
   "flag": "d5e1894ae1bb4e4d191702604bfea3ceb7a006074721d6fc3a05b8c601f42b83",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Misc-SignIN/xz1.jpg"
+    "data/questions_real/_attachments/misc/real_misc_xuanhun_signin/xz1.jpg"
   ],
   "difficulty": "EASY",
   "flag_sha256": "d5e1894ae1bb4e4d191702604bfea3ceb7a006074721d6fc3a05b8c601f42b83"

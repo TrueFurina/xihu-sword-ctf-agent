@@ -7,7 +7,7 @@
   "flag": "7130218010da8eea66d88b56a779817c0fca75707897285f104370bf1ed99842",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/9.CTF Reverse/SycRevLearn-main/lesson9/helloupx11"
+    "data/questions_real/_attachments/reverse/real_reverse_upx/helloupx11"
   ],
   "difficulty": "EASY",
   "flag_sha256": "7130218010da8eea66d88b56a779817c0fca75707897285f104370bf1ed99842"

@@ -1,0 +1,16 @@
+{
+  "id": "real_crypto_anxun2020_aes",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "安洵杯2020 crypto (AES-CBC 已知明密文恢复位移)",
+  "description": "安洵杯2020 crypto 题: 已知密文/明文/私钥, 依 AES-CBC 原理求位移, 用 mbruteforce 在 table='0123456789abcdef' 上恢复破损 hex flag (原 flag 中 ** 段为缺失位)。writeup 明文给出真 flag d0g3{71b2b56162a46397d979de964c}。",
+  "flag": "c6027195acce72e061439a8da8dc6121bf4579c25eaa53f743473b9ae9e6aebc",
+  "flag_pattern": "d0g3\\{[0-9a-f]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_anxun2020_aes/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "c6027195acce72e061439a8da8dc6121bf4579c25eaa53f743473b9ae9e6aebc",
+  "verified_solver": false,
+  "source": "安洵杯2020 官方 writeup (AES-CBC, 已知密文/明文/私钥求位移, mbruteforce 恢复破损 hex)"
+}

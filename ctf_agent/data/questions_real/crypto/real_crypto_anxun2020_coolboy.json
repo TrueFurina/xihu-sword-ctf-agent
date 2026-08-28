@@ -1,0 +1,16 @@
+{
+  "id": "real_crypto_anxun2020_coolboy",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "安洵杯 2020 (crypto: you_are_a_cool_boy)",
+  "description": "Crypto challenge from 安洵杯 2020. Reconstructed from 安洵杯官方wp (local PDF). Flag from official writeup. (Original challenge script/parameters needed for a fully automated re-solve.)",
+  "flag": "a1a65ec215e740dfead9be11ad54c534cac6848d1fe49d0b398254255942d0d2",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "recovered_external/wp_text/anxun2020_official.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "a1a65ec215e740dfead9be11ad54c534cac6848d1fe49d0b398254255942d0d2",
+  "verified_solver": false,
+  "source": "安洵杯官方wp (E:/Program/Cybersecurity/1.考研计算机408资料大全/安洵杯官方wp(1).pdf)"
+}

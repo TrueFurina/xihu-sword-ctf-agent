@@ -1,0 +1,16 @@
+{
+  "id": "real_reverse_vnctf_timeflies",
+  "provenance": "real_past_ctf",
+  "category": "reverse",
+  "title": "VNCTF2022 TimeFlies (pyc 反编译 reverse)",
+  "description": "附件为 python3.8 编译的 pyc, 用 uncompyle6 反编译后得到逻辑, 还原 TimeFlies 题意即得 flag。writeup 明文给出真 flag。",
+  "flag": "81dd6bd94dde9d9c78c99c7489bffc718516ea4ac809ef45827d46a76c3bea41",
+  "flag_pattern": "VNCTF\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/reverse/real_reverse_vnctf_timeflies/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "81dd6bd94dde9d9c78c99c7489bffc718516ea4ac809ef45827d46a76c3bea41",
+  "verified_solver": false,
+  "source": "VNCTF2022 官方 writeup (pyc 反编译, python3.8)"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_longjian2024_smallsword2",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "陇剑杯2024 SmallSword_2 攻击者留存值",
+  "description": "分析蚁剑流量, 找到向 hacker.txt 写入的 base64 解码值(攻击者留存的值)。",
+  "flag": "817268a4f80857891da3b682393dbc3e16283165f575609fce5cead2de08c446",
+  "flag_pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_longjian2024_smallsword2/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "817268a4f80857891da3b682393dbc3e16283165f575609fce5cead2de08c446",
+  "verified_solver": false,
+  "source": "第二届陇剑杯2024 初赛WP(博客)"
+}

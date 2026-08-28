@@ -1,0 +1,16 @@
+{
+  "id": "real_crypto_isctf2024_decrypt",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "ISCTF2024 解密题",
+  "description": "C 程序 decryption_key 还原 flag。",
+  "flag": "4904332117382114e04aaa3ade9cf4d2e8592af808ad5448f91710a8e74c5a78",
+  "flag_pattern": "ISCTF\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_isctf2024_decrypt/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "4904332117382114e04aaa3ade9cf4d2e8592af808ad5448f91710a8e74c5a78",
+  "verified_solver": false,
+  "source": "ISCTF2024WP.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/ISCTF2024WP.pdf)"
+}

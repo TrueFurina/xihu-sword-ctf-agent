@@ -1,0 +1,17 @@
+{
+  "id": "real_misc_longjian2024_ssw_redis",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "陇剑杯2024 数据分析-SSW redis.service 路径md5",
+  "description": "排查 redis 自启动服务, 锁定路径 /lib/systemd/system/redis.service, 提交其 md5(echo -n '/lib/systemd/system/redis.service' | md5sum)。可本地实跑校验。",
+  "flag": "35d1fcb0f40cf77f61677f88ed2452bad2647b01f359d3f3ffdd7293628ef32c",
+  "flag_pattern": "^[0-9a-f]{32}$",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_longjian2024_ssw_redis/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "35d1fcb0f40cf77f61677f88ed2452bad2647b01f359d3f3ffdd7293628ef32c",
+  "verified_solver": true,
+  "source": "第二届陇剑杯2024 初赛WP(博客)",
+  "solver": "scripts/_solve_longjian2024_redis.py"
+}

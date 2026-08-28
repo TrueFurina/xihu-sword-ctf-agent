@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_anxun2020_722b6d",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "安洵杯 2020 (misc: 722b6d90...)",
+  "description": "Misc challenge from 安洵杯 2020. Reconstructed from 安洵杯官方wp (local PDF). Flag from official writeup. (Original challenge file needed for a fully automated re-solve.)",
+  "flag": "01ef7cc4ea5b32c11bdb148dfb427d06e862d759778423c49aa07a16c112ba08",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "recovered_external/wp_text/anxun2020_official.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "01ef7cc4ea5b32c11bdb148dfb427d06e862d759778423c49aa07a16c112ba08",
+  "verified_solver": false,
+  "source": "安洵杯官方wp (E:/Program/Cybersecurity/1.考研计算机408资料大全/安洵杯官方wp(1).pdf)"
+}

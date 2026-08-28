@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_longjian2023_bf",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "陇剑杯2023 BF 内存取证key",
+  "description": "BF.zip(解压密码4cf611...)用r-studio看镜像得key.txt。",
+  "flag": "85715f14b9ae72336bb5538a44f9d4c95e91c843673b8b8bbe9a6a87afc07b40",
+  "flag_pattern": "NSSCTF\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_longjian2023_bf/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "85715f14b9ae72336bb5538a44f9d4c95e91c843673b8b8bbe9a6a87afc07b40",
+  "verified_solver": false,
+  "source": "2023陇剑杯WP"
+}

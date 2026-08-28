@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_sheng2022_traffic_bruteforce_count",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "某省赛 路由器流量分析 题3 爆破次数",
+  "description": "统计 192.168.181.141 对 telnet 路由器的密码爆破次数; writeup 明确给出 145。flag{次数}。",
+  "flag": "be47addbcb8f60566a3d7fd5a36f8195798e2848b368195d9a5d20e007c59a0c",
+  "flag_pattern": "^\\d+$",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_sheng2022_traffic_bruteforce_count/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "be47addbcb8f60566a3d7fd5a36f8195798e2848b368195d9a5d20e007c59a0c",
+  "verified_solver": false,
+  "source": "CTF隐写题目/赛题与题解.pdf(leadlife 某省赛流量分析)"
+}

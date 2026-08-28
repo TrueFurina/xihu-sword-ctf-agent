@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_qiangwang2020_upload",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "强网杯2020 upload (steghide 隐写)",
+  "description": "强网杯2020 upload 题: 流量包导出图片, steghide 分离 (弱密码 123456) 得 flag。writeup 明文给出真 flag。",
+  "flag": "c462cfa208b35e359c691de7c4e85eb391237c4c2e6e497e8098627aae4069f0",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_qiangwang2020_upload/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "c462cfa208b35e359c691de7c4e85eb391237c4c2e6e497e8098627aae4069f0",
+  "verified_solver": false,
+  "source": "强网杯2020 Writeup (cloud.tencent.com/developer/article/1813450) 0x07 upload"
+}

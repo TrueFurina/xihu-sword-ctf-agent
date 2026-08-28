@@ -1,0 +1,16 @@
+{
+  "id": "real_crypto_gkctf2020_rsa",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "GKCTF2020 RSA 并行分解",
+  "description": "并行迭代求解 p,q 分解 n。",
+  "flag": "69f42f7dd30fe78e924113e7c5b1a60bc579e4e74e37ae8ddd92302562ca8d8b",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_gkctf2020_rsa/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "69f42f7dd30fe78e924113e7c5b1a60bc579e4e74e37ae8ddd92302562ca8d8b",
+  "verified_solver": false,
+  "source": "GKCTF2020_官方WriteUp.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/GKCTF2020_官方WriteUp.pdf)"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_bytectf_flag",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "ByteCTF2020 Nu1L flag题",
+  "description": "Nu1L 战队官方 WriteUp 收录题。",
+  "flag": "bfc59f143a3ae738fe28aaff9a3a255bfa8266d01444e25ec433777a19849baf",
+  "flag_pattern": "ByteCTF\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_bytectf_flag/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "bfc59f143a3ae738fe28aaff9a3a255bfa8266d01444e25ec433777a19849baf",
+  "verified_solver": false,
+  "source": "ByteCTF WriteUp By Nu1L.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/ByteCTF WriteUp By Nu1L.pdf)"
+}

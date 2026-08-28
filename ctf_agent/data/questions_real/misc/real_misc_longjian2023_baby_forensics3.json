@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_longjian2023_baby_forensics3",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "陇剑杯2023 baby_forensics_3 (对称加密 U2Fsd 还原)",
+  "description": "陇剑杯2023 baby_forensics_3: 内存导出便签 StikyNot.exe, 以对称加密特征 U2Fsd 找到密文 (去 \\par) 解密得 flag。writeup 明文给出真 flag。",
+  "flag": "20e6092c61846e7187af7c18b382e78e8212ca898bc94f2af9e32cada936a52a",
+  "flag_pattern": "flag\\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_longjian2023_baby_forensics3/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "20e6092c61846e7187af7c18b382e78e8212ca898bc94f2af9e32cada936a52a",
+  "verified_solver": false,
+  "source": "陇剑杯2023 Writeup (cnblogs WXjzc): 便签内存导出, 以 U2Fsd 特征定位对称加密密文还原"
+}

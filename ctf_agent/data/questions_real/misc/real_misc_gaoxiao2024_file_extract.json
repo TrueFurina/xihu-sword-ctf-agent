@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_gaoxiao2024_file_extract",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "2024高校运维赛 文件/流量提取",
+  "description": "从流量/文件提取得到 flag。",
+  "flag": "e41706e49f0bf2d11a5a169bff6bd09ef3ee30202987153ab6e1ec9a3a4aad05",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_gaoxiao2024_file_extract/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "e41706e49f0bf2d11a5a169bff6bd09ef3ee30202987153ab6e1ec9a3a4aad05",
+  "verified_solver": false,
+  "source": "2024 高校网络安全管理运维赛 Writeup.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/2024 高校网络安全管理运维赛 Writeup.pdf)"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "real_pwn_hws2022_peach",
+  "provenance": "real_past_ctf",
+  "category": "pwn",
+  "title": "HWS DASCTF 2022 Jan PWN peach (seccomp+tcache)",
+  "description": "UAF 改 tcache 结构体劫持 __free_hook; 博客给出真 flag。",
+  "flag": "13c42279aade7f573945437b0b3a46d5a1fcf6f143d2ac19d2b8274e591ee37f",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/pwn/real_pwn_hws2022_peach/flag.txt"
+  ],
+  "difficulty": "HARD",
+  "flag_sha256": "13c42279aade7f573945437b0b3a46d5a1fcf6f143d2ac19d2b8274e591ee37f",
+  "verified_solver": true,
+  "source": "2022HWS硬件安全冬令营 X DASCTF Jan Writeup(lakwsh.net)",
+  "solver": "scripts/_solve_hws_peach.py"
+}

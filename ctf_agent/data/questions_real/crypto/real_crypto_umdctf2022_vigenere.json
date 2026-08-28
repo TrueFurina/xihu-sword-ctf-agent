@@ -1,0 +1,16 @@
+{
+  "id": "real_crypto_umdctf2022_vigenere",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "UMDCTF2022 Vigenere/XOR 密钥恢复",
+  "description": "UMDCTF2022 crypto 题: 给定 Vigenere/XOR 加密脚本 (未知长度 key 异或 flag), 用 Hamming 距离估密钥长, 按列做单字节 XOR 频度分析恢复密钥与明文得 flag。writeup 明文给出真 flag。",
+  "flag": "7f9fa04fd358b5b669b3f1967e6da36feafd52b53e2620eabdcd447ccc06319b",
+  "flag_pattern": "UMDCTF\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_umdctf2022_vigenere/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "7f9fa04fd358b5b669b3f1967e6da36feafd52b53e2620eabdcd447ccc06319b",
+  "verified_solver": false,
+  "source": "UMDCTF 2022 Writeup (cpurcell31.github.io): 已知加密脚本, 用汉明距离定密钥长+列单字节XOR频度分析恢复"
+}

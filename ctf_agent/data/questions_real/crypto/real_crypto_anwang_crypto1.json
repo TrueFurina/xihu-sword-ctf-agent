@@ -7,7 +7,7 @@
   "flag": "2e9f80ef4619805caf4ae07ee11c4bc3d71e8563fa8ab0131fe8028273fcda0d",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/比赛真题/2022安网杯/2022安网杯/crypto/crypto1_8cc00e32a64d218f9a52e62741f668cf/flag.txt"
+    "data/questions_real/_attachments/crypto/real_crypto_anwang_crypto1/flag.txt"
   ],
   "difficulty": "EASY",
   "flag_sha256": "2e9f80ef4619805caf4ae07ee11c4bc3d71e8563fa8ab0131fe8028273fcda0d"

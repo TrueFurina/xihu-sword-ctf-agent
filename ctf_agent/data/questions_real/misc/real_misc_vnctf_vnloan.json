@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_vnctf_vnloan",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "VNCTF2022 VNloan (区块链/目录重建 misc)",
+  "description": "VNCTF2022 区块链类题 VNloan: 依链上路径序列 res 重建文件夹结构, 末节点文件名即 flag 片段。writeup 明文给出真 flag。",
+  "flag": "68fb5e5275a1c05d404c9a6922f400953aa8caf1b7f6db0c3fba75996e0e1ae3",
+  "flag_pattern": "vnctf\\{[0-9a-f]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_vnctf_vnloan/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "68fb5e5275a1c05d404c9a6922f400953aa8caf1b7f6db0c3fba75996e0e1ae3",
+  "verified_solver": false,
+  "source": "VNCTF2022 writeup (BlockChain/VNloan, 依 res 序列重建目录树)"
+}

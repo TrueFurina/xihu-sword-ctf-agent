@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_vnctf_strangeflag",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "VNCTF 2022 Strange flag",
+  "description": "TEA (Tiny Encryption Algorithm) decrypt. Encrypted data is decrypted with TEA (delta=0x9e3779b9, sum=0xC6EF3720, 32 rounds) to yield the flag. Reconstructed from VNCTF 2022 Official WriteUp (local PDF). Flag taken from the official writeup. (Original ciphertext array needed for a fully automated re-solve; TEA decrypt structure is in the source writeup.)",
+  "flag": "85ab27107d2a7cfa52f9a1dfd91df1b1d518ec307f531db5ab0421f91e779655",
+  "flag_pattern": "VNCTF\\{[^}]+\\}",
+  "attachments": [
+    "recovered_external/wp_text/vnctf2022.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "85ab27107d2a7cfa52f9a1dfd91df1b1d518ec307f531db5ab0421f91e779655",
+  "verified_solver": false,
+  "source": "VNCTF 2022 Official WriteUp (E:/Program/Cybersecurity/1.考研计算机408资料大全/VNCTF 2022 Official WriteUp.pdf)"
+}

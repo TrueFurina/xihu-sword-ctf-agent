@@ -7,8 +7,8 @@
   "flag": "aec640f00c418c309bd68dcbfd389df969fa3393a68aee14690393908d2f6ef9",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/9.CTF Reverse/Where is the flag/coso.js",
-    "E:/Program/Cybersecurity/9.CTF Reverse/Where is the flag/index.html"
+    "data/questions_real/_attachments/reverse/real_reverse_js/coso.js",
+    "data/questions_real/_attachments/reverse/real_reverse_js/index.html"
   ],
   "difficulty": "VERY_EASY",
   "flag_sha256": "aec640f00c418c309bd68dcbfd389df969fa3393a68aee14690393908d2f6ef9"

@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_udomctf2022_morse",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "UDOMCTF2022 Morse Code Audio 取证",
+  "description": "UDOMCTF2022 取证题: 压缩包内 pdf 实为 WAV 音频, 转音频后为摩斯电码, 翻译得 flag。writeup 明文给出真 flag。",
+  "flag": "bb0e2397592f15c502441031d136805d580f77a33ba3f0a42da5cacd30b9d0ab",
+  "flag_pattern": "UDOM\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_udomctf2022_morse/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "bb0e2397592f15c502441031d136805d580f77a33ba3f0a42da5cacd30b9d0ab",
+  "verified_solver": false,
+  "source": "UDOMCTF 2022/2023 Writeup (engineering.zooz.com): zip 内伪 pdf 实为 WAV, 转音频得摩斯电码"
+}

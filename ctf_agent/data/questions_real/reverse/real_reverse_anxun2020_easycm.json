@@ -1,0 +1,16 @@
+{
+  "id": "real_reverse_anxun2020_easycm",
+  "provenance": "real_past_ctf",
+  "category": "reverse",
+  "title": "安洵杯 2020 EasyCM",
+  "description": "Windows exe with SMC (self-modifying code) self-decoding via a section named '.cyzcc'. Two sub-threads: one encrypts a pseudo-flag to a comparison string; the other builds a base table from a data blob then swaps the table after thread sync. Recover the real flag via IDC script on the SMC-decoded code, or by manually decrypting the '.cyzcc' section. Reconstructed from 安洵杯官方wp (local PDF). Flag from official writeup.",
+  "flag": "888adf3fcf54ae54a11afa86b3056261ab32ce769791b519f0c78fe9ba6100b3",
+  "flag_pattern": "D0g3\\{[^}]+\\}",
+  "attachments": [
+    "recovered_external/wp_text/anxun2020_official.txt"
+  ],
+  "difficulty": "HARD",
+  "flag_sha256": "888adf3fcf54ae54a11afa86b3056261ab32ce769791b519f0c78fe9ba6100b3",
+  "verified_solver": false,
+  "source": "安洵杯官方wp (E:/Program/Cybersecurity/1.考研计算机408资料大全/安洵杯官方wp(1).pdf)"
+}

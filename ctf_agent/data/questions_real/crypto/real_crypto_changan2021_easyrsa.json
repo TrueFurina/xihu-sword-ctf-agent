@@ -1,0 +1,17 @@
+{
+  "id": "real_crypto_changan2021_easyrsa",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "长安杯2021 Crypto easyRSA (逐位恢复p,q)",
+  "description": "已知 n,e,p_add_q,p_mul_q,c; 由 p+q 与 p*q 逐位确定 p,q 数字恢复私钥解密。solver 实跑复现。",
+  "flag": "b8b6b346054d3c6c444fd004f77a8569b020db4ad703f3241c20c9af28bba11e",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_changan2021_easyrsa/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "b8b6b346054d3c6c444fd004f77a8569b020db4ad703f3241c20c9af28bba11e",
+  "verified_solver": true,
+  "source": "长安杯2021 PWN&Reverse wp 合集(博客)",
+  "solver": "scripts/_solve_changan_easyrsa.py"
+}

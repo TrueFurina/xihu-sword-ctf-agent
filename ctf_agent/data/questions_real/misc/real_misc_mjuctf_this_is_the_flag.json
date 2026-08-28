@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_mjuctf_this_is_the_flag",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "MJUCTF中级赛 基础题",
+  "description": "MJUCTF中级赛部分赛题(本地PDF)其二。",
+  "flag": "ff7dbfd3ab7f1c5e687e5ac861ad5e33c2af913832fb219fe42fcf9116902275",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_mjuctf_this_is_the_flag/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "ff7dbfd3ab7f1c5e687e5ac861ad5e33c2af913832fb219fe42fcf9116902275",
+  "verified_solver": false,
+  "source": "MJUCTF中级赛部分赛题.pdf(本地Cybersecurity)"
+}

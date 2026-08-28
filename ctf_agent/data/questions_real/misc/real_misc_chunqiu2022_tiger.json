@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_chunqiu2022_tiger",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "春秋杯2022 勇者山峰 tiger",
+  "description": "rot47+LSB隐写+zip明文攻击+零宽字节+Vigenère多步解密。",
+  "flag": "70d0fd2b14bb542d43cca26d6d622743eaab873140705a74ead35d69ecb1e77b",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_chunqiu2022_tiger/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "70d0fd2b14bb542d43cca26d6d622743eaab873140705a74ead35d69ecb1e77b",
+  "verified_solver": false,
+  "source": "2022春秋杯勇者山峰WP(CSDN)"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "real_misc_longjian2024_smallsword3",
+  "provenance": "real_past_ctf",
+  "category": "misc",
+  "title": "陇剑杯2024 SmallSword_3 攻击者下载的flag",
+  "description": "导出 huorong.exe 流量, 去除蚁剑识别头 ->| 保存为 exe, pyinstaller 打包, 运行后上一层目录拿到图片, 修复宽高得 flag。",
+  "flag": "2415582719bf1598005e6cd6cc844b75ff64193312f7dc27695a7533f13f5477",
+  "flag_pattern": "flag3\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/misc/real_misc_longjian2024_smallsword3/flag.txt"
+  ],
+  "difficulty": "HARD",
+  "flag_sha256": "2415582719bf1598005e6cd6cc844b75ff64193312f7dc27695a7533f13f5477",
+  "verified_solver": false,
+  "source": "第二届陇剑杯2024 初赛WP(博客)"
+}

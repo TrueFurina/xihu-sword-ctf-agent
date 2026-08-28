@@ -1,0 +1,16 @@
+{
+  "id": "real_crypto_udomctf2022_aes",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "UDOMCTF2022 AES 加解密 (CyberChef)",
+  "description": "UDOMCTF2022 crypto 题: 给定 AES 加密脚本, 用 CyberChef 反向解密即得 flag。writeup 明文给出真 flag。",
+  "flag": "bf9462ee7b04f567d925e0e10c7dfd81b1c5f42ba20273083f7802f49f2c38dd",
+  "flag_pattern": "UDOM\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_udomctf2022_aes/flag.txt"
+  ],
+  "difficulty": "EASY",
+  "flag_sha256": "bf9462ee7b04f567d925e0e10c7dfd81b1c5f42ba20273083f7802f49f2c38dd",
+  "verified_solver": false,
+  "source": "UDOMCTF 2022/2023 Writeup (engineering.zooz.com): 给 AES 加密 python 代码, 用 CyberChef 解密"
+}

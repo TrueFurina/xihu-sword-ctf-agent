@@ -1,0 +1,16 @@
+{
+  "id": "real_crypto_gkctf2020_che11y",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "GKCTF2020 Che11y_1s_EG0IST",
+  "description": "key 数组经 de_anwser 解码还原 flag。",
+  "flag": "37d6539632d5705632ce0ee3c10722317fd25a4a307c87601b3a9b0ad6c31c23",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/crypto/real_crypto_gkctf2020_che11y/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "37d6539632d5705632ce0ee3c10722317fd25a4a307c87601b3a9b0ad6c31c23",
+  "verified_solver": false,
+  "source": "GKCTF2020_官方WriteUp.pdf (本地: E:/Program/Cybersecurity/1.考研计算机408资料大全/GKCTF2020_官方WriteUp.pdf)"
+}

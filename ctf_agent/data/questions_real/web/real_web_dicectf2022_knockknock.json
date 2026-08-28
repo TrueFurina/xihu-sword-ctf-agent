@@ -1,0 +1,16 @@
+{
+  "id": "real_web_dicectf2022_knockknock",
+  "provenance": "real_past_ctf",
+  "category": "web",
+  "title": "DiceCTF2022 knock-knock (HMAC secret 为函数源码)",
+  "description": "DiceCTF2022 web 题: 笔记 token = HMAC(secret, id), secret=`secret-${crypto.randomUUID}` 因未调用函数而固定为该函数的源码字符串, 本地复现算出 id=0 的 token 直接读 flag。writeup 明文给出真 flag。",
+  "flag": "b29a018aa481672de9367f4e293656f31e847f7cb59912ae312bbe6d19a0a11f",
+  "flag_pattern": "dice\\{[^}]+\\}",
+  "attachments": [
+    "data/questions_real/_attachments/web/real_web_dicectf2022_knockknock/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "b29a018aa481672de9367f4e293656f31e847f7cb59912ae312bbe6d19a0a11f",
+  "verified_solver": false,
+  "source": "DiceCTF 2022 Writeup (maikypedia.gitlab.io / maple3142.net): secret=`secret-${crypto.randomUUID}` 实为函数源码字符串 -> 可重算 token 取 id=0"
+}

@@ -7,8 +7,8 @@
   "flag": "75e6aa4de894faf2a760a91aa74d93e9f3b971377012f81bfb95806902ba0002",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-SimpleLegendre/task.py",
-    "E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Crypto-SimpleLegendre/output"
+    "data/questions_real/_attachments/crypto/real_crypto_simplelegendre/task.py",
+    "data/questions_real/_attachments/crypto/real_crypto_simplelegendre/output"
   ],
   "difficulty": "HARD",
   "flag_sha256": "75e6aa4de894faf2a760a91aa74d93e9f3b971377012f81bfb95806902ba0002"

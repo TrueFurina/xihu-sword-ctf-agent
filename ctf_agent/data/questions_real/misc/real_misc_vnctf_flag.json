@@ -7,7 +7,7 @@
   "flag": "7d9ce4e1a4e7369ed227dd7106ecf8e14b6b0a4755416d28d2c844d385a0ebcd",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "E:/Program/Cybersecurity/比赛真题/VNCTF2022公开赛/MISC/flag/flag.png"
+    "data/questions_real/_attachments/misc/real_misc_vnctf_flag/flag.png"
   ],
   "difficulty": "MEDIUM",
   "flag_sha256": "7d9ce4e1a4e7369ed227dd7106ecf8e14b6b0a4755416d28d2c844d385a0ebcd"

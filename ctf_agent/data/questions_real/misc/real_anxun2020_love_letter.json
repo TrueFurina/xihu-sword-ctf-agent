@@ -1,0 +1,12 @@
+{
+  "id": "real_anxun2020_love_letter",
+  "provenance": "real_past_ctf",
+  "recovered_from": "https://github.com/D0g3-Lab/i-SOON_CTF_2020 (公开仓库，误删后外网重建)",
+  "category": "misc",
+  "title": "安洵杯2020 MISC 一封情书（97×97二维码+坐标+36进制）",
+  "description": "附件 9409 字符按 97×97 渲染为二维码，扫码得坐标串，在 6×6 网格提取色块值，二进制转三十六进制得 flag。二进制原题见官方仓库。",
+  "flag": "flag{j5w2a0o0}",
+  "flag_pattern": "flag\\{[^}]+\\}",
+  "attachments": ["data/questions_real/_attachments/anxun2020/misc/love_letter.md"],
+  "difficulty": "EASY"
+}

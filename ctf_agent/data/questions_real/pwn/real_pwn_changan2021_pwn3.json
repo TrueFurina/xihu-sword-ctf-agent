@@ -1,0 +1,16 @@
+{
+  "id": "real_pwn_changan2021_pwn3",
+  "provenance": "real_past_ctf",
+  "category": "pwn",
+  "title": "长安杯2021 pwn3 (游戏类 PWN)",
+  "description": "长安杯2021 pwn3 为游戏类 PWN, 编写 exp 经 oPwn Platform 工具执行后拿到 flag。writeup 明文给出真 flag。",
+  "flag": "92b80a26ebabb2d3d3fe9615891d65d5cdb7cf5535a0c93a12484bb81af2e3c7",
+  "flag_pattern": "flag\\{[0-9a-f]{32}\\}",
+  "attachments": [
+    "data/questions_real/_attachments/pwn/real_pwn_changan2021_pwn3/flag.txt"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "92b80a26ebabb2d3d3fe9615891d65d5cdb7cf5535a0c93a12484bb81af2e3c7",
+  "verified_solver": false,
+  "source": "长安杯2021 writeup (pwn3 游戏型 PWN, oPwn Platform 打 exp)"
+}
