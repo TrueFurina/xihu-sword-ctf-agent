@@ -32,6 +32,8 @@ _ARCHIVE_*/
 tmp_*/
 _INDEX.md
 deliverables/archive_禁用引用/
+# 发布产物（GitHub Pages 等生成输出，非项目源码，不入库）
+.publish_assets/
 
 # ---------- 3. 真实赛事内部资源（平台私有，含附件 URL/签名，不公开） ----------
 ctf_agent/data/race_details/
