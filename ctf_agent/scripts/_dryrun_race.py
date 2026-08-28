@@ -203,13 +203,23 @@ def verify_against_truth(cid: str, out: dict) -> dict:
 
 
 async def run_presolve(qdict: dict, solver) -> dict:
-    """确定性预扫（flag_scan/crypto_auto/math_engine/关键词 fast_solve）。"""
+    """确定性预扫（flag_scan/crypto_auto/math_engine/关键词 fast_solve）。
+
+    M2-AUDIT-INJECT 修复：presolve 阶段（如 _try_web_source_audit）会把审计报告
+    写入 q.extra["web_audit_report"]，但 q 是 Question.from_dict(qdict) 新建对象，
+    presolve 改的是 q.extra 而非共享 qdict。run_llm_agent 又 from_dict(qdict) 重建
+    对象 → LLM 阶段 extra 为空、报告传不过去。此处把 q.extra 回写共享 qdict，
+    使后续 LLM 阶段能注入审计报告（prompts.py 消费 question.extra）。
+    """
     from eval.cases import Question
     q = Question.from_dict(qdict)
     try:
         from core.presolve import presolve
         _reg = getattr(solver, "registry", None)
         _flag = await presolve(q, registry=_reg, sandbox=None, answers=None)
+        # 回写 presolve 产物到共享 qdict（web_audit_report 等），供 LLM 阶段注入
+        if getattr(q, "extra", None):
+            qdict.setdefault("extra", {}).update(q.extra)
         if _flag:
             return {"flag": _flag, "method": "presolve", "validated": True}
         return {"flag": None, "method": "presolve_miss"}

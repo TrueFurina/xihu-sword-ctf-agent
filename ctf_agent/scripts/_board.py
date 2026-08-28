@@ -171,6 +171,47 @@ def test_baseline_drift() -> dict:
     }
 
 
+def trends() -> dict:
+    """两条 KPI 趋势线（作战计划 3.1，2026-08-25）：
+
+    ① offline_verified 只升不降：基线 = KPI_BASELINE.json 历史高水位（合并闸门棘轮锚），
+       当前 = REAL_SOLVES_LEDGER 实时计数。当前 < 基线 → 红色告警（台账被删行）。
+    ② 5_LLM主Agent 失败占比：基线 = KPI_BASELINE.chain_worst_step（历史高水位 81.9%），
+       当前 = 最新 chain_stats_*.json 的 worst_step。目标每周 -10pt（作战计划 3.4）。
+    """
+    baseline_file = ROOT / "data" / "results" / "KPI_BASELINE.json"
+    base = {}
+    if baseline_file.is_file():
+        try:
+            base = json.loads(baseline_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            base = {}
+    # ① offline_verified 棘轮
+    base_ov = base.get("offline_verified")
+    cur_ov = ledger_count()["offline_verified"]
+    ov = {
+        "baseline": base_ov,
+        "current": cur_ov,
+        "ok": base_ov is None or cur_ov >= base_ov,
+    }
+    # ② 5_LLM主Agent 失败占比（从 KPI_BASELINE.chain_worst_step 解析 81.9%）
+    base_worst = base.get("chain_worst_step", "")
+    base_pct = None
+    m = re.search(r"([\d.]+)%", str(base_worst))
+    if m:
+        base_pct = float(m.group(1))
+    cs = chain_stats()
+    cur_pct = cs.get("worst_pct") if cs.get("worst_step") == "5_LLM主Agent" else None
+    llm = {
+        "baseline_pct": base_pct,
+        "current_pct": cur_pct,
+        "worst_step": cs.get("worst_step", "—"),
+        "ok": cur_pct is None or base_pct is None or cur_pct <= base_pct,
+        "note": "目标每周 -10pt（81.9% → 70% → 60%）" if base_pct is not None else "无基线",
+    }
+    return {"offline_verified": ov, "llm_fail_pct": llm}
+
+
 def direction(subjects: list) -> str:
     """方向判定：解题 / 治理 / 混合。"""
     s = " ".join(subjects).lower()
@@ -195,6 +236,7 @@ def main() -> int:
     bl = blindspots()
     cs = chain_stats()
     tbd = test_baseline_drift()
+    tr = trends()
     main_commit = run(["git", "log", "-1", "--format=%h %s", "main"]).strip()
 
     lanes = []
@@ -211,6 +253,7 @@ def main() -> int:
         print(json.dumps({
             "main_head": main_commit,
             "ledger": ledger,
+            "trends": tr,
             "blindspots": bl,
             "chain_stats": cs,
             "lanes": lanes,
@@ -221,6 +264,16 @@ def main() -> int:
     print(f"main: {main_commit}")
     print(f"唯一 KPI（REAL_SOLVES_LEDGER）: offline_verified={ledger['offline_verified']} "
           f"claimed_pending={ledger['claimed_pending']} platform_accepted=0")
+    # 趋势线① offline_verified 棘轮（只升不降）
+    _ov = tr["offline_verified"]
+    _ov_txt = (f"趋势① offline_verified: 当前 {_ov['current']}"
+               f"（基线 {_ov['baseline'] or '无'}）")
+    print(f"{'✅ 只升不降' if _ov['ok'] else '❌ 跌破基线（台账被删行？）'}: {_ov_txt}")
+    # 趋势线② 5_LLM主Agent 失败占比
+    _llm = tr["llm_fail_pct"]
+    _llm_txt = (f"趋势② 5_LLM主Agent 失败占比: 当前 {_llm['current_pct'] or '—'}%"
+                f"（基线 {_llm['baseline_pct'] or '—'}% | {_llm['note']}）")
+    print(f"{'✅ 未升' if _llm['ok'] else '❌ 失败占比反弹（违反每周 -10pt 目标）'}: {_llm_txt}")
     if bl:
         _cat = ", ".join(f"{k}:{v}" for k, v in sorted(bl["by_category"].items())) or "—"
         print(f"盲区（confidence>={bl['threshold']} 且未解出）: {bl['count']} 道 / 总 {bl['total']} 道"

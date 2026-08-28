@@ -20,9 +20,13 @@ import struct
 import sys
 import zlib
 
-from z3 import BitVec, BitVecVal, Extract, If, LShR, Solver, sat
+try:
+    from z3 import BitVec, BitVecVal, Extract, If, LShR, Solver, sat
+    HAS_Z3 = True
+except ImportError:
+    HAS_Z3 = False
 
-M32 = BitVecVal(0xFFFFFFFF, 32)
+M32 = BitVecVal(0xFFFFFFFF, 32) if HAS_Z3 else None
 
 
 def _crc_table():
@@ -150,7 +154,16 @@ def gen_keystream(k0, k1, k2, n):
 
 
 def main():
-    ZDIR = r"E:/Program/Cybersecurity/比赛真题/2020年玄盾杯试题(1)/Misc_EZIP"
+    import os
+    # 真题附件路径（仓库内部;2026-08-27 将功补过尝试重建,但原始 zip 公开渠道不可得,缺失则优雅 SKIP）
+    ZDIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data/questions_real/_attachments/xuandun_ezip/Misc_EZIP")
+    # ── fail-closed: 外部真题源缺失即优雅退出(不裸崩) ──
+    if not os.path.isdir(ZDIR):
+        print("=== 外部真题源已失效 (EXTERNAL-SOURCE-MISSING) ===")
+        print(f"  缺失目录: {ZDIR}")
+        print("=== 说明: 玄盾杯 Misc_EZIP 外部附件 2026-08-26 清理时删除,且 2026-08-27 用户确认无备份,")
+        print("===       永久不可复现。本脚本保留为 ZipCrypto 已知明文攻击(KPA)方法学记录,不计入 KPI。退出码 2。")
+        return 2
     import zipfile
     from zipfile import _ZipDecrypter
 

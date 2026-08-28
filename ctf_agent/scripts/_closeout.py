@@ -140,5 +140,28 @@ def main_junk_only():
     return 0
 
 
+# ── 外部依赖资产检查（2026-08-27 事故固化：E:/Program/Cybersecurity/比赛真题 被清理删除 ──
+# 导致 4 道 verify 断链。收尾时必须核对所有 verify 脚本依赖的附件源仍存在，
+# 防"外部真题归档再被清理→verify 静默断链"复发。──
+EXTERNAL_DEPS = [
+    # 仓库内重建附件（2026-08-27 起 verify_hgame2022_rsa.py 依赖这些）
+    os.path.join(ROOT, "data", "questions_real", "_attachments", "hg2022",
+                 "RSA Attack", "output.txt"),
+    os.path.join(ROOT, "data", "questions_real", "_attachments", "hg2022",
+                 "RSA Attack 2", "output.txt"),
+    os.path.join(ROOT, "data", "questions_real", "_attachments", "hg2022",
+                 "RSA Attack 3", "output.txt"),
+]
+
+
+def check_external_deps() -> list:
+    """核对 verify 脚本依赖的附件源是否存在（缺失=断链风险，收尾告警）。"""
+    missing = []
+    for p in EXTERNAL_DEPS:
+        if not os.path.isfile(p):
+            missing.append(os.path.relpath(p, ROOT))
+    return missing
+
+
 if __name__ == "__main__":
     sys.exit(main())

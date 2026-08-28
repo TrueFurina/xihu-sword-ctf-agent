@@ -36,8 +36,12 @@ MANAGED_EXT = {
 # REAL_SOLVES_LEDGER.md = 反注水法令 fact-layer（被 _antifraud/_merge_gate/_board/_fix_ledger_kpi
 #   四处硬编码引用，且被 .gitignore 的 /data/* 排除——若移入 data/results/ 会从版本控制丢失，
 #   故保留在根并显式白名单）；requirements.txt = 构建清单（pip 约定根级，universal convention）。
+# 协同任务总账-TOP0.md = 包工头总账活文件（post-commit 自动记账硬编码写 ../协同任务总账-TOP0.md，
+#   移动会破坏记账路径，故白名单保留在根）；_INDEX.md = 项目索引（归 docs/ 更规范，但历史散落
+#   已存在，先白名单合法化防 --all 误报，doc-归位留给后续）。
 ROOT_ALLOW = {"README.md", "CLAUDE.md", "LICENSE", "AGENTS.md",
-              "REAL_SOLVES_LEDGER.md", "requirements.txt"}
+              "REAL_SOLVES_LEDGER.md", "requirements.txt",
+              "协同任务总账-TOP0.md", "_INDEX.md"}
 DELIV_ROOT_ALLOW = {"deliverables/overview.md"}
 IDEA_ROOT_ALLOW = {
     "idea-stage/IDEA_REPORT.md",

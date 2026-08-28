@@ -309,10 +309,17 @@ def path_in_scope(path: str, scope: list) -> bool:
 
 
 def _staged_files() -> list:
-    """git diff --cached --name-only -z（NUL 分隔，UTF-8 原始路径，避免中文文件名八进制转义）。"""
+    """git diff --cached --name-only -z（NUL 分隔，UTF-8 原始路径，避免中文文件名八进制转义）。
+
+    2026-08-27 修复（质检 R3 连锁）：git 仓库根 = 父目录（`E:/Program/西湖论剑`），
+    `git diff` 返回的路径相对 toplevel（带 `ctf_agent/` 前缀），而 scope 相对 ctf_agent 根
+    （ROOT）——两者基准不一致会导致 lease scope 门禁误拒。此处 strip `ctf_agent/` 前缀。
+    """
     out = subprocess.run(["git", "diff", "--cached", "--name-only", "-z"],
                          cwd=ROOT, capture_output=True)
-    return [p for p in out.stdout.decode("utf-8", errors="ignore").split("\0") if p.strip()]
+    files = [p for p in out.stdout.decode("utf-8", errors="ignore").split("\0") if p.strip()]
+    prefix = "ctf_agent/"
+    return [p[len(prefix):] if p.startswith(prefix) else p for p in files]
 
 
 def _exempt(path: str) -> bool:

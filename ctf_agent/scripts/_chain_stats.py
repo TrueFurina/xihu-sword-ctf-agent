@@ -84,6 +84,132 @@ def classify(record: dict) -> str:
     return "未知"
 
 
+# ── 3.2 失败子类学（A-F）：把 5_LLM主Agent 失败再分桶 ──
+# 数据源同 goal_log；识别特征以 error_struct.category / class4 为准
+# （goal_log 无"附件是否已读但 prompt 未含"等细粒度信号，C/C2 采用
+#  tool_failure / 超时兜底映射，并在输出注明数据局限）。
+SUBCLASSES = [
+    ("A",  "输出格式崩",   "JSON 解析失败 / action 缺字段"),
+    ("B",  "方向决策错",   "步骤空转 / 重复同动作"),
+    ("C",  "证据不进脑",   "附件已读但 prompt 未含内容"),
+    ("C2", "上下文遗忘",   "关键参数在后轮丢失"),
+    ("D",  "修正无效",     "correction 注入后仍同错"),
+    ("E",  "模型能力不足", "以上都不是（含响应超时 wallclock_timeout）"),
+    ("F",  "flag 提取失败", "解出但输出无 flag / 提取被拒"),
+]
+
+# error_struct.category → 子类（基于 goal_log 现有信号）
+_SUBCAT_BY_CAT = {
+    "stuck_loop": "B",
+    "wrong_direction": "B",
+    "wallclock_timeout": "E",
+    "extract_fail": "F",
+    "tool_failure": "C",
+    "hallucination": "A",
+}
+# error_struct.class4 → 子类（category 缺省时兜底）
+_SUBCAT_BY_C4 = {
+    "决策错": "B",
+    "超时": "E",
+    "提取错": "F",
+    "工具调用错": "C",
+}
+
+
+def subclassify(record: dict):
+    """把一条记录归到 3.2 子类（A-F），非 LLM/工具类失败返回 None。
+
+    仅对带 LLM/工具/提取类错误信号的失败记录分桶；早期断裂
+    （step 1/2：task_id/question_type 空）与成功记录返回 None。
+
+    C 桶（证据不进脑）判定升级（2026-08-25 E3 验收后）：
+      - 优先用 error_struct.evidence_injected 三态真信号：
+          False（有附件但未注入 prompt）→ C（正是 E3 想修的"证据不进脑"）
+          True（有附件且注入过）→ 不归 C（进了脑仍失败是别的原因，归 B/E）
+      - 历史数据缺 evidence_injected 字段时，回退 tool_failure 代理（保持旧口径兼容）。
+    """
+    if record.get("flag") and record.get("validated"):
+        return None  # 成功
+    es = record.get("error_struct") or {}
+    cat = es.get("category", "") if isinstance(es, dict) else ""
+    c4 = es.get("class4", "") if isinstance(es, dict) else ""
+    # ── E3 真信号优先（2026-08-25）：evidence_injected 三态 ──
+    ev = es.get("evidence_injected", "__absent__") if isinstance(es, dict) else "__absent__"
+    if ev is False:
+        return "C"  # 有附件但证据未进 prompt —— 真·证据不进脑
+    if ev != "__absent__":
+        # 有真信号（True=进了脑 / None=无附件）：以真信号为准，忽略 tool_failure→C 代理映射，
+        # 避免"进了脑仍失败"(True) 或"无附件"(None) 被误归 C。按其余子类归桶。
+        _cat_map = {k: v for k, v in _SUBCAT_BY_CAT.items() if v != "C"}
+        _c4_map = {k: v for k, v in _SUBCAT_BY_C4.items() if v != "C"}
+        if cat in _cat_map:
+            return _cat_map[cat]
+        if c4 in _c4_map:
+            return _c4_map[c4]
+        return None
+    # 历史数据（缺 evidence_injected 字段）：回退旧口径，tool_failure→C 代理兼容
+    if cat in _SUBCAT_BY_CAT:
+        return _SUBCAT_BY_CAT[cat]
+    if c4 in _SUBCAT_BY_C4:
+        return _SUBCAT_BY_C4[c4]
+    return None
+
+
+def analyze_subclass(log_path: str) -> dict:
+    """按 3.2 子类统计 5_LLM主Agent 失败分布。"""
+    if not os.path.isfile(log_path):
+        raise FileNotFoundError(log_path)
+    total = 0
+    sub = Counter()
+    unmapped = 0
+    with open(log_path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            sc = subclassify(rec)
+            if sc is None:
+                continue
+            total += 1
+            sub[sc] += 1
+    dist = {}
+    for code, name, feat in SUBCLASSES:
+        dist[code] = {
+            "name": name,
+            "feature": feat,
+            "count": sub.get(code, 0),
+            "pct": round(100.0 * sub.get(code, 0) / total, 1) if total else 0.0,
+        }
+    biggest = max(SUBCLASSES, key=lambda x: sub.get(x[0], 0))[0] if total else ""
+    return {
+        "as_of": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "log": os.path.basename(log_path),
+        "total_subclassed": total,
+        "distribution": dist,
+        "biggest_bucket": biggest,
+        "recommendation": _recommend_subclass(biggest, dist),
+        "note": "映射基于 error_struct.category/class4；A/C2/D 当前 goal_log 无直接"
+                "信号(计0)，属数据局限非真零。哪个桶最大先打哪个。",
+    }
+
+
+def _recommend_subclass(biggest: str, dist: dict) -> str:
+    if not biggest:
+        return "无 LLM 类失败记录"
+    d = dist[biggest]
+    return (f"最大子类 = {biggest} {d['name']}（{d['count']} 次，{d['pct']}%）"
+            f"→ 优先实验："
+            f"{'E2步骤预算/E6 few-shot' if biggest=='B' else ''}"
+            f"{'E2步骤预算' if biggest=='E' else ''}"
+            f"{'E8多候选提交' if biggest=='F' else ''}"
+            f"{'E3附件证据注入' if biggest=='C' else ''}"
+            f"；其余桶按分布依次推进。")
+
+
 def analyze(log_path: str) -> dict:
     """解析 goal_log → 失败步直方图 + 每步失败明细。"""
     if not os.path.isfile(log_path):
@@ -171,11 +297,58 @@ def render_md(stats: dict) -> str:
     return "\n".join(L)
 
 
+def render_subclass_md(stats: dict) -> str:
+    L = [f"# 失败子类分布（A-F，{stats['as_of']}）",
+         f"\n数据源：`{stats['log']}` | 子类化 {stats['total_subclassed']} 条 "
+         f"LLM/工具类失败\n",
+         "## 子类直方图\n",
+         "| 子类 | 名称 | 识别特征 | 次数 | 占比 | 条形 |",
+         "|---|---|---|---|---|---|"]
+    for code, name, feat in SUBCLASSES:
+        d = stats["distribution"][code]
+        bar = "#" * max(1, int(d["pct"] / 5))
+        L.append(f"| {code} | {name} | {feat} | {d['count']} | {d['pct']}% | {bar} |")
+    L.append(f"\n## 最大子类：{stats['biggest_bucket'] or '无'}\n")
+    L.append(stats["recommendation"])
+    L.append(f"\n> {stats['note']}")
+    return "\n".join(L)
+
+
+def _run_subclass(args) -> int:
+    try:
+        stats = analyze_subclass(args.log)
+    except FileNotFoundError:
+        print(f"❌ 未找到日志：{args.log}")
+        return 1
+    os.makedirs(args.out, exist_ok=True)
+    ts = time.strftime("%Y%m%d", time.gmtime())
+    jpath = os.path.join(args.out, f"chain_subclass_{ts}.json")
+    mpath = os.path.join(args.out, f"chain_subclass_{ts}.md")
+    with open(jpath, "w", encoding="utf-8") as fh:
+        json.dump(stats, fh, ensure_ascii=False, indent=2)
+    with open(mpath, "w", encoding="utf-8") as fh:
+        fh.write(render_subclass_md(stats))
+    print(f"✅ 子类分布完成：子类化 {stats['total_subclassed']} 条，"
+          f"最大桶 = {stats['biggest_bucket'] or '无'}")
+    for code, name, _ in SUBCLASSES:
+        d = stats["distribution"][code]
+        if d["count"]:
+            print(f"   {code} {name}: {d['count']} 次（{d['pct']}%）")
+    print(f"   JSON: {jpath}")
+    print(f"   MD  : {mpath}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="7 步链路失败步统计（P1 Step 3）")
     ap.add_argument("--log", default=DEFAULT_LOG, help="goal_log 路径")
     ap.add_argument("--out", default=RESULTS_DIR, help="输出目录")
+    ap.add_argument("--by-subclass", action="store_true",
+                    help="3.2 模式：按 A-F 子类统计 5_LLM主Agent 失败分布")
     args = ap.parse_args()
+
+    if args.by_subclass:
+        return _run_subclass(args)
 
     try:
         stats = analyze(args.log)

@@ -25,8 +25,19 @@ QUESTION = os.path.join(
 VERIFIED = os.path.join(ROOT, "data", "results", "verified_flags.json")
 # 台账第二节第 4 条承诺的 flag sha256 前缀（7d9ce4e1a4e7369e…，来自官方 writeup 原文）
 LEDGER_SHA256_PREFIX = "7d9ce4e1a4e7369e"
-# 官方附件路径（题面 attachments[0]）
-ATTACH = "E:/Program/Cybersecurity/比赛真题/VNCTF2022公开赛/MISC/flag/flag.png"
+# 附件路径：从题面 attachments[0] 解析，仓库内可移植（不再硬编码绝对路径）。
+# 早期版本硬编码 E:/Program/Cybersecurity/... 在其它机器 exit=1（不可复现），现已改为相对 ROOT 解析。
+_ATTACH_CANDIDATES = []
+try:
+    with open(QUESTION, encoding="utf-8") as _f:
+        _q = json.load(_f)
+    _att_rel = (_q.get("attachments") or [None])[0]
+    if _att_rel:
+        _ATTACH_CANDIDATES.append(
+            _att_rel if os.path.isabs(_att_rel) else os.path.join(ROOT, _att_rel))
+except Exception:  # noqa: BLE001
+    _ATTACH_CANDIDATES = []
+ATTACH = next((p for p in _ATTACH_CANDIDATES if os.path.isfile(p)), "")
 
 
 def main() -> int:

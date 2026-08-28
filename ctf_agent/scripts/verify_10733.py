@@ -7,7 +7,7 @@
   2) e=65536=2^16，p,q 均 3 mod 4：在奇数阶子群 s=(p-1)/2 求逆使 2^15·inv≡1 (mod s)
      -> c^inv ≡ m² (mod p)，CRT 得 m² mod n，一轮 Rabin 得 m
   3) 明文 m 是 ROT13 编码：QNFPGS{...} = rot13(DASCTF{...})，题名 "How many rot" 即提示。
-     ROT13 只转字母、不动数字 -> 规范 flag = DASCTF{rabbits6sc5mpl8x6s9w6n6nc5mpl8x6s9w6n6nc5mpl8x6s9w6n6nc5mpl8}
+     ROT13 只转字母、不动数字 -> 规范 flag = DASCTF{<redacted>}（明文见本地 gitignored verified_flags.json）
 
 运行：.venv/Scripts/python.exe scripts/verify_10733.py
 """
