@@ -141,4 +141,4 @@
 
 - Claim 1 已闭环（measurement 完成），无需重跑。
 - Claim 2/3 待 LLM 真推理贡献 >0 后测（当前 0，测了也是空信号）。
-- Block 2（并发效率）依赖 `ctf_agent/` 多题并发层，当前代码**无 asyncio/semaphore 并发**（见 `方案评估-IDEA1可行性效度评审-20260828.md`），暂不可执行。
+- Block 2（并发效率）**已可执行**：2026-08-28 已为 `ctf_agent/eval/benchmark.py` 新增 `concurrency` 参数 + 单事件循环 `asyncio.Semaphore(N)` + `gather` 并发分支（Semaphore 在运行循环内创建，规避 "future belongs to a different loop"；presolve 直出题安全，LLM 重度题建议先隔离 MainAgent 再高并发），并被治理收口提交并入 HEAD（`a97c33e`）。实测 mock 冒烟 4/4 解出、无 different-loop 错误（零回归）。真实 Block 2 验证见下「后续 / Block 2 实测」。

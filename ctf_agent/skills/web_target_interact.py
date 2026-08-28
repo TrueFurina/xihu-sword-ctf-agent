@@ -29,15 +29,20 @@ def _classify(exc: Exception, url: str) -> dict:
     name = type(exc).__name__
     msg = str(exc)
     low = msg.lower()
-    verdict = name
     detail = msg[:160]
+    # P0 修复（2026-08-28）：默认兜底绝不再把原始异常类名当 verdict 透出——
+    # 否则 ConnectionResetError / TimeoutError / 裸 OSError 等未命中上面特定分支时，
+    # verdict 会变成 "ConnectionResetError" 之类原始类名，调用方（如 conn_refused
+    # 诊断测试）无法识别为故障，导致偶发 flaky 失败。任何 OSError 系（含 socket 错误、
+    # ConnectionError 各子类、TimeoutError）一律归连接类诊断。
+    verdict = "connect_error" if isinstance(exc, OSError) else "transport_error"
     if isinstance(exc, httpx.ConnectTimeout):
         verdict = "conn_timeout"
     elif isinstance(exc, (httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout)):
         verdict = "conn_timeout"
     elif "10061" in msg or "connection refused" in low or "econnrefused" in low:
         verdict = "conn_refused"
-    elif "10060" in msg or "timed out" in low:
+    elif "10060" in msg or "timed out" in low or "timeout" in low:
         verdict = "conn_timeout"
     elif "name or service not known" in low or "getaddrinfo" in low or "nodename" in low:
         verdict = "dns_fail"
@@ -47,6 +52,9 @@ def _classify(exc: Exception, url: str) -> dict:
         verdict = "unsupported_protocol"
     elif isinstance(exc, httpx.TransportError):
         verdict = "transport_error"
+    # 再保险：未命中特定分支但属 OSError（如 ConnectionResetError / BrokenPipeError）→ 连接错误
+    if verdict == "transport_error" and isinstance(exc, OSError):
+        verdict = "connect_error"
     if "certificate" in low or "ssl" in low or "tls" in low or "handshake" in low:
         verdict = "tls_error"
     return {"verdict": verdict, "exc_type": name, "detail": detail, "url": url}
@@ -95,6 +103,7 @@ def probe(params: dict) -> dict:
                 t0 = time.time()
                 r = httpx.request(m, u, timeout=timeout, verify=False,
                                   follow_redirects=True, headers=headers,
+                                  trust_env=False,
                                   **_proxy_kwargs(params))
                 results.append({
                     "method": m, "url": str(r.url),
@@ -140,6 +149,7 @@ def retry(params: dict) -> dict:
             t0 = time.time()
             r = httpx.get(url, timeout=timeout, verify=False,
                           follow_redirects=True, headers=headers,
+                          trust_env=False,
                           **_proxy_kwargs(params))
             history.append({"attempt": i, "status": r.status_code,
                             "elapsed": round(time.time() - t0, 2), "verdict": "http_ok"})
@@ -170,7 +180,8 @@ def fetch(params: dict) -> dict:
         t0 = time.time()
         r = httpx.get(url, timeout=timeout, verify=False,
                       follow_redirects=bool(params.get("follow_redirects", True)),
-                      headers=headers, **_proxy_kwargs(params))
+                      headers=headers, trust_env=False,
+                      **_proxy_kwargs(params))
         body = r.content
         preview = _body_preview(body, int(params.get("max_body", 600)))
         hints = _flag_hints(body)

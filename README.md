@@ -18,12 +18,12 @@ Most "CTF agents" are just an LLM with a shell. This one is the opposite: **dete
 ctf_agent/
 ├── core/          main loop, presolve static analyzer, supervisor agent, wall-clock stop-loss
 ├── agents/        per-category solvers (crypto_toolkit / misc / web / reverse / pwn …)
-├── skills/        49 deterministic skills (run(params) -> dict interface)
+├── skills/        52 deterministic skills (run(params) -> dict interface)
 ├── llm/           LLM client (provider whitelist, fail-closed circuit breaking)
 ├── ctfplatform/   contest-platform client (DASCTF-style), retry / fail-open submit path
 ├── sandbox/       code-execution sandbox (subprocess isolation)
 ├── eval/          historical-problem benchmark (honest KPI measurement)
-├── data/questions_real/   historical problem corpus structure (flags redacted/placeholder)
+├── data/questions_real/   historical problem corpus (most flags SHA-256; a few long-public events e.g. Anxun Cup 2020 retain plaintext; 2026 contest excluded)
 ├── config.py      config (defaults + environment-variable fallback)
 ├── run.py         entry point (--mode cli/web/mock)
 └── setup.sh       environment bootstrap
@@ -33,12 +33,12 @@ ctf_agent/
 
 ```
 platform poll → triage/classify → attachment download + target probe
-             → deterministic skills (49) ⇄ LLM reasoning (whitelisted providers)
+             → deterministic skills (52) ⇄ LLM reasoning (whitelisted providers)
              → flag validation → platform submit (fail-closed on request errors)
 ```
 
 - **Supervisor architecture**: `core/main_agent.py` plans per challenge, `core/supervisor_agent.py` enforces step budgets, tool-first discipline, and the request-failure-vs-wrong-flag separation (the post-incident fix for a submit-circuit-breaker bug).
-- **Deterministic-first**: `skills/` holds 49 runnable skills. `core/presolve.py` runs them before any LLM token is spent.
+- **Deterministic-first**: `skills/` holds 52 runnable skills. `core/presolve.py` runs them before any LLM token is spent.
 - **Whitelisted LLM only** (contest rule §3); multi-source fallback with 401/402 circuit breaking, per-question token budgets, heavy-model upgrade policy.
 - **Race harness**: `scripts/_race_start.py --compete` = first-blood scan → stable polling → final report, with a mandatory e2e data-link preflight (fail-closed).
 
@@ -73,7 +73,7 @@ The single machine-enforced KPI is **`offline_verified`** — the number of *his
 | Metric | Result |
 |--------|--------|
 | **offline_verified** (strict real-problem KPI) | **9** |
-| Deterministic pipeline coverage (`data/questions_real/` 15) | **14 / 15** (presolve direct-solve coverage — NOT a "solved" claim) |
+| Deterministic pipeline coverage (presolve direct-solve, early 15-problem subset) | **14 / 15** (presolve direct-solve coverage — NOT a "solved" claim; full 92-problem corpus coverage tracked in REAL_SOLVES_LEDGER.md) |
 | LLM autonomous-reasoning contribution | **0** (all 9 verified solves are deterministic presolve/tooling; zero LLM reasoning) |
 
 > ⚠️ **What `offline_verified=9` does and does NOT mean.** It is the count of *real past-CTF problems* (provenance=`real_past_ctf`, sha256-verified, machine-counted by `scripts/_merge_gate.py count_offline_verified`) solved by a **reproducible deterministic pipeline** — a real engineering milestone, but **NOT a capability measurement**. These problems' writeups are public and almost certainly in LLM pre-training corpora (contamination risk — see `data/results/CTF-Agent深度评审报告_20260828.md` G1). LLM autonomous-reasoning contribution is **0/9**. Treat 9 as "template coverage of memorizable public problems," never as "reasoning ability." (Note: `real_crypto_ezrsa` / `real_crypto_simplelegendre` / `real_crypto_exciting_inverse` were historically solved manually but are **not currently reproducible** by the deterministic pipeline — they were removed from the strict KPI on 2026-08-28 after `presolve` returned `None` for all three; see `KNOWN_GAP`.)
@@ -86,7 +86,7 @@ Interpretation: **capability = static-analyzer coverage**, not LLM reasoning. To
 
 This repo publishes the **engineering skeleton and methodology only**. Red lines:
 
-1. **Real flags are never published.** All plaintext flags are stripped; only `<REDACTED>` / sha256 placeholders remain. Truth files live in `.gitignore`.
+1. **Flags are handled per-event, honestly.** The large majority of historical-contest flags are stored as SHA-256. A small number of entries from long-public events (e.g. Anxun Cup 2020, whose write-ups are already public) retain plaintext flags. **Flags and attachments for the 2026 West Lake Sword contest itself are NOT included in this repo** (excluded via `.gitignore`). Truth files for the strict KPI live in `.gitignore`.
 2. **No secrets in the repo.** LLM keys and platform tokens are injected via env vars / registry only.
 3. **Internal contest resources are excluded** (`data/race_details/`, attachments, signatures) via `.gitignore`.
 4. **Honest water-level.** We do not exaggerate capability. See above.

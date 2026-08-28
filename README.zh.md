@@ -18,12 +18,12 @@
 ctf_agent/
 ├── core/          主循环、presolve 静态分析器、监督 Agent、墙钟止损
 ├── agents/        各题型求解器（crypto_toolkit / misc / web / reverse / pwn …）
-├── skills/        49 个确定性解题 skill（run(params) -> dict 接口）
+├── skills/        52 个确定性解题 skill（run(params) -> dict 接口）
 ├── llm/           LLM 客户端（provider 白名单、fail-closed 熔断）
 ├── ctfplatform/   赛事平台客户端（DASCTF 类）、重试 / fail-open 提交路径
 ├── sandbox/       代码执行沙箱（subprocess 隔离）
 ├── eval/          真题集 benchmark（诚实 KPI 度量）
-├── data/questions_real/   历年真题题库结构（真值已占位脱敏）
+├── data/questions_real/   历年真题题库结构（多数 flag 存 SHA-256；少量久远公开赛事如安洵杯 2020 保留明文；2026 西湖论剑赛事题已排除）
 ├── config.py      配置（默认值 + 环境变量回退）
 ├── run.py         入口（--mode cli/web/mock）
 └── setup.sh       环境初始化
@@ -33,12 +33,12 @@ ctf_agent/
 
 ```
 平台轮询 → 分类 → 附件下载 + 靶机探测
-        → 确定性 skill(49) ⇄ LLM 推理(白名单 provider)
+        → 确定性 skill(52) ⇄ LLM 推理(白名单 provider)
         → flag 校验 → 平台提交(fail-closed)
 ```
 
 - **监督架构**：`core/main_agent.py` 按题规划，`core/supervisor_agent.py` 强制步骤预算、工具优先纪律，并区分"请求失败"与"flag 错误"（提交断路器 bug 的事后修复）。
-- **确定性优先**：`skills/` 含 49 个即用 skill，`core/presolve.py` 在任何 LLM token 消耗前先跑完它们。
+- **确定性优先**：`skills/` 含 52 个即用 skill，`core/presolve.py` 在任何 LLM token 消耗前先跑完它们。
 - **仅白名单 LLM**（赛事规则 §3）；多源回退含 401/402 熔断、按题 token 预算、重型模型升级策略。
 - **作战脚本**：`scripts/_race_start.py --compete` = 首血扫描 → 稳定轮询 → 终报，内置强制 e2e 数据链路预检（fail-closed）。
 
@@ -68,11 +68,11 @@ export DEEPSEEK_API_KEY=sk-xxx     # 你的密钥，勿提交
 
 ## 诚实 KPI
 
-对 `data/questions_real/` 15 道历年真题，跑**真实**工具链路：
+对 `data/questions_real/`（共 92 道历年真题），跑**真实**工具链路：
 
 | 指标 | 结果 |
 |------|------|
-| 确定性管线（presolve 直出） | **14 / 15（93.3%）** |
+| 确定性管线（presolve 直出，早期 15 题子集） | **14 / 15（93.3%）** |
 | LLM 自主推理贡献 | **0 / 1**（唯一未解题为数据集缺陷，非能力缺口） |
 
 即：**能力 = 静态分析器覆盖度**，不是 LLM 推理。要解更多题型，就写更多确定性 skill。我们直言此事，因为对开源安全工具而言，夸大能力是最容易翻车的方式。
@@ -81,7 +81,7 @@ export DEEPSEEK_API_KEY=sk-xxx     # 你的密钥，勿提交
 
 本仓库仅发布**工程骨架与方法论**。红线：
 
-1. **真 flag 永不公开**：所有明文 flag 已剥离，仅留 `<REDACTED>` / sha256 占位；真值文件在 `.gitignore` 中屏蔽。
+1. **flag 按赛事如实处理**：绝大多数历史真题 flag 以 SHA-256 存储；少量来自早已公开的赛事（如安洵杯 2020，其 writeup 已全网公开）保留明文。本项目**不包含 2026 西湖论剑赛事自身的 flag 与附件**（经 `.gitignore` 排除）；严格 KPI 真值文件同样在 `.gitignore` 中屏蔽。
 2. **密钥不入库**：LLM Key 与平台 Token 仅经环境变量 / 注册表注入。
 3. **内部赛事资源不公开**（`data/race_details/`、附件、签名）经 `.gitignore` 排除。
 4. **诚实水位**：不夸大能力，详见上文。

@@ -381,8 +381,15 @@ def decode_multi_layer(s, max_layers=20):
         funcs = "\n".join(
             t for t in cls.attack_templates.values()
         )
+        # P0 修复（2026-08-28）：子进程 cwd 未必是项目根（如 pytest 从仓库根启动、
+        # 或 agent 从其他目录启动），而 triage 体依赖 `from skills.rsa_fermat_factor
+        # import run`（沙盒白名单已放行 skills，但需 ctf_agent 在 sys.path 上）。
+        # 在脚本最顶部把 ctf_agent 包根注入 sys.path，使 skills 导入与 cwd 无关。
+        # 否则 import 失败被 try/except 静默吞掉 → 费马/phi_known 等攻击整段跳过 → 无输出。
+        _pkg_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _prolog = "import sys as _sys\n_sys.path.insert(0, %r)\n" % _pkg_root
         header = "paths = %r\nWORDS = %r\n" % (paths, cls.COMMON_WORDS)
-        return funcs + "\n" + header + cls._TRIAGE_BODY
+        return _prolog + funcs + "\n" + header + cls._TRIAGE_BODY
 
     # 通用嗅探主体（__PLACEHOLDER__ 由 build_fallback_script 替换；raw 串保留正则反斜杠）
     # 多附件支持：paths 为全部附件路径列表，逐一读取拼接后统一嗅探
