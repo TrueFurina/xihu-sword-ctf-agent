@@ -17,6 +17,7 @@ from core.main_agent import (
     AgentContext,
     ERR_WALLCLOCK_TIMEOUT,
     ERR_STUCK_LOOP,
+    ERR_UNRESOLVED,
 )
 
 
@@ -52,16 +53,19 @@ def test_wallclock_hit_classified():
     print("✓ test_wallclock_hit_classified")
 
 
-def test_wallclock_not_hit_returns_stuck_loop():
-    """未命中墙钟 + 无 flag + 无异常 → stuck_loop（回归保护，不误判）。"""
+def test_wallclock_not_hit_returns_unresolved():
+    """未命中墙钟 + 无 flag + 无异常 → unresolved（2026-08-28 新 taxonomy：
+
+    非真死循环（stuck_count<3）的"未解出且无明确归因"归 unresolved，而非一律 stuck_loop。
+    """
     agent = _make_agent(wallclock=300)
     ctx = AgentContext(question=_make_question())
     ctx._wallclock_hit = False
     result = agent._finalize(ctx, attempt=0)
     err = result["error"]
     assert err is not None
-    assert err["category"] == ERR_STUCK_LOOP, f"期望 stuck_loop，实得 {err['category']}"
-    print("✓ test_wallclock_not_hit_returns_stuck_loop")
+    assert err["category"] == ERR_UNRESOLVED, f"期望 unresolved，实得 {err['category']}"
+    print("✓ test_wallclock_not_hit_returns_unresolved")
 
 
 def test_wallclock_threshold_injectable():

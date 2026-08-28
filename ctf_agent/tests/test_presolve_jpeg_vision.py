@@ -18,8 +18,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from llm import client as llm_client
 import core.presolve as P
 
-JPG = "data/questions_real/_attachments/misc/real_misc_xuanhun_signin/xz1.jpg"
-IMG = "data/questions_real/_attachments/misc/real_misc_xuanhun_signin/_extracted.png"
+# 用仓库内真实附件的【绝对路径】，避免 pytest 运行 cwd 非 ctf_agent/ 时相对路径
+# 解析失败导致 os.path.isfile 守卫判 false（历史桩失败根因）。附件属真题集仓库一部分。
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+JPG = os.path.join(_REPO, "data/questions_real/_attachments/misc/real_misc_xuanhun_signin/xz1.jpg")
+IMG = os.path.join(_REPO, "data/questions_real/_attachments/misc/real_misc_xuanhun_signin/_extracted.png")
 
 
 def _q(flag_sha256=""):

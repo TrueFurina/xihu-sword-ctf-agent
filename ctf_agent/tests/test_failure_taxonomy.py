@@ -21,6 +21,7 @@ from core.main_agent import (
     StepRecord,
     ERR_WALLCLOCK_TIMEOUT,
     ERR_STUCK_LOOP,
+    ERR_UNRESOLVED,
     ERR_TOOL_FAILURE,
     ERR_WRONG_DIRECTION,
     ERR_EXTRACT_FAIL,
@@ -72,15 +73,19 @@ def test_wrong_direction_classified():
     print("✓ test_wrong_direction_classified")
 
 
-def test_fresh_ctx_still_stuck_loop():
-    """回归保护：无任何失败信号时仍 stuck_loop（不误判）。"""
+def test_fresh_ctx_unresolved():
+    """回归保护：无任何失败信号且 stuck_count<3 时归 unresolved（2026-08-28 新 taxonomy：
+
+    仅连续同动作死循环 stuck_count>=3 才 stuck_loop，其余"未解出且无明确归因"归 unresolved，
+    使失败桶口径诚实，不把所有无解都误判为死循环）。
+    """
     agent = MainAgent(per_question_wallclock=300)
     ctx = AgentContext(question=_make_question())
     result = agent._finalize(ctx, attempt=0)
     err = result.get("error")
     assert err is not None
-    assert err["category"] == ERR_STUCK_LOOP, f"期望 stuck_loop，实得 {err['category']}"
-    print("✓ test_fresh_ctx_still_stuck_loop")
+    assert err["category"] == ERR_UNRESOLVED, f"期望 unresolved，实得 {err['category']}"
+    print("✓ test_fresh_ctx_unresolved")
 
 
 def test_wallclock_still_priority():

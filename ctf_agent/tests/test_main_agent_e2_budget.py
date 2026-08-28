@@ -24,6 +24,7 @@ from core.main_agent import (
     STAGE_STUCK,
     ERR_TOOL_FAILURE,
     ERR_STUCK_LOOP,
+    ERR_UNRESOLVED,
 )
 
 
@@ -86,8 +87,8 @@ def test_llm_call_budget_capped_at_12():
     assert ctx.llm_calls == 12, f"期望 llm_calls==12（预算封顶），实得 {ctx.llm_calls}"
     assert res["llm_calls"] == 12, "result 契约应暴露 llm_calls"
     err = res.get("error")
-    assert err is not None and err["category"] == ERR_STUCK_LOOP, \
-        f"无 flag 应 stuck_loop，实得 {err}"
+    assert err is not None and err["category"] == ERR_UNRESOLVED, \
+        f"预算封顶无 flag（非真死循环）应 unresolved，实得 {err}"
     print("✓ test_llm_call_budget_capped_at_12 (llm_calls=12)")
 
 

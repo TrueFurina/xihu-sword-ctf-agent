@@ -336,7 +336,10 @@ def ai_vision(
     except Exception:  # noqa: BLE001
         _cfg = None
     model = model or (_cfg.vision_model if _cfg else None)
-    provider = provider or (_cfg.llm_provider if _cfg else None)
+    # 视觉模型（ernie-4.5-turbo-vl）为 baidu 千帆独占能力；不继承 config.llm_provider
+    # 的环境漂移（如 CTF_AGENT_LLM_PROVIDER=qwen），否则会把 vl 模型发往 qwen 端点
+    # 导致 404 model_not_found。显式未传 provider 时固定走 baidu。
+    provider = provider or "baidu"
     if not model or not provider:
         logger.warning("ai_vision: 未解析到视觉模型/provider，返回 None")
         return None
