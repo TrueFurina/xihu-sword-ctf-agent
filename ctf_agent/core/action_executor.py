@@ -45,6 +45,10 @@ async def execute_tool(registry, ctx, plan: dict, detail: str) -> dict:
             if len(attachments) == len(ctx._attachments_seen):
                 ctx._attachment_analyzed = True
             result = {"kind": "tool", "tool": tool_name, "output": "\n\n".join(parts)}
+            # E3（2026-08-25 桶C攻坚）：累积 file_analyze 全文，供 plan prompt 强制重投
+            if not hasattr(ctx, "attachment_evidence") or ctx.attachment_evidence is None:
+                ctx.attachment_evidence = []
+            ctx.attachment_evidence.append(result["output"])
             if errors:
                 result["error"] = "; ".join(errors)[:500]
             return result
@@ -96,5 +100,9 @@ async def execute_forced_file_analyze(registry, ctx) -> dict:
         ctx._attachments_seen.add(p)
     if len(attachments) == len(ctx._attachments_seen):
         ctx._attachment_analyzed = True
-    return {"kind": "tool", "tool": "file_analyze",
-            "output": "\n\n".join(parts) if parts else "全部附件已分析过"}
+    _fa_output = "\n\n".join(parts) if parts else "全部附件已分析过"
+    # E3（2026-08-25 桶C攻坚）：累积 file_analyze 全文，供 plan prompt 强制重投
+    if not hasattr(ctx, "attachment_evidence") or ctx.attachment_evidence is None:
+        ctx.attachment_evidence = []
+    ctx.attachment_evidence.append(_fa_output)
+    return {"kind": "tool", "tool": "file_analyze", "output": _fa_output}

@@ -186,7 +186,10 @@ class SupervisorAgent:
             recent = []
             for s in ctx.steps[-5:]:
                 err = f" [错误:{s.error_category}]" if s.error_category else ""
-                recent.append(f"- {s.stage} | {s.action}{err} | {s.observation[:80]}")
+                # 2026-08-26 攻 wrong_direction：补工具证据——监督 LLM 需区分
+                # "方向对但无工具证据(空转)" vs "方向错"，缺 tool_used 会误判 wrong_direction
+                tool = f" [工具:{s.tool_used}]" if s.tool_used else " [无工具]"
+                recent.append(f"- {s.stage} | {s.action}{err}{tool} | {s.observation[:80]}")
             parts.append("最近步骤:\n" + "\n".join(recent))
         parts.append(f"候选 flag: {ctx.candidate_flag or '无'}")
         parts.append(f"策略切换次数: {ctx.strategy_switches}  模型升级次数: {ctx.model_upgrades}")

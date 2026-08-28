@@ -43,7 +43,7 @@ def sanitized_env() -> dict:
 # 危险调用由 _FORBIDDEN_CALLS 在 AST 调用层拦截（os.system/popen/eval/exec 仍禁）；
 # 此前全禁导致 agent 无法用 script 读附件（Prompt 第21条 vs 沙盒自相矛盾，实测 0/10）。
 _ALLOWED_IMPORTS = {
-    "math", "random", "re", "base64", "struct", "binascii", "json", "hashlib",
+    "math", "random", "re", "base64", "struct", "binascii", "json", "hashlib", "hmac",
     "zipfile", "string", "itertools", "collections", "functools", "datetime",
     "codecs", "urllib.parse", "urllib", "time", "io", "tempfile", "zlib", "gzip",
     "httpx",  # web 题型发包（超时+进程隔离已兜底）
@@ -55,7 +55,10 @@ _ALLOWED_IMPORTS = {
 # 允许导入的子模块前缀（如 Crypto.* / PIL.* 等解题工具）
 # "skills" 于 2026-08-21 P0-C 整改加入：crypto/misc fallback 脚本需
 # `from skills.rsa_fermat_factor import run` 复用确定性攻击脚本（沙盒 cwd=项目根）。
-_ALLOWED_IMPORT_PREFIXES = ("Crypto", "PIL", "pwn", "gmpy2", "sympy", "numpy", "skills")
+# "sandbox" 于 2026-08-27 加入：受信 RCE 通道（sandbox.trusted_rce）需可被
+# 经制裁决的 fallback 脚本 import；真实门控在 execute_trusted 内部的
+# CTF_AGENT_TRUSTED_RCE 环境检查，默认关闭，非默认沙盒弱化。
+_ALLOWED_IMPORT_PREFIXES = ("Crypto", "PIL", "pwn", "gmpy2", "sympy", "numpy", "skills", "sandbox")
 # 禁止导入的模块（危险）：os/sys 已于 2026-08-21 解除（见 _ALLOWED_IMPORTS 注释），
 # 其余保持全禁——subprocess/shutil/socket/ctypes 等一旦可导入配合调用层仍具逃逸面。
 _FORBIDDEN_IMPORTS = {

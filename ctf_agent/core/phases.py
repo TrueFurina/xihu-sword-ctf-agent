@@ -8,6 +8,7 @@ main_agent 只保留 solve() 主循环编排 + _finalize 契约生成。
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 from typing import Optional
@@ -310,21 +311,61 @@ async def supervise_step(agent, ctx: AgentContext) -> SupervisionVerdict:
     return SupervisionVerdict(action=VERDICT_CONTINUE)
 
 
+def _structured_candidate_texts(output: str) -> list:
+    """从 LLM 结构化输出中收集候选 flag 文本（主输出之外的额外候选）。
+
+    E1 结构化输出增强：支持 LLM 返回 JSON，含 candidates/flags/flag_candidates
+    数组，或 ```json 代码块。仅做文本收集，校验沿用 extract_flag 既有逻辑。
+    返回去重后的候选文本列表（不含主 output 本身）。
+    """
+    texts: list = []
+    stripped = str(output).strip()
+    blobs = [stripped]
+    # 粗提 ```json ... ``` / ``` ... ``` 代码块
+    for m in re.finditer(r"```(?:json)?\s*(\{.*?\})\s*```", str(output), re.DOTALL):
+        blobs.append(m.group(1))
+    # 内联 JSON 对象（无围栏，如 LLM 直接回 {...} 但前面夹了分析文字）：
+    # 用平衡括号正则抓所有顶层 {...} 片段，逐个尝试解析
+    for m in re.finditer(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", str(output), re.DOTALL):
+        blobs.append(m.group(0))
+    seen = set()
+    for blob in blobs:
+        try:
+            j = json.loads(blob)
+        except Exception:
+            continue
+        if not isinstance(j, dict):
+            continue
+        for key in ("candidates", "flags", "flag_candidates"):
+            v = j.get(key)
+            if isinstance(v, list):
+                for x in v:
+                    if x and str(x) not in seen:
+                        seen.add(str(x))
+                        texts.append(str(x))
+        if isinstance(j.get("flag"), str) and j["flag"] not in seen:
+            seen.add(j["flag"])
+            texts.append(j["flag"])
+    return texts
+
+
 def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
     """从执行结果中提取 flag（优先用 checker，其次正则）。原 MainAgent._extract_flag。
 
     攻克 hallucination：提取后过三态校验（REJECT=格式非法/疑似幻觉，直接丢弃）。
     """
     output = act.get("flag") or act.get("output") or ""
+    primary_blocked = False
     # 模板假阳性拒绝（2026-08-21 攻坚修复）：flag 含 %d/%s 格式符 = 题面模板未替换
-    # （实测 filterrandom LLM 抄题面 DASCTF{%d-%d} 当答案且通过校验）
+    # （实测 filterrandom LLM 抄题面 DASCTF{%d-%d} 当答案且通过校验）。
+    # 仅标记主输出不可用，仍允许下方结构化候选兜底（E1）。
     if re.search(r"%[dsfx]", str(output)):
-        logger.info("[%s] flag 含格式符模板（疑似抄题面），拒绝: %s",
+        logger.info("[%s] flag 含格式符模板（疑似抄题面），主输出拒绝: %s",
                     getattr(ctx, "question", None) and ctx.question.id or "?",
                     str(output)[:60])
         ctx._extract_failed = True  # 提取错埋点（2026-08-22 M1.3）
-        return None
-    if agent.checker is not None:
+        primary_blocked = True
+    if not primary_blocked and agent.checker is not None:
         flag = agent.checker.extract(str(output))
         if flag:
             from verify.flag_checker import V_REJECT
@@ -369,5 +410,18 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
                 return None
             return flag
     pattern = getattr(ctx.question, "flag_pattern", None) or r"flag\{[^}]+\}"
-    m = re.search(pattern, str(output))
-    return m.group(0) if m else None
+    if not primary_blocked:
+        m = re.search(pattern, str(output))
+        if m:
+            return m.group(0)
+    # ── E1 结构化候选兜底：主输出无匹配时，扫 JSON 候选列表 ──
+    # 仅做模板级校验（格式符占位/flag_pattern 正则），不重复三态工具证据校验
+    # （候选来自 LLM 结构化输出，工具证据判定由上游调用方对最终选定 flag 负责）。
+    for cand in _structured_candidate_texts(output):
+        if re.search(r"%[dsfx]", cand):
+            continue  # 模板占位，跳过（疑似抄题面）
+        mc = re.search(pattern, cand)
+        if mc:
+            ctx._extract_failed = False  # 找到有效候选，撤销主输出误触发的提取失败埋点
+            return mc.group(0)
+    return None

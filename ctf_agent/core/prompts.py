@@ -31,6 +31,28 @@ SOLVE_DISCIPLINE = """\
    先报信心再动手。该值仅作自评记录（赛后按 solved_by 拆分盲区），不参与任何自动化判定。"""
 
 
+# ── E6（2026-08-25 桶B攻坚）few-shot 方向决策范例 ──
+# 目标：桶B=方向决策错（占失败 57.1%）——模型在"先判断题型→选正确首步"上走偏。
+# 以下精选"题型速判 → 正确首步"范例，注入 plan 提示，帮模型先定方向再动手，
+# 与 SOLVE_DISCIPLINE 互补（铁律是规则，范例是 concrete worked example）。
+# 默认不注入（ctx.few_shot=False）；仅 A/B 实验开启（CTF_AGENT_FEWSHOT=1）。
+FEW_SHOT_BANK = """\
+【方向决策范例·先定题型再动手】
+例1(crypto·RSA): 拿到 n,e,c → 先算 gcd(e,φ?) 不可行；先判 e 与 n 的关系——
+  · e 极小(如3)→ m^e < n 直接开 e 次根；否则密文小直接开方。
+  · |p-q| 极小→费马分解(rsa_fermat_factor)；d 极小→维纳(Wiener)连分数。
+  · 多题同 n 不同 m→共模/广播攻击。切勿一上来手搓大数分解。
+例2(misc·压缩包): 拿到 zip → 先看是否加密类型——
+  · 伪加密(标志位 09→00)→改字节免密解；已知部分明文→bkcrack 已知明文攻击。
+  · 弱密码→字典/hashcat 有界爆破(先声明预算轮数)。切勿全空间暴力。
+例3(web): 拿到网址 → 先源码审计+目录扫描+备份文件(/.git/robots/flag.php~)，
+  再据漏洞类型构造 payload；切勿盲打。sql→先测注入点，ssrf→探内网，xxe→读文件。
+例4(reverse): 拿到二进制 → 先 file/strings/查壳确定语言与保护，
+  再决定 IDA/Ghidra/pyc反编译；切勿一上来反编译最大函数空读。
+例5(misc·流量/图像): 拿到 pcap→先 tshark 过滤协议与字符串；拿到图像→先 steg
+  工具扫描+网格采样(如 VNCTF 类需逐格 OCR)，切勿只做单层 base 解码即放弃。"""
+
+
 def build_plan_prompt(ctx, attempt: int) -> str:
     """首轮/每轮 plan 提示词（题型/附件/监督建议/错误归因/已执行步骤）。"""
     q = ctx.question
@@ -39,12 +61,25 @@ def build_plan_prompt(ctx, attempt: int) -> str:
              str(getattr(q, 'description', '') or '')]
     if getattr(q, 'attachments', None):
         parts.append(f"附件: {', '.join(q.attachments)}")
+    # E3（2026-08-25 桶C攻坚）：file_analyze 全文强制注入 plan prompt。
+    # 桶C=证据不进脑——附件已读但 prompt 仅含路径/截断摘要，模型空转。
+    # 把累积的附件全文整段重投，不受 steps 窗口（近3步）挤出，且不做 1200 截断。
+    # 仅 ctx.e3_enabled 开启时注入（A/B 开关，默认关，保证基线 KPI 不被改动）；
+    # 注入时置 ctx.evidence_injected_into_prompt=True，供 error_struct.evidence_injected 度量。
+    _att_evidence = getattr(ctx, "attachment_evidence", None) or []
+    if _att_evidence and getattr(ctx, "e3_enabled", False):
+        _ev_block = "\n\n".join(
+            f"【附件分析全文 #{i+1}】\n{e[:3000]}" for i, e in enumerate(_att_evidence)
+        )
+        parts.append("⚠️ 附件分析全文（解题必须基于以下真实内容，勿凭空猜测）:\n" + _ev_block)
+        ctx.evidence_injected_into_prompt = True
     if ctx.hint_text:
         parts.append(f"提示: {ctx.hint_text}")
     # 抄 NUS Advisor：监督定向建议注入（AI 卡壳/走偏时修正路径）
     if ctx.advisor_hint:
         parts.append(f"⚠️ 监督建议: {ctx.advisor_hint}")
-    parts.append(f"flag 格式: {getattr(q, 'flag_pattern', r'flag\\{[^}]+\\}')}")
+    default_flag_pattern = r'flag\{[^}]+\}'
+    parts.append(f"flag 格式: {getattr(q, 'flag_pattern', default_flag_pattern)}")
     # 结构化修正指令（v2.0 错误归因：明确告诉模型错在哪、关键信息、往哪改）
     if ctx.correction:
         corr = ctx.correction
@@ -66,6 +101,21 @@ def build_plan_prompt(ctx, attempt: int) -> str:
     if _audit:
         parts.append(f"【web 源码审计报告】{_audit}")
     parts.append(SOLVE_DISCIPLINE)  # 作战铁律运行时强制注入
+    # E6（2026-08-25 桶B攻坚）：few-shot 方向决策范例注入（仅 ctx.few_shot 开启时）
+    # 帮模型在"先判断题型→选正确首步"上少走错方向（桶B=方向决策错 占失败 57.1%）。
+    if getattr(ctx, "few_shot", False):
+        parts.append(FEW_SHOT_BANK)
+    # IDEA-5 Writeup RAG（默认关，仅 ctx.knowledge_hits 非空时注入）：
+    # 检索到的历史解法/工具手册作为参考知识，须基于本题真实证据验证、不得照搬。
+    _hits = getattr(ctx, "knowledge_hits", None)
+    if _hits:
+        _kb = []
+        for i, h in enumerate(_hits[:3]):
+            _kb.append(f"【参考#{i+1}·{h.get('title', '')}（{h.get('category', '')}）】{h.get('text', '')[:400]}")
+        parts.append(
+            "📚 检索到的历史解法/工具手册（参考，须基于本题真实证据验证，勿照搬）:\n"
+            + "\n\n".join(_kb)
+        )
     return "\n".join(parts)
 
 

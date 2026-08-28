@@ -11,7 +11,9 @@ v2.0 架构核心：唯一的大脑。
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -36,10 +38,18 @@ VERDICT_GIVE_UP = "give_up"
 
 # 错误分类（v2.0 步骤级校验）
 ERR_STUCK_LOOP = "stuck_loop"
+ERR_UNRESOLVED = "unresolved"  # 2026-08-28：未解出且无明确归因（非死循环）——区分真死循环
 ERR_WRONG_DIRECTION = "wrong_direction"
 ERR_HALLUCINATION = "hallucination"
 ERR_TOOL_FAILURE = "tool_failure"
 ERR_ENV_FAILURE = "env_failure"
+# KNOWN_GAP 题集（从台账 REAL_SOLVES_LEDGER.md「可复现脚本待固化/缺运行时参数」条目自动派生）：
+# 10732（PKCS#1 v1.5，缺 hint_enc/AES_KEY_ENC 运行时参数）、10735（logbool 流量包，pcap 攻击链+7z 未固化）
+# —— 题面缺参解不出是题缺参（extract_fail），非方向错（wrong_direction），避免污染失败桶统计。
+# 注意：anwang_crypto1（安网杯八进制+Vigenère）是 presolve 可解题（台账 offline_verified），
+# 不属于 KNOWN_GAP——它曾经的 wrong_direction 是 presolve 路由未覆盖所致，正确修法是路由覆盖（83f2fa1），
+# 而非归类为 KNOWN_GAP。
+_KNOWN_GAP_IDS = {"10732", "10735"}
 # 墙钟硬止损（2026-08-20 锐评 P0-2）：单题墙钟超限强制放弃，防单步极慢拖死并发池
 ERR_WALLCLOCK_TIMEOUT = "wallclock_timeout"
 # 提取错（2026-08-22 赛后重锐评 M1.3）：候选 flag 被提取校验拒绝（模板/幻觉/无工具证据）
@@ -106,6 +116,7 @@ class AgentContext:
     advisor_hint: Optional[str] = None  # 监督建议累积（抄 NUS Advisor：定向提示注入）
     _attachment_analyzed: bool = False  # 附件是否已被工具读取（防止空想）
     _attachments_seen: set = field(default_factory=set)  # 已实际分析过的附件路径（多附件遍历）
+    attachment_evidence: list = field(default_factory=list)  # E3(2026-08-25 桶C攻坚): file_analyze 全文累积，强制注入 plan prompt 防"证据不进脑"
     # 墙钟硬止损标记（2026-08-20 锐评 P0-2）：墙钟超限时置 True，_finalize 据此分类
     _wallclock_hit: bool = False
     _start_monotonic: Optional[float] = None  # solve() 入口时间戳
@@ -116,9 +127,25 @@ class AgentContext:
     give_up_reason: Optional[str] = None
     # 2026-08-24 诚实化：静态分析器（presolve）直出标记，零 LLM 调用时置 True
     solved_by_presolve: bool = False
+    # E2（2026-08-25 桶B攻坚）可观测计数：每题 LLM 调用数 / 每步超时次数
+    llm_calls: int = 0
+    step_timeouts: int = 0
+    # E6（2026-08-25 桶B攻坚）：few-shot 方向决策范例注入开关（默认关，A/B 可切）
+    few_shot: bool = False
+    # E3（2026-08-25 桶C攻坚）：附件证据强制注入 plan prompt 开关（默认关，A/B 可切）
+    # 照搬 E6 模式：env CTF_AGENT_E3=1 开启；开启后 file_analyze 全文才会注入 prompt。
+    e3_enabled: bool = False
+    # E3 效果埋点：本题求解过程中附件全文是否真注入过 plan prompt（供 error_struct.evidence_injected 度量"证据不进脑"）
+    evidence_injected_into_prompt: bool = False
     # 监督裁决流水（2026-08-23 质检④采纳率统计）：每次 _supervise 咨询记录一条
     # {action, step_index}——用于量化"监督建议被采纳率"，证明监督者非摆设
     supervisor_verdicts: list = field(default_factory=list)
+    # race-intelligence 微观态势快照（2026-08-27）：单题信心，由 _log_situation 每 5 步写入
+    last_confidence: Optional[float] = None
+    # Writeup RAG（IDEA-5 务实落地）：每步检索到的历史解法/工具手册，注入 plan prompt
+    knowledge_hits: Optional[list] = None
+    # budget-reflection（race-intelligence 第二层，2026-08-27）：预算反思决策快照（只读日志写入）
+    last_reflection: Optional[dict] = None
 
     def is_stuck(self) -> bool:
         return self.stuck_count >= 3
@@ -219,6 +246,10 @@ class MainAgent:
         provider=None,      # LLM provider 名（baidu/mimo/...，供报告与流量吻合）
         per_question_wallclock: Optional[int] = None,  # 单题墙钟硬止损（秒，None→读 config）
         hard_wallclock: Optional[int] = None,          # HARD/VERY_HARD 分级墙钟（秒，None→读 config）
+        step_timeout_s: Optional[float] = None,        # E2 每步超时（秒，None→env/默认60）
+        llm_call_budget: Optional[int] = None,         # E2 每题 LLM 调用上限（None→env/默认12）
+        few_shot: Optional[bool] = None,               # E6 few-shot 方向范例注入（None→env/默认关）
+        e3_enabled: Optional[bool] = None,             # E3 附件证据注入开关（None→env/默认关）
     ):
         self.llm_client = llm_client
         self.registry = registry
@@ -250,6 +281,23 @@ class MainAgent:
                 self.hard_wallclock = AppConfig.from_env().hard_wallclock
             except Exception:  # noqa: BLE001 - config 不可用时兜底默认
                 self.hard_wallclock = 480
+        # E2（2026-08-25 桶B攻坚）：每步超时 + 每题 LLM 调用预算（可 env 覆盖，与墙钟同风格）
+        # step_timeout_s：单步 LLM+工具执行硬上限，防单步极慢拖死并发池（区别于每题墙钟）。
+        # llm_call_budget：每题 LLM 调用硬上限，收敛"无限试错"——真题回归验收要求 ≤12。
+        self.step_timeout_s = float(step_timeout_s) if step_timeout_s is not None \
+            else float(os.getenv("CTF_AGENT_STEP_TIMEOUT_S", "60"))
+        self.llm_call_budget = int(llm_call_budget) if llm_call_budget is not None \
+            else int(os.getenv("CTF_AGENT_LLM_CALL_BUDGET", "12"))
+        # E6（2026-08-25 桶B攻坚）：few-shot 方向决策范例注入开关（可 env 覆盖，默认关）
+        # 仅在 LLM plan 提示注入精选「先判断题型→正确首步」范例，帮模型少走错方向
+        # （桶B=方向决策错 占失败 57.1%）。默认关：保证基线 KPI（presolve 主导）不被改动。
+        self.few_shot = bool(few_shot) if few_shot is not None \
+            else bool(os.getenv("CTF_AGENT_FEWSHOT", ""))
+        # E3（2026-08-25 桶C攻坚）：附件证据注入开关（默认关，保证基线 KPI 不被改动；
+        # 仅 A/B 实验开启 CTF_AGENT_E3=1）。开启后 file_analyze 全文才注入 plan prompt，
+        # 使"证据不进脑"可被 error_struct.evidence_injected 真实度量（见 _chain_stats）。
+        self.e3_enabled = bool(e3_enabled) if e3_enabled is not None \
+            else bool(os.getenv("CTF_AGENT_E3", ""))
 
     # ── 主循环 ──────────────────────────────────────────
 
@@ -264,6 +312,8 @@ class MainAgent:
             correction: 结构化修正指令（错误归因：error_category/key_info/suggestion）
         """
         ctx = AgentContext(question=question, hint_text=hint, correction=correction)
+        ctx.few_shot = self.few_shot  # E6 开关透传：plan 提示按需注入方向决策范例
+        ctx.e3_enabled = self.e3_enabled  # E3 开关透传：plan 提示按需注入附件全文
         # 2026-08-21 攻坚（解出数优先）+ P1-3 收敛（赛后）：确定性预扫统一入口——
         # 原入口手工 flag_scan/crypto_auto 收敛为 core.presolve.presolve，按序
         # flag_scan → crypto_auto → math_engine → 关键词 fast_solve；命中即直接
@@ -311,8 +361,11 @@ class MainAgent:
             _max_steps = self.max_retries * 4
         else:
             _max_steps = self.max_retries * 3
+        # E2（2026-08-25 桶B攻坚）：每题 LLM 调用预算硬封顶（默认12），收敛"无限试错"——
+        # 真题回归验收要求每题 LLM 调用 ≤12。简单题 9/中等 12 不变，难题 15 收敛到 12。
+        _max_steps = min(_max_steps, self.llm_call_budget)
         try:
-            for step_index in range(_max_steps):  # 分级步骤上限保护
+            for step_index in range(_max_steps):  # 分级步骤上限保护（E2：封顶 llm_call_budget）
                 # ── 墙钟硬止损检查（每步顶部，先于一切重活）──
                 # 防止单步 LLM+工具执行过长（实测单步可达数百秒）把并发池拖死。
                 if ctx._start_monotonic is not None:
@@ -333,26 +386,58 @@ class MainAgent:
                         ctx.advisor_hint = hint_inj
                         logger.info("[%s] 注入人工提示: %s", question.id, hint_inj[:60])
 
-                # ── Plan：生成下一步行动 ──
-                plan = await self._plan(ctx, attempt)
+                # ── Plan：生成下一步行动（E2 每步超时 + 每题 LLM 调用计数）──
+                # step_timeout_s 单步硬上限：防单步 LLM 调用极慢拖死并发池（区别于每题墙钟）。
+                ctx.llm_calls += 1
+                try:
+                    plan = await asyncio.wait_for(self._plan(ctx, attempt), timeout=self.step_timeout_s)
+                except asyncio.TimeoutError:
+                    ctx.step_timeouts += 1
+                    ctx.record(StepRecord(stage=STAGE_STUCK, action="reason",
+                                          observation="", error_category=ERR_TOOL_FAILURE))
+                    logger.warning("[%s] 单步 _plan 超时(>%.0fs)，记一步失败继续循环",
+                                   getattr(question, "id", "?"), self.step_timeout_s)
+                    continue
                 # 仅当已有经校验的候选 flag 才 break；
                 # 模型 plan 声称 done 时仍走 _act（触发 flag→crypto/misc 兜底真算，防猜 flag）
                 if ctx.candidate_flag:
                     break
 
-                # ── Act：执行一步 ──
-                act_result = await self._act(ctx, plan, attempt)
+                # ── Act：执行一步（E2 每步超时：单步工具/脚本执行硬上限）──
+                try:
+                    act_result = await asyncio.wait_for(self._act(ctx, plan, attempt), timeout=self.step_timeout_s)
+                except asyncio.TimeoutError:
+                    ctx.step_timeouts += 1
+                    ctx.record(StepRecord(stage=STAGE_STUCK, action="reason",
+                                          observation="", error_category=ERR_TOOL_FAILURE))
+                    logger.warning("[%s] 单步 _act 超时(>%.0fs)，记一步失败继续循环",
+                                   getattr(question, "id", "?"), self.step_timeout_s)
+                    continue
 
                 # ── Observe：解析结果，更新上下文 ──
                 step = self._observe(ctx, plan, act_result)
                 ctx.record(step)
+                # race-intelligence 微观态势快照（只读日志，不改控制流）
+                self._log_situation(ctx)
+                # budget-reflection 第二层（race-intelligence）：每 5 步预算反思日志（只读）
+                self._log_budget_reflection(ctx)
+                # 早停闸门（默认关 CTF_AGENT_BUDGET_REFLECTION=1）：预算将尽+零进展+低信心→提前放弃
+                if self._budget_reflection_should_abandon(ctx):
+                    logger.info(
+                        "[%s] budget_reflection 早停(ABANDON)：预算将尽+零进展+低信心，放弃止损",
+                        getattr(question, "id", "?"),
+                    )
+                    ctx.give_up_reason = "budget_reflection 早停(ABANDON)"
+                    break
+                # Writeup RAG（IDEA-5 务实落地）：每步按"题型+最新观察"检索历史解法/工具手册
+                self._retrieve_knowledge(ctx, step)
 
                 # ── 卡关处理（P0-A 修复：先升级再放弃，而非直接 break）──
                 # 原逻辑在监督咨询前就 break，导致 HARD 题未升级重型模型就被放弃，
                 # 监督的 upgrade/switch/reset 在连续失败场景永远到不了（死锁）。
                 # 现改为：连续失败先咨询监督——允许升级重型模型/换策略后重试一次；
                 # 已升级过（attempt>=2）仍连续失败才放弃。墙钟硬止损(300s)仍是最终兜底。
-                if ctx.stuck_count >= 2:
+                if ctx.stuck_count >= 2 or self._situation_override_triggered(ctx):
                     verdict = await self._supervise(ctx)
                     if verdict.action == VERDICT_GIVE_UP:
                         logger.info("[%s] 监督裁决放弃: %s", question.id, verdict.reason)
@@ -370,6 +455,23 @@ class MainAgent:
                         continue
                     # continue / switch / redirect：继续循环（stuck_count 可能已被 reset）
                     continue
+
+                # ── E2（2026-08-25 桶B攻坚）：连续同动作 3 次 → 强制切换策略 ──
+                # 仅看 action（不要求 observation 完全相同），比下方"完全相同 observation 死循环放弃"
+                # 更宽松：真在"换参数重试"也算重复，主动换策略而非空等到监督已放弃。
+                # 与下方"完全相同 observation → presolve 兜底 → 放弃"互补（软 switch 优先于硬放弃）。
+                if len(ctx.steps) >= 3:
+                    _acts = [getattr(s, "action", "") for s in ctx.steps[-3:]]
+                    if all(_a and _a == _acts[0] for _a in _acts):
+                        ctx.strategy_switches += 1
+                        ctx.stuck_count = 0
+                        ctx.advisor_hint = (
+                            f"⚠️ 检测到连续 3 步执行相同动作（{_acts[0]}），疑似策略空转死循环，"
+                            "强制切换解题策略：换个切入点/工具/参数，禁止重复同一动作。"
+                        )
+                        logger.info("[%s] 连续同动作3次检测：强制切换策略 (action=%s)",
+                                    question.id, _acts[0])
+                        continue
 
                 # ── 同参数重复检测（第五轮锐评：连续同工具同参数=死循环，快速终止）──
                 # P0修复（2026-08-21）：改为连续3步相同才判定死循环，避免误判正常相似步骤
@@ -425,16 +527,78 @@ class MainAgent:
                         )
                         logger.info("[%s] web 无靶机空转检测：注入模板兜底提示", question.id)
 
-                # ── 全题型连续 reason 空转检测：3 步纯推理无工具调用 → 强制转工具（reverse stuck_loop 教训）──
-                if len(ctx.steps) >= 3:
-                    recent_actions = [s.action for s in ctx.steps[-3:]]
-                    if all(a == "reason" for a in recent_actions):
+                # ── 监督强制路由（战役A/IDEA-1 最小实现，2026-08-27 多轮实测迭代）──
+                # 触发：① 连续 3 步纯 reason 空转；或 ② 总步数≥5 仍无 candidate_flag
+                #   （LLM 交替做无效 tool 调用也会卡死，仅靠①漏判）。最多强制 3 次，避免无限干预主循环。
+                # 级联：flag_scan → crypto_auto → file_analyze(内嵌文件头扫描) → stego_lsb(图片LSB)。
+                # 仅在区间失败路径触发（presolve 命中的题早已 break），不影响 14/15 主导解出路径。
+                _recent = [s.action for s in ctx.steps[-3:]] if ctx.steps else []
+                _consec_reason = len(ctx.steps) >= 3 and all(a == "reason" for a in _recent)
+                _forced_count = getattr(ctx, "_forced_route_count", 0)
+                _no_flag_yet = not getattr(ctx, "candidate_flag", None)
+                if (_consec_reason or (len(ctx.steps) >= 5 and _no_flag_yet)) and _forced_count < 3:
+                    ctx._forced_route_count = _forced_count + 1
+                    if _consec_reason:
                         ctx.advisor_hint = (
                             "⚠️ 检测到连续 3 步纯推理无任何工具/脚本调用——立即停止推理空转！"
                             "必须执行具体动作：附件用 file/strings/capstone 反汇编，crypto 用 script 计算，"
                             "web 用 http_request 发包，pwn 用 pwntools 交互，禁止继续输出 reason。"
                         )
                         logger.info("[%s] 连续 reason 空转检测：强制转工具调用", question.id)
+                    _cat = str(getattr(question, "category", "")).lower()
+                    _atts = list(getattr(question, "attachments", []) or [])
+                    if _atts:
+                        import re as _re
+                        _hit = None
+                        # 1) 明文 flag 直扫
+                        try:
+                            _fo = await self.registry.run("flag_scan", {"attachments": _atts})
+                            _txt = getattr(_fo, "text", "") or ""
+                            _m = _re.search(r"flag\{[^}\s]{3,}\}", _txt, _re.IGNORECASE)
+                            if _m:
+                                _hit = _m.group(0)
+                        except Exception as _fe:  # noqa: BLE001
+                            logger.warning("[%s] 监督强制 flag_scan 异常: %s", question.id, _fe)
+                        # 2) crypto/misc 确定性求解（crypto_auto：RSA 全套 + 哈希 + 多层编码 + 已知key 维吉尼亚 + 八进制）
+                        if _hit is None and _cat in ("crypto", "misc"):
+                            try:
+                                _fo = await self.registry.run("crypto_auto", {"attachments": _atts})
+                                _txt = getattr(_fo, "text", "") or ""
+                                _m = _re.search(r"flag\{[^}\s]{3,}\}", _txt, _re.IGNORECASE)
+                                if _m:
+                                    _hit = _m.group(0)
+                            except Exception as _fe:  # noqa: BLE001
+                                logger.warning("[%s] 监督强制 crypto_auto 异常: %s", question.id, _fe)
+                        # 3) 通用文件分析（binwalk 式内嵌文件头扫描 + 字符串flag提取；覆盖 JPEG尾附PNG等）
+                        if _hit is None:
+                            try:
+                                for _a in _atts:
+                                    _fo = await self.registry.run("file_analyze", {"path": _a})
+                                    _txt = getattr(_fo, "text", "") or ""
+                                    _m = _re.search(r"flag\{[^}\s]{3,}\}", _txt, _re.IGNORECASE)
+                                    if _m:
+                                        _hit = _m.group(0)
+                                        break
+                            except Exception as _fe:  # noqa: BLE001
+                                logger.warning("[%s] 监督强制 file_analyze 异常: %s", question.id, _fe)
+                        # 4) misc 含图片 → LSB 隐写提取（仅当上述未命中）
+                        if _hit is None and _cat == "misc":
+                            for _im in [a for a in _atts if str(a).lower().endswith(
+                                    (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".webp"))]:
+                                try:
+                                    _fo = await self.registry.run("stego_lsb", {"path": _im})
+                                    _txt = getattr(_fo, "text", "") or ""
+                                    _m = _re.search(r"flag\{[^}\s]{3,}\}", _txt, _re.IGNORECASE)
+                                    if _m:
+                                        _hit = _m.group(0)
+                                        break
+                                except Exception as _fe:  # noqa: BLE001
+                                    logger.warning("[%s] 监督强制 stego_lsb 异常: %s", question.id, _fe)
+                        if _hit is not None:
+                            ctx.candidate_flag = _hit
+                            logger.info("[%s] 监督强制路由命中 flag: %s", question.id, _hit[:40])
+                            break
+                        logger.info("[%s] 监督强制路由第%d次未命中，继续循环", question.id, ctx._forced_route_count)
 
                 # ── crypto/misc 无数据快速失败：附件/靶机/题面全缺 → 连续 reason 空转 → 快速放弃 ──
                 # （可解的 crypto/misc 题数据全在附件里，附件为空=无数据可算，纯推理必然空转）
@@ -540,6 +704,138 @@ class MainAgent:
         return verdict
     # ── 工具方法 ────────────────────────────────────────
 
+    # ── 态势感知快照（race-intelligence 微观态势，只读日志，不改控制流）──
+    def _log_situation(self, ctx: AgentContext) -> None:
+        """每 5 步从已有步骤历史计算单题信心并日志（纯规则，零额外 LLM 调用）。
+
+        设计：仅读取 ctx.steps（已在 record 阶段累积），不改动解题控制流；
+        计算出的信心写入 ctx.last_confidence 供看板/后续决策消费。
+        """
+        try:
+            from core.confidence import ConfidenceEstimator, classify_step
+        except Exception:  # noqa: BLE001 - 态势日志不应影响主流程
+            return
+        recent = ctx.steps[-5:]
+        if not recent:
+            return
+        step_history = [s.observation for s in recent]
+        error_history = [classify_step(s.observation, s.error_category) for s in recent]
+        _budget_cap = getattr(self, "llm_call_budget", 1) or 1
+        budget_ratio = min(1.0, ctx.llm_calls / max(_budget_cap, 1))
+        conf = ConfidenceEstimator().estimate(step_history, error_history, budget_ratio)
+        ctx.last_confidence = conf
+        if len(ctx.steps) % 5 == 0:
+            logger.info(
+                "[%s] 态势快照: 信心=%.2f (步=%d, 卡壳=%d, LLM调用=%d)",
+                getattr(ctx.question, "id", "?"), conf, len(ctx.steps),
+                ctx.stuck_count, ctx.llm_calls,
+            )
+
+    def _situation_override_triggered(self, ctx: AgentContext) -> bool:
+        """态势接管闸门（race-intelligence）：默认关闭，CTF_AGENT_SITUATION_OVERRIDE=1 开启。
+
+        开启后，单题信心过低且已过半预算时，提前触发监督咨询换策略（复用既有
+        _supervise 块），避免低信心题空转到预算耗尽。默认关闭 = 不影响现有调优行为/回归。
+        """
+        if os.environ.get("CTF_AGENT_SITUATION_OVERRIDE") != "1":
+            return False
+        try:
+            from core.confidence import should_early_switch
+        except Exception:  # noqa: BLE001
+            return False
+        return should_early_switch(
+            ctx.last_confidence, ctx.llm_calls,
+            getattr(self, "llm_call_budget", 12) or 12, override=True,
+        )
+
+    def _log_budget_reflection(self, ctx: AgentContext) -> None:
+        """每 5 步做预算反思并日志（纯规则，零额外 LLM 调用，不改控制流，除非闸门开启）。"""
+        try:
+            from core.budget_reflection import (
+                reflect as _reflect_budget, BudgetState as _BudgetState,
+                DECISION_ABANDON,
+            )
+        except Exception:  # noqa: BLE001 - 反思日志不应影响主流程
+            return
+        _st = _BudgetState(
+            budget_total=getattr(self, "llm_call_budget", 12) or 12,
+            budget_used=len(ctx.steps),
+        )
+        _res = _reflect_budget(_st, ctx.steps, getattr(ctx, "last_confidence", None))
+        ctx.last_reflection = {
+            "decision": _res.decision, "reason": _res.reason, "metrics": _res.metrics,
+        }
+        if len(ctx.steps) % 5 == 0:
+            logger.info(
+                "[%s] budget_reflection: %s | %s",
+                getattr(ctx.question, "id", "?"), _res.decision, _res.reason,
+            )
+
+    def _budget_reflection_should_abandon(self, ctx: AgentContext) -> bool:
+        """预算反思早停闸门（budget-reflection）：默认关闭，CTF_AGENT_BUDGET_REFLECTION=1 开启。
+
+        开启且反思决策为 ABANDON（预算将尽+零进展+低信心）时，提前 break 放弃，
+        避免把整段预算空烧在 hopeless 路径上。复用既有 give_up 语义（ctx.give_up_reason）。
+        默认关闭 = 不影响现有调优行为/回归。
+        """
+        if os.environ.get("CTF_AGENT_BUDGET_REFLECTION") != "1":
+            return False
+        try:
+            from core.budget_reflection import (
+                reflect as _reflect_budget, BudgetState as _BudgetState,
+                DECISION_ABANDON,
+            )
+        except Exception:  # noqa: BLE001
+            return False
+        _st = _BudgetState(
+            budget_total=getattr(self, "llm_call_budget", 12) or 12,
+            budget_used=len(ctx.steps),
+        )
+        _res = _reflect_budget(_st, ctx.steps, getattr(ctx, "last_confidence", None))
+        return _res.decision == DECISION_ABANDON
+
+    # ── Writeup RAG（IDEA-5 务实落地：知识增强检索，默认关、零回归）──
+    def _get_knowledge_index(self):
+        """懒加载知识索引（仅 CTF_AGENT_WRITEUP_RAG=1 时构建；否则返回 None）。
+
+        知识库 = 项目自有真实资产（writeups_corpus.jsonl 已验证解法 + skills/ 文档），
+        不依赖外网爬取。构建失败绝不中断解题主流程。
+        """
+        if os.environ.get("CTF_AGENT_WRITEUP_RAG") != "1":
+            return None
+        if getattr(self, "_knowledge_index", None) is None:
+            try:
+                from knowledge.writeup_rag import WriteupIndex
+                idx = WriteupIndex()
+                n1 = idx.load_corpus_jsonl()
+                n2 = idx.load_skills_docs()
+                idx.build()
+                self._knowledge_index = idx
+                logger.info("[RAG] 知识索引就绪: 语料=%d 篇（solutions=%d, skills=%d）",
+                            n1 + n2, n1, n2)
+            except Exception as e:  # noqa: BLE001 - RAG 失败绝不应中断解题
+                logger.warning("[RAG] 索引构建失败，跳过知识增强: %s", e)
+                return None
+        return self._knowledge_index
+
+    def _retrieve_knowledge(self, ctx: AgentContext, step) -> None:
+        """每步按"题型 + 最新观察"检索 top-k，写入 ctx.knowledge_hits 供 prompts 注入。
+
+        仅当 RAG 启用时执行；任何异常都被吞掉，保证解题控制流不受影响。
+        """
+        idx = self._get_knowledge_index()
+        if idx is None:
+            return
+        try:
+            q_parts = [
+                getattr(ctx.question, "title", "") or "",
+                getattr(ctx.question, "category", "") or "",
+                (step.observation or "")[:400],
+            ]
+            ctx.knowledge_hits = idx.retrieve(" ".join(q_parts), k=5)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("[RAG] 检索失败，跳过本次注入: %s", e)
+
     def _wallclock_for(self, question) -> float:
         """分级墙钟（速度系统性优化：简单题更快止损，3h 吞吐提升）。
 
@@ -580,7 +876,9 @@ class MainAgent:
                 "强制止损防拖死并发池"
             )
         elif error and not flag:
-            err_category = ERR_HALLUCINATION
+            # 2026-08-28 步级硬停：异常自带 category（如 BudgetExceeded.category=
+            # budget_exceeded）时优先采用，不一律落进 hallucination 桶。
+            err_category = getattr(error, "category", None) or ERR_HALLUCINATION
             err_detail = str(error)
         # ── 4 类失败埋点（2026-08-22 赛后重锐评 M1.3）──
         # 提取错：候选 flag 被提取校验拒绝（模板/幻觉/无工具证据）
@@ -594,12 +892,26 @@ class MainAgent:
             err_category = ERR_TOOL_FAILURE
             err_detail = "工具调用失败累积后未解出"
         # 决策错：监督裁决放弃（方向性失败）
+        # 2026-08-27 修复误判：KNOWN_GAP 题（题面缺运行时参数，如 anwang_crypto1 缺
+        # hint_enc/AES_KEY_ENC，台账 REAL_SOLVES_LEDGER.md）解不出是题缺参，非方向错——
+        # 归 extract_fail（题缺参）而非 wrong_direction（方向错），避免污染失败桶统计。
         elif getattr(ctx, "give_up_reason", None) and not flag:
-            err_category = ERR_WRONG_DIRECTION
-            err_detail = ctx.give_up_reason
+            if str(getattr(ctx.question, "id", "")).lower() in _KNOWN_GAP_IDS:
+                err_category = ERR_EXTRACT_FAIL
+                err_detail = f"{ctx.give_up_reason}（题面缺运行时参数，KNOWN_GAP）"
+            else:
+                err_category = ERR_WRONG_DIRECTION
+                err_detail = ctx.give_up_reason
         elif not flag:
-            err_category = ERR_STUCK_LOOP
-            err_detail = "未解出 flag"
+            # 2026-08-28 修复兜底污染：此前所有"未解出 flag"都归 stuck_loop，但实测
+            # 98.2% 案例 stuck_count=0（非真死循环）——只有连续同动作（stuck_count>=3）
+            # 才算死循环，其余归 unresolved（未解出且无明确归因），使失败桶口径诚实。
+            if getattr(ctx, "stuck_count", 0) >= 3:
+                err_category = ERR_STUCK_LOOP
+                err_detail = "未解出 flag（连续同动作死循环）"
+            else:
+                err_category = ERR_UNRESOLVED
+                err_detail = "未解出 flag（无明确归因，非死循环）"
         else:
             err_category = None
             err_detail = None
@@ -621,6 +933,14 @@ class MainAgent:
                 {
                     "category": err_category,
                     "detail": err_detail,
+                    # E3（2026-08-25 桶C攻坚）效果埋点：三态信号，使 C 桶成为"证据不进脑"真实度量
+                    #   None = 本题无附件（E3 不相关，不归 C 桶）
+                    #   True = 有附件且附件全文曾注入 plan prompt（进了脑，失败归其他桶）
+                    #   False = 有附件但未注入（"证据不进脑"，归 C 桶——正是 E3 想修的）
+                    "evidence_injected": (
+                        bool(ctx.evidence_injected_into_prompt)
+                        if getattr(ctx.question, "attachments", None) else None
+                    ),
                 }
                 if not flag
                 else None
@@ -630,6 +950,10 @@ class MainAgent:
             # corrective_rate = 非 continue 裁决占比（真正干预而非默认放行）。
             # 统计口径：一次 solve 内全部 _supervise 咨询；跨题聚合见赛后报告。
             "supervision_stats": _supervision_stats(ctx),
+            # E2（2026-08-25 桶B攻坚）可观测：每题 LLM 调用数 / 每步超时次数，
+            # 供 goal_log 统计与真题回归验收（平均每题 LLM 调用数下降 = 验收指标）
+            "llm_calls": ctx.llm_calls,
+            "step_timeouts": ctx.step_timeouts,
             "duration_ms": 0,  # 由调度层填充
             "provider": provider_label,
             "retries": attempt,

@@ -656,7 +656,9 @@ _km = re.search(r"key\s*[:：=]\s*(\S+)", text, re.I)
 _dm = re.search(r"data\s*[:：=]\s*(\S+)", text, re.I)
 if not (_km and _dm):
     # 八进制 ASCII 预解码后重试（crypto1: flag.txt 是八进制序列）
-    _oct_chars = [chr(int(n, 8)) for n in re.findall(r"\b[0-7]{3}\b", text)]
+    # 2026-08-27 修复：\b[0-7]{3}\b 只匹配 3 位，漏 2 位冒号(72)等 token → key:/data: 匹配失败
+    # 改 {2,3} 兼容 2-3 位八进制（如 ':' = 0o72 = '72'）
+    _oct_chars = [chr(int(n, 8)) for n in re.findall(r"\b[0-7]{2,3}\b", text)]
     if len(_oct_chars) >= 20:
         _oct_text = "".join(_oct_chars)
         _km = re.search(r"key\s*[:：=]\s*(\S+)", _oct_text, re.I)

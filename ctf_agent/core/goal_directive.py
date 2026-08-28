@@ -202,6 +202,8 @@ class GoalLogger:
                 "category": _cat,
                 "detail": str(raw_err.get("detail") or ""),
                 "class4": classify_failure(_cat),
+                # E3（2026-08-25 桶C攻坚）：透传三态证据信号，使 C 桶成为"证据不进脑"真实度量
+                "evidence_injected": raw_err.get("evidence_injected"),
             }
 
         entry = GoalLogEntry(

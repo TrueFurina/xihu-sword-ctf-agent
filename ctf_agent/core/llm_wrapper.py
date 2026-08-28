@@ -36,6 +36,12 @@ async def llm_json(system: str, user: str, attempt: int, llm_client=None) -> Opt
             except Exception:  # noqa: BLE001
                 return None
         return None
+    import os as _os
+    if _os.getenv("CTF_AGENT_LLM_FAILOVER", "0") == "1":
+        from llm.failover import ai_chat_json_failover_async
+
+        return await ai_chat_json_failover_async(
+            [{"role": "user", "content": user}], system=system, attempt=attempt)
     from llm.client import ai_chat_json, get_model_for_attempt
 
     model = get_model_for_attempt(attempt)
@@ -55,6 +61,12 @@ async def llm_text(system: str, user: str, attempt: int, llm_client=None) -> str
                     return val
             return ""
         return ""
+    import os as _os
+    if _os.getenv("CTF_AGENT_LLM_FAILOVER", "0") == "1":
+        from llm.failover import ai_chat_text_failover_async
+
+        return await ai_chat_text_failover_async(
+            [{"role": "user", "content": user}], system=system, attempt=attempt)
     from llm.client import ai_chat, get_model_for_attempt
 
     model = get_model_for_attempt(attempt)

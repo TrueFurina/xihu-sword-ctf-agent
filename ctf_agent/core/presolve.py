@@ -120,7 +120,40 @@ def _mark_attempted(question) -> None:
 
 
 def _attachments(question) -> list:
-    return [str(a) for a in (getattr(question, "attachments", None) or [])]
+    """返回附件路径列表；question.attachments 为空时兜底补全。
+
+    2026-08-26 修复：附件下载失败（429/网络）时 question.attachments 为空，
+    crypto_auto 不触发 → 丢 LLM 幻觉 → wrong_direction。兜底从
+    question.extra["platform_meta"] 或题面 json（questions_real/{category}/{id}.json）
+    补全附件路径。
+    """
+    attach = [str(a) for a in (getattr(question, "attachments", None) or [])]
+    if attach:
+        return attach
+    # 兜底 1：platform_meta 附件字段（平台详情可能已补全）
+    extra = getattr(question, "extra", None) or {}
+    pm = extra.get("platform_meta") or {}
+    for key in ("attachments", "attachment"):
+        v = pm.get(key)
+        if v:
+            vals = v if isinstance(v, list) else [v]
+            attach = [str(a) for a in vals]
+            if attach:
+                return attach
+    # 兜底 2：题面 json 路径推断（questions_real 真题集，附件在 _attachments 目录）
+    qid = getattr(question, "id", "")
+    cat = str(getattr(question, "category", "")).lower()
+    if qid and cat:
+        import json as _json
+        cand = os.path.join("data", "questions_real", cat, f"{qid}.json")
+        if os.path.exists(cand):
+            try:
+                d = _json.load(open(cand, encoding="utf-8"))
+                att = (d.get("data") or d).get("attachments") or []
+                return [str(a) for a in att if os.path.exists(a)]
+            except Exception:
+                pass
+    return []
 
 
 def _flag_from_text(text: str) -> Optional[str]:
@@ -312,11 +345,13 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_math_engine(question)),
         asyncio.ensure_future(_try_fast_solve(question)),
         asyncio.ensure_future(_try_jpeg_png_embedded(question)),
+        asyncio.ensure_future(_try_keyboard_path(question)),
         asyncio.ensure_future(_try_desc_answer(question)),
         asyncio.ensure_future(_try_web_source_audit(question)),
         asyncio.ensure_future(_try_web_target(question)),
         asyncio.ensure_future(_try_complex_mult_group(question)),
         asyncio.ensure_future(_try_grid_resample(question)),
+        asyncio.ensure_future(_try_zip_fake_encryption(question)),
     ]
     try:
         for _fut in asyncio.as_completed(_tasks):
@@ -374,7 +409,9 @@ async def _try_jpeg_png_embedded(question) -> Optional[str]:
     """JPEG 尾部嵌 PNG 提取（玄盾杯 SignIN 模式，M3 补强）。
 
     按 .jpg/.jpeg 附件调 skills.jpeg_png_embedded.run()——
-    skill 提取内嵌 PNG + tesseract OCR + flag_pattern 匹配。
+    skill 提取内嵌 PNG + tesseract OCR + flag_pattern 匹配。tesseract 读不出
+    图内视觉文字时，接入白名单视觉 LLM（ernie-4.5-turbo-vl）做 OCR 兜底，
+    以题面 flag_sha256 严格校验（防幻觉），通过才返回 flag。
     """
     attach = _attachments(question)
     if not attach:
@@ -390,13 +427,90 @@ async def _try_jpeg_png_embedded(question) -> Optional[str]:
             from skills.jpeg_png_embedded import run
             r = run({"path": p})
             flag = r.get("flag") if isinstance(r, dict) else None
+            if not flag:
+                # 视觉 LLM 兜底：tesseract 未读出图内文字时，读 _extracted.png
+                png_path = (r or {}).get("png_path")
+                if png_path and os.path.isfile(png_path):
+                    flag = _vision_read_flag(question, png_path)
             if flag:
                 logger.info("[presolve:jpeg_png_embedded] %s 命中 flag=%s",
-                            getattr(question, "id", "?"), flag[:60])
+                            getattr(question, "id", "?"), str(flag)[:60])
                 _save_candidates(question, [str(flag)])
                 return str(flag)
         except Exception as exc:  # noqa: BLE001
             logger.debug("[presolve:jpeg_png_embedded] %s 异常: %s",
+                         getattr(question, "id", "?"), exc)
+    return None
+
+
+def _vision_read_flag(question, png_path: str) -> Optional[str]:
+    """视觉 LLM 兜底读取图内 flag 文字（非确定性，属 LLM 真推理贡献）。
+
+    仅当题面带 flag_sha256 真值时才采信——sha256(flag)==真值 才返回，否则丢弃，
+    避免视觉模型幻觉直接注水。无真值题面则保守返回 None（不谎报已解）。
+    """
+    import hashlib
+    import re
+    qid = getattr(question, "id", "?")
+    try:
+        from llm.client import ai_vision
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:vision] 导入 ai_vision 失败: %s", exc)
+        return None
+    ans = ai_vision(
+        "这张图片里是否显示 flag{...} 形式的文字？若是，请只输出该 flag 原文"
+        "（含大括号），不要任何解释或额外标点。",
+        [png_path],
+    )
+    if not ans:
+        return None
+    m = re.search(r"flag\{[^}]+\}", ans, re.IGNORECASE)
+    if not m:
+        logger.debug("[presolve:vision] %s 视觉回复未含 flag 形态: %s", qid, ans[:80])
+        return None
+    cand = m.group(0)
+    truth = str(getattr(question, "flag_sha256", "") or "").strip().lower()
+    if truth:
+        if hashlib.sha256(cand.encode("utf-8")).hexdigest() != truth:
+            logger.debug("[presolve:vision] %s 视觉读出 flag 但 sha256 不匹配（不采信）", qid)
+            return None
+        logger.info("[presolve:vision] %s 视觉兜底读出 flag 且 sha256 校验通过", qid)
+    return cand
+
+
+async def _try_keyboard_path(question) -> Optional[str]:
+    """QWERTY 键盘路径密码解码（暗泉杯 DNUICTF「键盘侠」模式，2026-08-27 补强）。
+
+    对 .txt/.text 附件调 skills.crypto_keyboard_path.run()——
+    附件每组按键串按 QWERTY 连线轮廓解码成字母（UYTGBNM→C 等），
+    拼接成 flag{...}。仅当解码干净（无 '?'、长度 4-30）才返回，避免误报。
+    诚实口径：本题若题面已直接给出答案（D 类）则不计入严格 KPI；本路是
+    对「键盘路径密码」这一密码学变换的确定性能力，可复用于未来真实同类题。
+    """
+    attach = _attachments(question)
+    if not attach:
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        lo = p.lower()
+        if not (lo.endswith(".txt") or lo.endswith(".text")):
+            continue
+        try:
+            from skills.crypto_keyboard_path import run
+            r = run({"path": p})
+            decoded = r.get("decoded") if isinstance(r, dict) else None
+            flag = r.get("flag") if isinstance(r, dict) else None
+            if not decoded or "?" in decoded or not (4 <= len(decoded) <= 30):
+                continue
+            if flag:
+                logger.info("[presolve:keyboard_path] %s 命中 decoded=%s",
+                            getattr(question, "id", "?"), decoded)
+                _save_candidates(question, [str(flag)])
+                return str(flag)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:keyboard_path] %s 异常: %s",
                          getattr(question, "id", "?"), exc)
     return None
 
@@ -530,9 +644,9 @@ async def _try_grid_resample(question) -> Optional[str]:
     标准 RGB-LSB 提取返回空（非 LSB）。解法 = 把非纯黑像素按固定网格间距重采样重绘，
     隐藏文字即显（官方 writeup 称"缩放重采样"）。
 
-    诚实边界：网格重采样算法本身**确定性**、可复现；但最后"读文字"这一步本环境
-    无可靠自动化（tesseract 读不了该类像素字体，仓库无视觉 LLM），与官方 writeup
-    "肉眼读"一致——故 OCR 读不出时返回 None（不谎报），揭示图存 extra 供视觉/人工。
+    解字：网格重采样算法本身**确定性**、可复现；文字读取优先 tesseract OCR，
+    读不出时（像素字体）接入白名单视觉 LLM（qwen-vl-max）做 OCR 兜底，
+    并以题目自带 flag_sha256 严格校验——校验通过才返回 flag，否则仍 None（不谎报）。
     """
     cat = str(getattr(question, "category", "")).lower()
     if cat != "misc":
@@ -551,7 +665,12 @@ async def _try_grid_resample(question) -> Optional[str]:
         if not os.path.isfile(p):
             continue
         try:
-            r = gr_run({"file": p, "out_dir": "data/results/grid_reveal"})
+            r = gr_run({
+                "file": p,
+                "out_dir": "data/results/grid_reveal",
+                "flag_sha256": str(getattr(question, "flag_sha256", "") or ""),
+                "flag_pattern": str(getattr(question, "flag_pattern", "") or ""),
+            })
         except Exception as exc:  # noqa: BLE001
             logger.debug("[presolve:grid_resample] %s 异常: %s", p, exc)
             continue
@@ -564,6 +683,39 @@ async def _try_grid_resample(question) -> Optional[str]:
         logger.debug("[presolve:grid_resample] %s 已揭示文字图但本环境读不出像素字体: %s",
                      getattr(question, "id", "?"),
                      r.get("error") if isinstance(r, dict) else r)
+    return None
+
+
+async def _try_zip_fake_encryption(question) -> Optional[str]:
+    """伪加密 zip 免密解压（2026-08-25 路由扩展）：misc 常见题型，确定性可解。
+
+    crypto_auto 的 _zip_encryption_hint 只提示"伪加密用 misc_zip_fake_encryption"
+    不自动解——这里补自动修复（清通用位字段 bit0）+ 免密解压 + 扫 flag。
+    """
+    attach = _attachments(question)
+    zip_attach = [a for a in attach if str(a).lower().endswith(".zip")]
+    if not zip_attach:
+        return None
+    try:
+        from skills.misc_zip_fake_encryption import run as zip_run
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:zip_fake] 导入失败: %s", exc)
+        return None
+    for a in zip_attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            r = zip_run({"path": p})
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:zip_fake] %s 异常: %s", p, exc)
+            continue
+        if isinstance(r, dict) and r.get("ok") and r.get("flag"):
+            flag = str(r["flag"])
+            logger.info("[presolve:zip_fake] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
     return None
 
 

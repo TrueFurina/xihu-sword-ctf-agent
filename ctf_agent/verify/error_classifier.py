@@ -23,6 +23,7 @@ from core.main_agent import (
     ERR_HALLUCINATION,
     ERR_STUCK_LOOP,
     ERR_TOOL_FAILURE,
+    ERR_UNRESOLVED,
     ERR_WRONG_DIRECTION,
     StepRecord,
 )
@@ -34,6 +35,7 @@ class ErrorClassifier:
     def __init__(self) -> None:
         self.CATEGORIES = {
             ERR_STUCK_LOOP: "连续 N 步同一动作/输出，死循环",
+            ERR_UNRESOLVED: "未解出且无明确归因（非死循环）",
             ERR_WRONG_DIRECTION: "偏离题目目标（分析错文件/错端口/错思路）",
             ERR_HALLUCINATION: "编造输出（flag 未经验证/工具未执行就断言）",
             ERR_TOOL_FAILURE: "工具执行失败（命令不存在/超时/语法错）",

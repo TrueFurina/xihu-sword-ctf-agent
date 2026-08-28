@@ -18,6 +18,7 @@ v2.0 迁移要点：
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -307,6 +308,75 @@ def ai_chat(
     except Exception as exc:  # noqa: BLE001 - 失败开放：任何异常都不外抛
         logger.warning("AI 调用失败（fail-open 返回 None）: %s", exc)
         return None
+
+
+def ai_vision(
+    prompt: str,
+    image_paths: list,
+    system: Optional[str] = None,
+    temperature: float = 0.2,
+    max_tokens: int = 1024,
+    model: Optional[str] = None,
+    provider: Optional[str] = None,
+) -> Optional[str]:
+    """多模态视觉调用：文本提示 + 图片（base64 data URI），用于 OCR / 图内文字读取。
+
+    默认 model=config.vision_model（ernie-4.5-turbo-vl），provider=config.llm_provider
+    （baidu）；复用统一 _post_chat（含白名单校验与熔断），失败开放返回 None。
+
+    消息按 OpenAI 多模态格式构造：content 为分片数组，含一个 text 分片与若干
+    image_url 分片（url=data:<mime>;base64,<b64>）。千帆 ERNIE-4.5-Turbo-VL 走与
+    文本模型相同的 /v2/chat/completions 端点，故白名单（qianfan）天然放行。
+    """
+    if not image_paths:
+        logger.warning("ai_vision: 至少需要一张图片，返回 None")
+        return None
+    try:
+        _cfg = AppConfig.from_env()
+    except Exception:  # noqa: BLE001
+        _cfg = None
+    model = model or (_cfg.vision_model if _cfg else None)
+    provider = provider or (_cfg.llm_provider if _cfg else None)
+    if not model or not provider:
+        logger.warning("ai_vision: 未解析到视觉模型/provider，返回 None")
+        return None
+    content_parts = [{"type": "text", "text": str(prompt)}]
+    for ip in image_paths:
+        ip = str(ip)
+        if not os.path.isfile(ip):
+            logger.warning("ai_vision: 图片不存在 %s，返回 None", ip)
+            return None
+        try:
+            with open(ip, "rb") as fh:
+                b64 = base64.b64encode(fh.read()).decode("ascii")
+        except OSError as exc:
+            logger.warning("ai_vision: 读图失败 %s: %s", ip, exc)
+            return None
+        ext = os.path.splitext(ip)[1].lower().lstrip(".")
+        mime = {
+            "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+            "gif": "image/gif", "bmp": "image/bmp", "webp": "image/webp",
+        }.get(ext, "image/png")
+        content_parts.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:{mime};base64,{b64}"},
+        })
+    messages = [{"role": "user", "content": content_parts}]
+    settings = _resolve_settings(model, provider=provider)
+    if not settings.get("api_key"):
+        logger.warning("ai_vision: 未配置 API Key，视觉能力不可用")
+        return None
+    _prov = settings.get("provider", "")
+    if _prov and provider_circuit_open(_prov):
+        logger.warning("ai_vision: provider=%s 已熔断（连续 401/402/403），跳过", _prov)
+        return None
+    content, _ = _post_chat(
+        _with_system(messages, system),
+        temperature=temperature, max_tokens=max_tokens, settings=settings,
+    )
+    if content is not None:
+        _circuit_record_success(_prov)
+    return content
 
 
 def ai_chat_with_usage(

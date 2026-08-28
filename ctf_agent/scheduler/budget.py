@@ -32,6 +32,23 @@ BUDGET_DOWNGRADE = "downgrade"  # 接近上限，建议降级轻量模型
 BUDGET_STOP = "stop"          # 超限，必须终止
 
 
+class BudgetExceeded(Exception):
+    """步级硬停（2026-08-28 Claim 1 超调整改）：LLM 调用中途即达单题上限。
+
+    由 run.py llm_client 闭包在每次调用累计后抛出，主循环兜底转成
+    budget_exceeded 归因——避免「等 attempt 结束才 record/check」导致的
+    超调（实测 vnctf_flag 超调至 139K，cap 仅 80K）。
+    """
+
+    category = "budget_exceeded"
+
+    def __init__(self, question_id: str, used: int, cap: int):
+        super().__init__(f"单题 token 预算超限（{question_id}: {used} >= {cap}），步级硬停")
+        self.question_id = question_id
+        self.used = used
+        self.cap = cap
+
+
 class BudgetTracker:
     """预算追踪与熔断器。"""
 
