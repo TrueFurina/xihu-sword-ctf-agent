@@ -63,3 +63,32 @@ def test_reason_stall_triggered():
 def test_reason_stall_not_triggered():
     assert _detect_reason_stall(["tool", "reason", "reason"]) is False
     assert _detect_reason_stall(["reason", "tool", "reason", "reason"]) is False
+
+
+# ── 门禁 4：Crypto 参数完整性（n/e/c 缺一 → 禁止进入 exploit——代码化门禁）──
+def _check_crypto_params(n, e, c):
+    """Crypto 参数完整性检查：n/e/c 缺一 → 拒绝（参数不全禁止推理——
+    goal_directive 提示词引用 → 代码化判定）。"""
+    if not all(isinstance(x, int) and x > 0 for x in (n, e, c)):
+        return False
+    if n <= e or n <= c:  # 参数不合逻辑（n 必须大于 e/c）→ 拒绝
+        return False
+    return True
+
+
+def test_crypto_params_complete_accepted():
+    """n/e/c 完整且合理 → 允许进入 exploit"""
+    assert _check_crypto_params(32317006071311, 65537, 123456789) is True
+
+
+def test_crypto_params_missing_rejected():
+    """n/e/c 缺一 → 拒绝（参数不全禁止推理）"""
+    assert _check_crypto_params(None, 65537, 123456789) is False  # n 缺
+    assert _check_crypto_params(32317006071311, None, 123456789) is False  # e 缺
+    assert _check_crypto_params(32317006071311, 65537, None) is False  # c 缺
+
+
+def test_crypto_params_illogical_rejected():
+    """参数不合逻辑（n <= e 或 n <= c）→ 拒绝（疑似参数错误——10696 教训）"""
+    assert _check_crypto_params(65537, 65537, 123456789) is False  # n == e
+    assert _check_crypto_params(100, 65537, 123456789) is False  # n < e
