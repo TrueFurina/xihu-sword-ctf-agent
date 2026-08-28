@@ -39,7 +39,7 @@ MANAGED_EXT = {
 # 协同任务总账-TOP0.md = 包工头总账活文件（post-commit 自动记账硬编码写 ../协同任务总账-TOP0.md，
 #   移动会破坏记账路径，故白名单保留在根）；_INDEX.md = 项目索引（归 docs/ 更规范，但历史散落
 #   已存在，先白名单合法化防 --all 误报，doc-归位留给后续）。
-ROOT_ALLOW = {"README.md", "CLAUDE.md", "LICENSE", "AGENTS.md",
+ROOT_ALLOW = {"README.md", "README.zh.md", "CLAUDE.md", "LICENSE", "AGENTS.md",
               "REAL_SOLVES_LEDGER.md", "requirements.txt",
               "协同任务总账-TOP0.md", "_INDEX.md"}
 DELIV_ROOT_ALLOW = {"deliverables/overview.md"}
