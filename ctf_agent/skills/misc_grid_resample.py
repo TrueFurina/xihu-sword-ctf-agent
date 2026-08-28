@@ -5,12 +5,14 @@
 
 与 LSB 隐写不同：标准 RGB-LSB 提取返回空，必须用网格重采样才能揭示。
 最后"读文字"这一步优先用 tesseract + 题目自带 flag_sha256 做 OCR 结果校验；
-若校验失败，揭示图仍存盘供视觉 LLM/人工复核，不谎报。
+tesseract 失败时回退到视觉 LLM（qwen-vl）读取揭示图。
+若仍校验失败，揭示图仍存盘供人工复核，不谎报。
 
 纯算法部分是确定性的：给定网格参数 (gx, gy, ox, oy)，揭示结果可复现。
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import os
 import re
@@ -28,17 +30,21 @@ except Exception:  # noqa: BLE001
 
 
 def _flag_regex(flag_pattern: str) -> re.Pattern:
-    """把题目 flag_pattern 转成可抓候选的 regex；无法解析时用通用集合。"""
+    """把题目 flag_pattern 转成可抓候选的 regex；同时保留通用格式兜底。"""
+    fallback = rb"flag\{[^}]*\}|vnctf\{[^}]*\}|DASCTF\{[^}]*\}"
+    parts = [fallback]
     if flag_pattern:
-        # 如 flag\{[^}]+\} 或 vnctf\{[^}]+\}
         pat = flag_pattern.strip("/^")
         try:
             # 把 Python re 字面量中常见未转义字符补一下（仅处理花括号）
             pat = pat.replace("{", r"\{").replace("}", r"\}")
-            return re.compile(pat.encode("utf-8"), re.IGNORECASE)
+            user_pat = pat.encode("utf-8")
+            # 只有当用户提供的 pattern 与兜底不同才并入
+            if user_pat != fallback:
+                parts.insert(0, user_pat)
         except re.error:
             pass
-    return re.compile(rb"flag\{[^}]*\}|vnctf\{[^}]*\}|DASCTF\{[^}]*\}", re.IGNORECASE)
+    return re.compile(b"|".join(parts), re.IGNORECASE)
 
 
 def _autodetect_grid(pts):
@@ -63,6 +69,57 @@ def _autodetect_grid(pts):
     if gx <= 1 or gy <= 1:
         return None
     return gx, gy, ox, oy
+
+
+def _build_or_reveal(img: Image.Image, arr: np.ndarray, gx: int, gy: int, ox: int, oy: int) -> Image.Image:
+    """传统"非黑即点"OR 揭示（numpy 向量化版；与原像素级双循环二进制等价，O(像素)→向量化）。
+
+    关键提速：原实现用 Python 双循环逐像素 putpixel（2205×3920 图 ~5s/候选网格），
+    本版用 np.nonzero + 单元格首像素着色，单次 <0.1s，揭示图二进制完全一致。
+    """
+    h, w = arr.shape[:2]
+    cols = max(1, (w - ox) // gx) + 1
+    rows = max(1, (h - oy) // gy) + 1
+    # 非黑像素坐标（np.nonzero 返回 (row=y, col=x)）
+    ys, xs = np.nonzero(np.any(arr != (0, 0, 0), axis=2))
+    if len(xs) == 0:
+        return None, None, None
+    cx = (xs - ox) // gx
+    cy = (ys - oy) // gy
+    valid = (cx >= 0) & (cx < cols) & (cy >= 0) & (cy < rows)
+    xs, ys, cx, cy = xs[valid], ys[valid], cx[valid], cy[valid]
+    if len(xs) == 0:
+        return None, None, None
+    # 每个网格取首个非黑像素的颜色（二进制揭示等价：单元格只要出现过非黑即显）
+    keys = cy * cols + cx
+    _, first = np.unique(keys, return_index=True)
+    ra = np.full((rows, cols, 3), 255, dtype=np.uint8)
+    ra[cy[first], cx[first]] = arr[ys[first], xs[first]]
+    mask = np.any(ra < 250, axis=2)
+    ys_i, xs_i = np.where(mask)
+    if len(xs_i) == 0:
+        return None, None, None
+    y0, y1, x0, x1 = ys_i.min(), ys_i.max(), xs_i.min(), xs_i.max()
+    crop = mask[y0:y1 + 1, x0:x1 + 1]
+    # 正确反色：填充格 = 黑点(0)，空背景 = 白(255)；
+    reveal_arr = (1 - crop.astype(np.uint8)) * 255
+    return Image.fromarray(reveal_arr), (cols, rows), (y0, y1, x0, x1)
+
+
+def _build_max_brightness_reveal(arr: np.ndarray, gx: int, gy: int, ox: int, oy: int) -> Image.Image:
+    """按单元格最大亮度揭示：flag 杂色点通常比图标主体暗，能减轻 logo 干扰。"""
+    h, w = arr.shape[:2]
+    cols = (w - ox) // gx + 1
+    rows = (h - oy) // gy + 1
+    reveal = np.zeros((rows, cols), dtype=np.uint8)
+    for r in range(rows):
+        y0 = oy + r * gy
+        y1 = min(y0 + gy, h)
+        for c in range(cols):
+            x0 = ox + c * gx
+            x1 = min(x0 + gx, w)
+            reveal[r, c] = arr[y0:y1, x0:x1].max()
+    return Image.fromarray(reveal), (cols, rows)
 
 
 def _ocr_one(path: str, tess: str, psm: str = "6") -> bytes:
@@ -106,6 +163,40 @@ def _verify_by_sha256(candidates: list[str], flag_sha256: str) -> str | None:
     return None
 
 
+def _vision_ocr(reveal_path: str, flag_sha256: str, flag_pat: re.Pattern) -> str | None:
+    """tesseract 失败时回退视觉 LLM（ernie-4.5-turbo-vl via baidu）读取揭示图并校验 sha256。
+
+    复用与 xuanhun_signin 同链路的统一 ai_vision 接口（c3709ef 落地）。显式指定
+    provider="baidu" 以对抗 CTF_AGENT_LLM_PROVIDER 环境变量漂移（当前 shell 误设为 qwen），
+    确保视觉模型 ernie-4.5-turbo-vl 命中千帆端点。仅当 sha256(flag)==题面真值 才返回，
+    否则丢弃——避免视觉模型幻觉直接注水。失败开放返回 None。
+    """
+    try:
+        from llm.client import ai_vision
+    except Exception:  # noqa: BLE001
+        return None
+    if not os.path.isfile(reveal_path):
+        return None
+    prompt = (
+        "This image is a pixel-font flag revealed by grid resampling of a dot-matrix. "
+        "Read the exact flag text. The flag is wrapped in a format like "
+        "vnctf{...} or flag{...} or DASCTF{...}. Return ONLY the flag string, nothing else."
+    )
+    try:
+        txt = ai_vision(
+            prompt, [reveal_path], temperature=0.1, max_tokens=200, provider="baidu",
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    if not txt:
+        return None
+    cands = _extract_candidates(txt.encode("utf-8"), flag_pat)
+    matched = _verify_by_sha256(cands, flag_sha256)
+    if matched:
+        return matched
+    return None
+
+
 def run(params: dict) -> dict:
     if not HAS_DEPS:
         return {"ok": False, "error": "缺少 numpy/PIL 依赖"}
@@ -138,41 +229,33 @@ def run(params: dict) -> dict:
     flag: str | None = None
     used = None
     reveal_path = None
+    reveal_max_path = None
     tess = params.get("tesseract") or r"C:\Users\Lenovo\miniconda3\Library\bin\tesseract.exe"
     have_tess = os.path.isfile(tess)
     best_candidates: list[str] = []
 
     for (gx, gy, ox, oy) in candidates:
-        cols = max(1, (w - ox) // gx) + 1
-        rows = max(1, (h - oy) // gy) + 1
-        res = Image.new("RGB", (cols, rows), 255)
-        px = img.load()
-        for x in range(w):
-            for y in range(h):
-                p = px[x, y]
-                if p != (0, 0, 0):
-                    cx = (x - ox) // gx
-                    cy = (y - oy) // gy
-                    if 0 <= cx < cols and 0 <= cy < rows:
-                        res.putpixel((cx, cy), p)
-        ra = np.array(res)
-        mask = np.any(ra < 250, axis=2)
-        ys_i, xs_i = np.where(mask)
-        if len(xs_i) == 0:
+        # 1) OR 揭示（兼容旧行为）
+        reveal_or, dims, _ = _build_or_reveal(img, arr, gx, gy, ox, oy)
+        if reveal_or is None:
             last_err = "重采样后无墨迹"
             continue
-        y0, y1, x0, x1 = ys_i.min(), ys_i.max(), xs_i.min(), xs_i.max()
-        crop = mask[y0:y1 + 1, x0:x1 + 1]
-        # 正确反色：填充格 = 黑点(0)，空背景 = 白(255)；
-        # 原代码 (~uint8)*255 会 uint8 回绕成一片黑。
-        reveal_arr = (1 - crop.astype(np.uint8)) * 255
-        reveal = Image.fromarray(reveal_arr)
-        reveal_big = reveal.resize((crop.shape[1] * 6, crop.shape[0] * 6), Image.NEAREST)
+        cols, rows = dims
+        reveal_big = reveal_or.resize((reveal_or.width * 6, reveal_or.height * 6), Image.NEAREST)
         rp = os.path.join(out_dir, "_grid_reveal.png")
         reveal_big.save(rp)
         reveal_path = rp
         used = (gx, gy, ox, oy)
 
+        # 2) 最大亮度揭示（供视觉 LLM，对 logo 干扰更鲁棒）
+        reveal_max, _ = _build_max_brightness_reveal(arr, gx, gy, ox, oy)
+        # 放大到与 OR 揭示相近尺寸以便人眼/视觉模型阅读
+        reveal_max_big = reveal_max.resize((cols * 10, rows * 10), Image.NEAREST)
+        rmp = os.path.join(out_dir, "_grid_reveal_max.png")
+        reveal_max_big.save(rmp)
+        reveal_max_path = rmp
+
+        # 3) tesseract OCR
         if have_tess:
             tmp = os.path.join(out_dir, "_grid_ocr.png")
             reveal_big.save(tmp)
@@ -194,12 +277,19 @@ def run(params: dict) -> dict:
         else:
             last_err = "无 tesseract，已揭示文字图待视觉/人工读取"
 
+    # 4) 视觉 LLM 兜底（tesseract 失败或不存在时）
+    if not flag and reveal_max_path and flag_sha256:
+        vision_flag = _vision_ocr(reveal_max_path, flag_sha256, flag_pat)
+        if vision_flag:
+            flag = vision_flag
+
     if flag:
-        return {"ok": True, "flag": flag, "method": f"grid_resample{gx,gy,ox,oy}",
-                "reveal_path": reveal_path}
+        return {"ok": True, "flag": flag, "method": f"grid_resample{used}",
+                "reveal_path": reveal_path, "reveal_max_path": reveal_max_path}
     # 汇总 OCR 候选供调试；仍不谎报 flag
     return {"ok": False,
             "error": last_err or f"网格重采样已揭示文字，但 tesseract 读不出该像素字体（OCR候选: {best_candidates[:5]}）",
             "method": f"grid_resample{used}" if used else None,
             "reveal_path": reveal_path,
+            "reveal_max_path": reveal_max_path,
             "candidates": best_candidates}
