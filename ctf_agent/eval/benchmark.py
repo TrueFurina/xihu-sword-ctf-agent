@@ -70,6 +70,8 @@ def run_benchmark(
     max_retries: int = 3,
     use_mock: bool = False,
     per_question_wallclock_s: float = 300.0,
+    race_controller: "Optional[RaceController]" = None,
+    concurrency: int = 1,
 ) -> list[BenchmarkResult]:
     """对题目列表逐个求解并统计。
 
@@ -84,8 +86,12 @@ def run_benchmark(
     墙钟口径（2026-08-23 锐评整改）：评测器必须与比赛执行器同一约束——超过墙钟的题
     判为 wallclock_timeout 失败，而非"解出"。否则评测高估比赛形态下的真实表现。
     """
-    results: list[BenchmarkResult] = []
-    for q in questions:
+    async def _solve_question(q) -> BenchmarkResult:
+        """单题完整求解（重试循环 + 墙钟 + race 早停），并发安全（ContextVar 记账）。
+
+        提取为协程：串行路径用独立事件循环逐个驱动；并发路径由 Semaphore+gather
+        在同一循环内并发驱动。solver 支持 sync / async 两种（async 自动 await）。
+        """
         start = time.perf_counter()
         output = None
         retries = 0
@@ -93,19 +99,12 @@ def run_benchmark(
             try:
                 _out = solver(q, attempt)
                 if asyncio.iscoroutine(_out):
-                    # 真实链路为 async solver：用独立事件循环驱动（CLI 同步上下文）
-                    _loop = asyncio.new_event_loop()
                     try:
-                        # 比赛墙钟：超过 per_question_wallclock_s 强杀（asyncio.wait_for 超时）
-                        output = _loop.run_until_complete(
-                            asyncio.wait_for(_out, timeout=per_question_wallclock_s)
-                        )
+                        output = await asyncio.wait_for(_out, timeout=per_question_wallclock_s)
                     except asyncio.TimeoutError:
                         output = {"error": {"category": "wallclock_timeout",
                                             "detail": f"超过 {per_question_wallclock_s:.0f}s 硬墙钟"}}
                         break  # 超时不再重试
-                    finally:
-                        _loop.close()
                 else:
                     output = _out
             except Exception as exc:  # noqa: BLE001 - 单题求解异常不中断整体评测
@@ -113,9 +112,55 @@ def run_benchmark(
                 output = {"error": {"category": "solver_exception", "detail": str(exc)[:200]}}
             if output and output.get("flag"):
                 break
-            retries = attempt + 1
+            # race-intelligence 预算反思早停（默认关闭；开启后仅 ABANDON 时提前中断重试）
+            if race_controller is not None and output is not None:
+                _decision = race_controller.reflect_on_attempt(q.id, output, attempt, max_retries)
+                if _decision == "ABANDON":
+                    output = {"error": {"category": "race_abandon",
+                                        "detail": "budget_reflection ABANDON 早停，避免空烧预算"}}
+                    break
+        retries = attempt + 1
         duration_ms = int((time.perf_counter() - start) * 1000)
-        results.append(BenchmarkResult(q, output, duration_ms, retries))
+        return BenchmarkResult(q, output, duration_ms, retries)
+
+    if concurrency and concurrency > 1:
+        # 并发层（Block 2 解锁）：单事件循环 + Semaphore(N) + gather 真实并发跑题。
+        # 默认关闭（concurrency<=1 走下方串行，行为与历史完全一致，零回归）。
+        # 注意：真实模式（MainAgent 共享实例）并发时，presolve 直出题（stateless）安全；
+        # LLM 重度题共享 MainAgent 上下文需隔离——kpi9 题集 LLM 贡献 0/9，故本基准并发低风险。
+        async def _run_concurrent():
+            # Semaphore 必须在运行中的循环内创建，否则会绑定到错误的事件循环
+            # （asyncio.Semaphore 在循环外构造时捕获 get_event_loop()，与 run_until_complete
+            # 新建的 _loop 不一致 → "future belongs to a different loop"）。
+            _sem = asyncio.Semaphore(concurrency)
+
+            async def _bounded(q):
+                async with _sem:
+                    return await _solve_question(q)
+
+            return await asyncio.gather(*[_bounded(q) for q in questions], return_exceptions=True)
+
+        _loop = asyncio.new_event_loop()
+        try:
+            _gathered = _loop.run_until_complete(_run_concurrent())
+        finally:
+            _loop.close()
+        results: list[BenchmarkResult] = []
+        for _r in _gathered:
+            if isinstance(_r, Exception):
+                logger.error("并发求解崩溃（已跳过该题）: %s", _r)
+                continue
+            results.append(_r)
+        return results
+
+    # 串行（默认）：每题独立事件循环，与历史版本行为一致
+    results = []
+    for q in questions:
+        _loop = asyncio.new_event_loop()
+        try:
+            results.append(_loop.run_until_complete(_solve_question(q)))
+        finally:
+            _loop.close()
     return results
 
 
@@ -194,6 +239,17 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=0, help="只跑前 N 题（真实模式省钱调试，0=全部）")
     parser.add_argument("--wallclock", type=float, default=300.0,
                         help="每题硬墙钟秒数（默认 300s 对齐比赛模式，超时判 timeout 失败）")
+    parser.add_argument("--presolve-skip", action="store_true",
+                        help="跳过确定性预扫（presolve），强制走主 Agent 全链路——"
+                             "构造「必须走主 Agent」的子集（回归集饱和时 presolve 14/15 直出，"
+                             "主 Agent 改进测不到，用本参数做 A/B 对比）")
+    parser.add_argument("--race-intelligence", action="store_true",
+                        help="启用 race-intelligence 预算反思早停（默认关闭；接入 "
+                             "core.race_orchestrator.RaceController，零 LLM、可单测）")
+    parser.add_argument("--concurrency", type=int, default=1,
+                        help="题目并发数（Block 2 解锁）：1=串行(历史默认,零回归)；"
+                             ">1=单事件循环+Semaphore(N)+gather 真实并发跑题。真实模式共享 MainAgent，"
+                             "presolve 直出题安全；LLM 重度题建议先隔离 MainAgent 再高并发")
     args = parser.parse_args()
 
     from eval.cases import load_questions, preset_answers
@@ -204,6 +260,15 @@ def main() -> None:
         return
     if args.limit and args.limit > 0:
         questions = questions[: args.limit]
+
+    # race-intelligence 接入（默认关闭）：构造控制器并规划资源分配方案
+    race_controller = None
+    if args.race_intelligence:
+        from core.race_orchestrator import RaceController
+        race_controller = RaceController()
+        _alloc = race_controller.plan(questions)
+        logger.info("RACE-INTELLIGENCE 已接入：Allocation concurrency=%s per_question_budget=%.3f focus=%s",
+                    _alloc.concurrency, _alloc.per_question_budget, _alloc.focus)
 
     # 钉死审计（2026-08-23）：打印本次基线使用的 provider/base_url，保证数字可复现、可审计。
     # base_url 含赛事网关路径，仅打印 host 段，不暴露凭证路径。
@@ -220,7 +285,8 @@ def main() -> None:
 
         logger.info("MOCK 基线（数字禁止引用）：仅统计框架回归")
         results = run_benchmark(questions, solver, max_retries=args.max_retries, use_mock=True,
-                                per_question_wallclock_s=args.wallclock)
+                                per_question_wallclock_s=args.wallclock,
+                                race_controller=race_controller, concurrency=args.concurrency)
         summary = summarize(results)
         _emit_report(args, "mock", summary, results, None)
         return
@@ -232,7 +298,8 @@ def main() -> None:
     providers = [p.strip() for p in args.provider.split(",") if p.strip()]
     if len(providers) == 1:
         # 单 provider：行为与历史版本完全一致（保持可复现基线）。
-        _solver = build_solver(use_mock=False, provider=providers[0], validate_locally=True)
+        _solver = build_solver(use_mock=False, provider=providers[0], validate_locally=True,
+                               skip_presolve=args.presolve_skip)
 
         async def solver(q, attempt):
             out = await _solver(q, attempt)
@@ -242,8 +309,17 @@ def main() -> None:
         logger.info("真实基线钉死配置 provider=%s base_url_host=%s wallclock=%.0fs",
                     providers[0], _bu_host, args.wallclock)
         results = run_benchmark(questions, solver, max_retries=args.max_retries, use_mock=False,
-                                per_question_wallclock_s=args.wallclock)
+                                per_question_wallclock_s=args.wallclock,
+                                race_controller=race_controller, concurrency=args.concurrency)
         summary = summarize(results)
+        # Claim 1 实验（2026-08-28）：真实 token 用量（solver.budget 记账）——
+        # 供"熔断降 Token"对比实验报实测基线（评估要求 ≥3 种子 + CI，先报基线再谈 delta）。
+        _b = getattr(_solver, "budget", None)
+        if _b is not None:
+            summary["tokens"] = {
+                "global_total": _b.global_usage,   # @property，非方法
+                "per_question": {q.id: _b.usage(q.id) for q in questions},
+            }
         _emit_report(args, "real_main_agent", summary, results, None)
         return
 
@@ -267,7 +343,8 @@ def main() -> None:
         _questions = load_questions(args.questions_dir)
         if args.limit and args.limit > 0:
             _questions = _questions[: args.limit]
-        _solver = build_solver(use_mock=False, provider=prov, validate_locally=True)
+        _solver = build_solver(use_mock=False, provider=prov, validate_locally=True,
+                               skip_presolve=args.presolve_skip)
 
         async def solver(q, attempt, _s=_solver):
             return await _s(q, attempt)
@@ -275,7 +352,8 @@ def main() -> None:
         logger.info("真实基线(多provider之一) provider=%s base_url_host=%s wallclock=%.0fs",
                     prov, _bu_host, args.wallclock)
         res = run_benchmark(_questions, solver, max_retries=args.max_retries, use_mock=False,
-                            per_question_wallclock_s=args.wallclock)
+                            per_question_wallclock_s=args.wallclock,
+                            race_controller=race_controller, concurrency=args.concurrency)
         summ = summarize(res)
         per_provider[prov] = summ
         ids = {r.question_id for r in res if r.solved}
