@@ -1,0 +1,44 @@
+{
+  "provider": "baidu",
+  "skip_presolve": true,
+  "total": 1,
+  "solved": 1,
+  "results": [
+    {
+      "qid": "real_crypto_ezmult",
+      "category": "crypto",
+      "difficulty": "EASY",
+      "status": "SOLVED",
+      "flag_found": "flag{le61u5mvgpbjtoxc}",
+      "sha256_ok": true,
+      "solved_by": "main_agent_llm",
+      "provider": "baidu/ernie-4.5-turbo-32k",
+      "validated": true,
+      "attempts_used": null,
+      "error": null,
+      "seconds": 8.9,
+      "raw_keys": [
+        "confidence",
+        "duration_ms",
+        "error",
+        "evidence",
+        "flag",
+        "llm_calls",
+        "provider",
+        "question_type",
+        "retries",
+        "self_reflection",
+        "skill_require",
+        "solved_by",
+        "stage",
+        "step_timeouts",
+        "steps",
+        "supervision",
+        "supervision_stats",
+        "task_id",
+        "task_status",
+        "validated"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+✅ 暂存区密钥扫描通过（无 ak_live_/sk-/DASCTF_TOKEN 明文）
+✅ 暂存区诚实口径扫描通过（无假水位表述）
+✅ lease: scope 内提交（0 文件），已续租（gu）
+── ⑥ 快速回归（防错体系核心测试）──
+........................................................................ [ 78%]
+....................                                                     [100%]
+92 passed in 1.80s
+✅ 文档↔实现一致性校验通过（无状态断言漂移 / 文件引用失效）
+── ⑩ 反注水法令（写死，fail-closed）──
+✅ 泄露式假验证扫描通过：无硬编码真实 flag / 无预植答案
+✅ 反注水法令：无注水行为，通过
+── ⑪ 目录结构守卫 ──
+✅ 目录结构守卫（暂存新增）：无散落文件
+On branch master
+Your branch is based on 'origin/open-clean', but the upstream is gone.
+  (use "git branch --unset-upstream" to fixup)
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   REAL_SOLVES_LEDGER.md
+	modified:   core/presolve.py
+	modified:   eval/benchmark.py
+	modified:   governance/anti_fraud/HONOR_CODE.md
+	modified:   llm/client.py
+	modified:   scripts/_antifraud.py
+	modified:   scripts/_merge_gate.py
+	deleted:    scripts/_mock_web_target.py
+	modified:   scripts/web_target_real.py
+	modified:   tests/test_antifraud.py
+	modified:   tests/test_web_target_mock.py
+	deleted:    ../recovered_external/RECOVERY_batch2.md
+	deleted:    ../recovered_external/wp_text/5space.txt
+	deleted:    "../recovered_external/wp_text/_pdf_MJUCTF\344\270\255\347\272\247\350\265\233\351\203\250\345\210\206\350\265\233\351\242\230.txt"
+	deleted:    "../recovered_external/wp_text/_pdf_\350\265\233\351\242\230\344\270\216\351\242\230\350\247\243.txt"
+	deleted:    ../recovered_external/wp_text/anxun2020_official.txt
+	deleted:    ../recovered_external/wp_text/bytectf.txt
+	deleted:    ../recovered_external/wp_text/changan.txt
+	deleted:    ../recovered_external/wp_text/ctf_misc_hidden.txt
+	deleted:    ../recovered_external/wp_text/gaoxiao_yunwei2024.txt
+	deleted:    ../recovered_external/wp_text/gkctf2020.txt
+	deleted:    ../recovered_external/wp_text/isctf2024.txt
+	deleted:    ../recovered_external/wp_text/mjuctf.txt
+	deleted:    ../recovered_external/wp_text/qiangwang2020_blockchain.txt
+	deleted:    ../recovered_external/wp_text/vnctf2022.txt
+	deleted:    ../research-wiki/competitive_landscape_round2.md
+	deleted:    ../research-wiki/gap_map.md
+	deleted:    ../research-wiki/graph/edges.jsonl
+	deleted:    ../research-wiki/ideas/idea_ctf_agent_context_compression.md
+	deleted:    ../research-wiki/ideas/idea_ctf_agent_human_in_loop.md
+	deleted:    ../research-wiki/ideas/idea_ctf_agent_race_intelligence.md
+	deleted:    ../research-wiki/ideas/idea_ctf_agent_writeup_rag.md
+	deleted:    ../research-wiki/index.md
+	deleted:    ../research-wiki/log.md
+	deleted:    ../research-wiki/papers/idea_ctf_agent_adaptive_routing.md
+	deleted:    ../research-wiki/papers/idea_ctf_agent_budget_reflection.md
+	deleted:    ../research-wiki/papers/idea_ctf_agent_memory_evolution.md
+	deleted:    ../research-wiki/papers/vaswani2017_attention_all_you.md
+	deleted:    ../research-wiki/query_pack.md
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	_vision_commit.txt
+	_vision_commit2.txt
+	deliverables/
+	scripts/_regress_one.py
+	tests/test_ai_vision.py
+	tests/test_presolve_jpeg_vision.py
+	../docs/.gitkeep
+	../idea-stage/proposals/
+	../idea-stage/refine-logs/FINAL_PROPOSAL_RACE_INTELLIGENCE.md
+	../idea-stage/research-wiki/
+	"../idea-stage/research/M2\347\234\237\345\256\236LLM\345\237\272\347\272\277\346\212\245\345\221\212-20260822.md"
+	"../idea-stage/research/M3\351\230\266\346\256\265\346\212\245\345\221\212-20260822.md"
+	"../idea-stage/research/\346\204\232\350\200\205\345\267\205\345\263\260-CTF-Agent\345\244\232\346\231\272\350\203\275\344\275\223\346\236\266\346\236\204\345\244\215\347\233\230-20260824.md"
+	"../idea-stage/research/\346\234\252\346\235\245\345\217\221\345\261\225\350\247\204\345\210\222-20260827.html"
+	"../idea-stage/research/\346\267\261\345\272\246\345\210\206\346\236\220\344\270\216\350\257\204\344\273\267-20260827.html"
+	"../idea-stage/research/\346\267\261\345\272\246\347\240\224\347\251\266-\347\234\237\351\242\230\345\275\222\346\241\243\346\266\210\345\244\261\344\270\216\351\227\270\351\227\250\347\272\242\346\265\213\350\257\225-20260827.html"
+	"../idea-stage/research/\346\267\261\345\272\246\350\260\203\347\240\224-\351\241\271\347\233\256\347\216\260\347\212\266\344\270\216\350\247\243\351\242\230\346\225\260\347\254\254\344\270\200\347\233\256\346\240\207-20260822.md"
+	"../idea-stage/research/\347\216\260\347\212\266\350\257\204\344\274\260-20260827.md"
+	"../idea-stage/research/\347\216\260\347\212\266\350\257\204\344\274\260\344\270\216\344\270\213\344\270\200\346\255\245\350\247\204\345\210\222-20260826.md"
+	"../idea-stage/research/\347\253\236\345\223\201\345\257\271\346\257\224\344\270\216\350\266\205\350\275\246\350\267\257\345\276\204-\351\224\220\350\257\204\346\212\245\345\221\212-20260824.md"
+	"../idea-stage/research/\351\241\271\347\233\256\346\243\200\346\265\213\344\270\216\344\274\230\345\214\226\350\267\257\347\272\277\345\233\276-20260826.md"
+	"../idea-stage/research/\351\241\271\347\233\256\347\216\260\347\212\266\350\257\232\345\256\236\350\257\204\344\274\260\346\212\245\345\221\212-20260824.md"
+	"../idea-stage/\346\226\271\346\241\210\350\257\204\344\274\260-IDEA1\345\217\257\350\241\214\346\200\247\346\225\210\345\272\246\350\257\204\345\256\241-20260828.md"
+
+no changes added to commit (use "git add" and/or "git commit -a")

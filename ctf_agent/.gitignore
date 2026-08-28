@@ -59,8 +59,8 @@ data/results_backup*/
 **/平台接入交接文档.md
 **/环境变量对照清单-*.md
 data/results/*.md
-# 真实解出台账含真 flag 明文(DASCTF{)，禁止入库（运行产物）
-REAL_SOLVES_LEDGER.md
+# 真实解出台账 REAL_SOLVES_LEDGER.md 现已脱敏（flag 仅 REDACTED+sha256），纳入版本控制以保真值源可追溯；
+# 若后续重新写入明文 flag，必须恢复忽略。
 _sec_*.txt
 # 一次性 diff/诊断输出（可能含 setx 注入的 sk- API Key 明文，如 _p0_diff.txt）
 /_p0_diff.txt
@@ -108,6 +108,11 @@ data/attachments/platform_archive/tmp_fate/
 !data/questions_real/
 !data/questions_real/**
 !/data/results/.gitkeep
+# 真题集附件含明文真 flag（flag.txt / flag.png / 赛题源码包），重新忽略以超越上面的 !data/questions_real/**
+data/questions_real/_attachments/
+data/questions_real/**/flag.txt
+data/questions_real/**/flag.png
+data/questions_real/**/*.flag
 
 # 根目录临时解密产物（赛时手工解题输出，非源码）
 /*.bin

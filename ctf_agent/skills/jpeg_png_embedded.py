@@ -5,23 +5,85 @@ xz1.jpg 是 JPEG（FFD8 头 + FFD9 尾），FFD9 后直接接 PNG（89504E47 魔
 按 flag_pattern 提取 flag 字符串供 presolve 直接命中。
 """
 from __future__ import annotations
-import os, re, struct, subprocess, tempfile
+import os, re, struct, subprocess, tempfile, shutil
 
 
 _FLAG_PAT = re.compile(rb"(?:flag|FLAG|Flag|DASCTF)\{[^}]{2,80}\}")
-_TESSERACT = "tesseract"
+
+# tesseract 常见安装路径（conda / choco / 官方 installer）。venv 环境下 tesseract
+# 通常不在 PATH，需显式定位。注：tesseract 是 Windows 原生程序，TESSDATA_PREFIX 必须
+# 传 Windows 风格路径（D:/... 或 D:\\...），Git Bash 的 /d/... POSIX 路径会被它忽略并报
+# "does not exist, ignore it" 导致加载不到 eng.traineddata。
+_TESS_CANDIDATES = [
+    r"D:/miniconda3_new/Library/bin/tesseract.exe",
+    r"C:/Users/Lenovo/miniconda3/Library/bin/tesseract.exe",
+    r"C:/Program Files/Tesseract-OCR/tesseract.exe",
+    r"C:/Program Files (x86)/Tesseract-OCR/tesseract.exe",
+    r"C:/tools/tesseract/tesseract.exe",
+    r"C:/tools/Tesseract-OCR/tesseract.exe",
+    r"C:/Users/Lenovo/AppData/Local/Programs/tesseract/tesseract.exe",
+]
+
+
+def _locate_tesseract():
+    """定位 tesseract 可执行文件及其 tessdata 目录。返回 (exe, tessdata_dir) 或 (None, None)。"""
+    exe = shutil.which("tesseract")
+    if exe:
+        exe = os.path.abspath(exe)
+    else:
+        for c in _TESS_CANDIDATES:
+            if os.path.isfile(c):
+                exe = c
+                break
+    if not exe:
+        return None, None
+    bindir = os.path.dirname(exe)
+    for cand in (os.path.join(bindir, "..", "share", "tessdata"),
+                 os.path.join(bindir, "tessdata")):
+        d = os.path.abspath(cand)
+        if os.path.isfile(os.path.join(d, "eng.traineddata")):
+            return exe, d
+    return exe, None
 
 
 def _ocr_text(png_path: str) -> str:
-    """subprocess 调 tesseract 读 PNG 文字（不依赖 pytesseract 包装库）。"""
+    """subprocess 调 tesseract 读 PNG 文字（不依赖 pytesseract 包装库）。
+
+    自动定位 tesseract，并以 Windows 风格路径设置 TESSDATA_PREFIX；若直出无 flag，
+    再做一次二值化+放大重试，应对浅色/低对比视觉文字。
+    """
+    exe, tdata = _locate_tesseract()
+    if not exe:
+        return ""
+    env = dict(os.environ)
+    if tdata:
+        env["TESSDATA_PREFIX"] = tdata.replace("\\", "/")
     try:
         r = subprocess.run(
-            [_TESSERACT, png_path, "stdout", "-l", "eng", "--psm", "6"],
-            capture_output=True, timeout=20,
+            [exe, png_path, "stdout", "-l", "eng", "--psm", "6"],
+            capture_output=True, timeout=20, env=env,
         )
-        return r.stdout.decode("utf-8", errors="ignore")
+        out = r.stdout.decode("utf-8", errors="ignore")
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         return ""
+    if _FLAG_PAT.search(out.encode("utf-8", errors="ignore")):
+        return out
+    # 二次尝试：二值化 + 放大，提升低对比文字命中率
+    try:
+        from PIL import Image
+        im = Image.open(png_path).convert("L")
+        im = im.point(lambda p: 0 if p < 128 else 255)
+        im = im.resize((im.width * 2, im.height * 2), Image.LANCZOS)
+        tmp = os.path.join(tempfile.gettempdir(), "_xz_ocr_retry.png")
+        im.save(tmp)
+        r2 = subprocess.run(
+            [exe, tmp, "stdout", "-l", "eng", "--psm", "6"],
+            capture_output=True, timeout=20, env=env,
+        )
+        out = r2.stdout.decode("utf-8", errors="ignore")
+    except Exception:
+        pass
+    return out
 
 
 def run(params: dict) -> dict:

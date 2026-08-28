@@ -110,8 +110,9 @@ class AppConfig:
     # P1-9 修复（2026-08-21 赛后）：单一事实源——默认 provider 统一为 baidu 千帆。
     # 此前三处漂移：dataclass 默认 "deepseek" / from_env 默认 "baidu" /
     # _resolve_provider_defaults 兜底 "deepseek-v4-flash"，注释还互相矛盾。
-    # 正式赛 deepseek 402 余额耗尽、qwen 403 额度耗尽；千帆 ernie-3.5 实测
-    # 200 OK 且为全系统最强单源（测试赛 72.4% 跑分）。显式 provider（竞速池）
+    # 千帆 ernie-4.5-turbo 三个免费模型（2026-08-28 充值后用户指定唯一使用）：
+    # ernie-4.5-turbo-32k / 128k / vl。deepseek 402 余额、qwen 额度问题为历史，已不相关。
+    # 显式 provider（竞速池）
     # 不受影响；仅影响无显式 provider 的单源模式。
     llm_provider: str = "baidu"      # 默认千帆 baidu（白名单内，实测存活主源）
     llm_base_url: str = ""           # 留空则按 provider 默认
@@ -119,9 +120,12 @@ class AppConfig:
     llm_timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
 
     # ── 分级降级调度（v2.0 核心）──────────────────────────
-    light_model: str = "ernie-3.5-8k-preview"  # attempt 0：轻量（千帆默认，与 llm_provider 同源）
-    mid_model: str = "qwen3.8-27b"             # 中型：pwn/reverse 起步 + attempt 1（百炼免费）
-    heavy_model: str = "ernie-3.5-8k-preview"  # attempt 2-3：默认与轻量同源（千帆当前仅 ernie-3.5）
+    # 2026-08-28：baidu 千帆充值后免费档仅 3 个 ernie-4.5-turbo 模型（用户指定唯一使用）：
+    # ernie-4.5-turbo-32k（轻量快速）/ ernie-4.5-turbo-128k（大上下文强推理）/ ernie-4.5-turbo-vl（视觉）。
+    light_model: str = "ernie-4.5-turbo-32k"   # attempt 0：轻量快速推理
+    mid_model: str = "ernie-4.5-turbo-128k"    # 中型：pwn/reverse 起步 + attempt 1（大上下文）
+    heavy_model: str = "ernie-4.5-turbo-128k"  # attempt 2-3：重型强推理（免费档仅 128k 最强）
+    vision_model: str = "ernie-4.5-turbo-vl"   # 视觉：图内渲染文字 flag（xuanhun_signin 类缺口）
     upgrade_after_attempts: int = 2          # 连续失败 N 次后升级重型模型
 
     # ── 调度与限流 ───────────────────────────────────────
@@ -200,12 +204,12 @@ class AppConfig:
             llm_api_key=os.getenv("CTF_AGENT_LLM_API_KEY", ""),
             llm_timeout_seconds=_int_env("CTF_AGENT_LLM_TIMEOUT", DEFAULT_TIMEOUT_SECONDS),
             light_model=_env_light or light_model,
-            mid_model=os.getenv("CTF_AGENT_MID_MODEL", "").strip() or "qwen3.8-27b",
-            # P0 修复（2026-08-21 17:22 赛后）：heavy_model 默认跟随 provider 默认模型。
-            # 此前默认 deepseek-reasoner——默认 provider 改千帆后，无显式 provider 的
-            # attempt>=2 升级会把 deepseek-reasoner 打到千帆端点 404。现在除非显式设置
-            # CTF_AGENT_HEAVY_MODEL，否则重型与轻量同源（千帆当前仅 ernie-3.5 可用）。
-            heavy_model=_env_heavy or (_env_light or light_model),
+            mid_model=os.getenv("CTF_AGENT_MID_MODEL", "").strip() or "ernie-4.5-turbo-128k",
+            # 2026-08-28：重型默认 ernie-4.5-turbo-128k（大上下文强推理）。
+            # 此前"重型与轻量同源"因千帆仅 ernie-3.5；现免费档有 128k 独立重型档，
+            # 显式固定为 128k（除非 CTF_AGENT_HEAVY_MODEL 覆盖）。
+            heavy_model=_env_heavy or "ernie-4.5-turbo-128k",
+            vision_model=os.getenv("CTF_AGENT_VISION_MODEL", "").strip() or "ernie-4.5-turbo-vl",
             upgrade_after_attempts=_int_env("CTF_AGENT_UPGRADE_AFTER", 2),
             max_concurrency=_int_env("CTF_AGENT_MAX_CONCURRENCY", DEFAULT_MAX_CONCURRENCY),
             rate_limit_per_minute=_int_env("CTF_AGENT_RATE_LIMIT", 60),
@@ -249,6 +253,66 @@ OFFICIAL_WHITELIST_PROVIDERS = {
 }
 
 
+# ── 百度千帆 ERNIE 全量模型登记表（2026-08-28 实测核对）──────────────
+# 来源：百度智能云千帆官方「模型列表」(cloud.baidu.com/doc/qianfan/s/rmh4stp0j)
+#       + 文心大模型「文生文模型列表」(ai.baidu.com/ai-doc/AISTUDIO/rm344erns)
+#       + Agent 开发平台免费分发模型清单 (cloud.baidu.com/doc/qianfan/s/Lmh4sv69i)。
+# 仅登记千帆端点（base_url=https://qianfan.baidubce.com/v2/chat/completions）可用的
+# 百度原生 ERNIE 系列模型，供显式 CTF_AGENT_*_MODEL 覆盖或能力路由选择。
+# ⚠️ 活跃三档默认仍只用用户指定的 3 个免费 turbo（见 AppConfig.light/mid/heavy/vision）；
+#    其余标 free=False 为付费/配额档，仅在显式覆盖或充值额度充足时使用。
+# 字段：ctx=上下文 token 数；free=是否免费档；vision=是否多模态视觉；family=代际。
+BAIDU_QIANFAN_ERNIE_MODELS: dict[str, dict] = {
+    # ── ERNIE 5.x 旗舰（付费/配额档，高能力）──
+    "ernie-5.1":                     {"ctx": 128000,  "free": False, "vision": False, "family": "ernie-5"},
+    "ernie-5.0":                     {"ctx": 128000,  "free": False, "vision": False, "family": "ernie-5"},
+    "ernie-5.0-thinking-preview":    {"ctx": 128000,  "free": False, "vision": False, "family": "ernie-5"},
+    # ── ERNIE 4.5 Turbo（用户指定唯一免费活跃档）──
+    "ernie-4.5-turbo-32k":           {"ctx": 32000,   "free": True,  "vision": False, "family": "ernie-4.5-turbo"},
+    "ernie-4.5-turbo-128k":          {"ctx": 128000,  "free": True,  "vision": False, "family": "ernie-4.5-turbo"},
+    "ernie-4.5-turbo-vl":            {"ctx": 128000,  "free": True,  "vision": True,  "family": "ernie-4.5-turbo"},
+    "ernie-4.5-turbo-vl-32k":        {"ctx": 32000,   "free": False, "vision": True,  "family": "ernie-4.5-turbo"},
+    "ernie-4.5-turbo-20260402":      {"ctx": 128000,  "free": False, "vision": False, "family": "ernie-4.5-turbo"},
+    # ── ERNIE X1 推理（付费/配额档）──
+    "ernie-x1-turbo-32k":            {"ctx": 32000,   "free": False, "vision": False, "family": "ernie-x1"},
+    # ── ERNIE 4.0 系列（付费/配额档）──
+    "ernie-4.0-turbo-128k":          {"ctx": 128000,  "free": False, "vision": False, "family": "ernie-4.0"},
+    "ernie-4.0-turbo-8k":            {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-4.0"},
+    "ernie-4.0-8k":                  {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-4.0"},
+    "ernie-4.0-8k-latest":           {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-4.0"},
+    "ernie-4.0-8k-0613":             {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-4.0"},
+    "ernie-4.0-8k-preview":          {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-4.0"},
+    # ── ERNIE 3.5 系列（付费/配额档）──
+    "ernie-3.5-128k":                {"ctx": 128000,  "free": False, "vision": False, "family": "ernie-3.5"},
+    "ernie-3.5-128k-preview":        {"ctx": 128000,  "free": False, "vision": False, "family": "ernie-3.5"},
+    "ernie-3.5-8k":                  {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-3.5"},
+    "ernie-3.5-8k-0613":             {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-3.5"},
+    "ernie-3.5-8k-preview":          {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-3.5"},
+    # ── 轻量/极速系列（付费/配额档，成本低）──
+    "ernie-speed-8k":                {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-speed"},
+    "ernie-speed-128k":              {"ctx": 128000,  "free": False, "vision": False, "family": "ernie-speed"},
+    "ernie-lite-8k":                 {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-lite"},
+    "ernie-tiny-8k":                 {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-tiny"},
+    "ernie-char-8k":                {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-char"},
+    "ernie-char-fiction-8k":         {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-char"},
+    "ernie-functions-8k":            {"ctx": 8000,    "free": False, "vision": False, "family": "ernie-functions"},
+}
+
+
+def list_baidu_models(free_only: bool = False, vision_only: bool = False) -> list[str]:
+    """千帆 ERNIE 模型清单（按上下文从大到小）。
+
+    free_only: 仅返回免费档（用户指定 3 个 turbo）；
+    vision_only: 仅返回多模态视觉模型（图内渲染文字 flag 缺口）。
+    """
+    items = BAIDU_QIANFAN_ERNIE_MODELS.items()
+    if free_only:
+        items = [(n, m) for n, m in items if m["free"]]
+    if vision_only:
+        items = [(n, m) for n, m in items if m["vision"]]
+    return [n for n, _ in sorted(items, key=lambda kv: kv[1]["ctx"], reverse=True)]
+
+
 def _resolve_provider_defaults(provider: str) -> tuple[str, str]:
     """返回 (base_url, 轻量模型名)。"""
     if provider == "deepseek":
@@ -258,24 +322,27 @@ def _resolve_provider_defaults(provider: str) -> tuple[str, str]:
         return ("https://api.deepseek.com/chat/completions", "deepseek-chat")
     if provider == "qwen":
         # 千问 AI 平台 / 阿里云百炼共用 OpenAI 兼容端点。
-        # 默认模型用 qwen3.7-plus（中高性价比、默认非思考模式、速度远快于
-        # qwen3.8-max 旗舰；新用户免费 1 亿+ tokens 额度内零成本）。
+        # 默认模型用 qwen3.7-flash（2026-08-26 实测 HTTP 200 可用、快速非思考模型，
+        # 用户账号该模型 1M tokens 免费额度仅用 346 tokens（99.97% 剩余），性价比最高）——
+        # 此前默认 deepseek-v4-pro-0813 虽可用但深推理单题 3-5 分钟且额度消耗快（用户明确
+        # 要求"别用 pro，太贵了"，2026-08-27）；更早的 qwen3.7-plus 免费额度已耗尽（403）。
         # 需要更强推理时可改用 qwen3.8-max（CTF_AGENT_LIGHT_MODEL 覆盖）。
         # ⚠️ 重型模型（attempt≥2 升级）：阿里云百炼 deepseek-v4-pro-0813 免费
         #    100 万 token（2026-08-20 实测 HTTP 200）——正式赛设置：
         #    CTF_AGENT_LLM_PROVIDER=qwen + CTF_AGENT_HEAVY_MODEL=deepseek-v4-pro-0813
-        #    （深推理模型单题耗时较长，高难 crypto/reverse 升级场景使用）
+        #    （深推理模型单题耗时较长，仅高难 crypto/reverse 升级场景按需启用）
         return (
             "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-            "qwen3.7-plus",
+            "qwen3.7-flash",
         )
     if provider == "mimo":
         # 小米 MiMo（限时免费，白名单内）：api.xiaomimimo.com
         return ("https://api.xiaomimimo.com/v1/chat/completions", "mimo-v2.5-pro")
     if provider == "baidu":
-        # 百度千帆（白名单内）：ernie-3.5-8k-preview 实测可用（永久免费，2026-08-19 实测）
-        # 备选：ernie-speed-8k（需控制台开通 ERNIE Speed 免费服务）、deepseek-v4-flash（0.001元/千token，聚合低价 DeepSeek）
-        return ("https://qianfan.baidubce.com/v2/chat/completions", "ernie-3.5-8k-preview")
+        # 百度千帆（白名单内）：2026-08-28 充值后免费档仅 3 个 ernie-4.5-turbo 模型
+        # （用户指定唯一使用）：ernie-4.5-turbo-32k / ernie-4.5-turbo-128k / ernie-4.5-turbo-vl。
+        # 默认 light 返回 32k（快速）；重型升级到 128k 在 main_agent 分级调度中处理。
+        return ("https://qianfan.baidubce.com/v2/chat/completions", "ernie-4.5-turbo-32k")
     if provider == "glm":
         # 智谱（白名单内）通用资源包：glm-4.7 500万token/glm-4.5-air 1200万等（2026-08-20 领取）
         # 通用端点 /api/paas/v4（Coding Plan 才用 /api/coding/paas/v4）

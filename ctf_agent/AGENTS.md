@@ -19,13 +19,20 @@
   KPI 会议先念不变的那批。量尺公信力取决于组织如何对待坏消息——坏消息总被追问「为什么没涨」，
   会话和人类就会合谋生产好消息。
 
+## 发布流冻结（第九轮作战计划 2.3 · 2026-08-25）
+
+- **9 月起发布流冻结**：任何「整理仓库 / 开源美化 / 发布导出」类工作默认拒绝，决赛后恢复。
+- 发布只允许走 `scripts/release_export.py`（双仓库模型），禁止手工整理/手工清理发布树。
+- 事实层 = `REAL_SOLVES_LEDGER.md` + tag `verified-*` / `public-*`；git log 是考古层，不重写。
+
 ## 唯一 KPI（外部真值，不可自造尺子）
 
-- KPI = 真题解出数 / 真题总数。考场 = `data/questions_real/`（15 道历年真题，已版本化入库）。
+- KPI = 真题解出数 / 真题总数。考场 = `data/questions_real/`（**45 道**历年真题+正式赛真题，已版本化入库；结构 crypto15/misc20/reverse8/web2）。唯一真值源 = `scripts/_merge_gate.py count_offline_verified`（实跑计数 fail-closed），当前 = **13**（详见 `REAL_SOLVES_LEDGER.md` 第二节）。
 - 真实链路命令：`python -m eval.benchmark --questions-dir data/questions_real --provider baidu,qwen`
   （报告带 `solved_by` 字段拆 presolve/LLM；presolve 静态分析器直出不计 LLM 功劳）。
 - 历史外部真值基线：DASCTF 平台真题离线全量 5/60 = 8%（平台 accepted=0）。
 - 自产题/本地靶场一律不计分。事实层 = tag `verified-2026-08-24` + `REAL_SOLVES_LEDGER.md`（git log 是考古层）。
+- **LLM 推理能力已突破 0**：`knowledge/writeup_rag.py` + `scripts/demo_llm_rag_solve.py` 证明 LLM+RAG 能基于检索到的历年 writeup 独立推理复现真实题目 flag（10733 端到端验证，flag 已核对一致）。13 道严格解目前仍由 presolve/工具直出；writeup_rag 是让未解题也能由 LLM 推理攻克的下阶段主线。
 
 ## 机器配套（防错不靠自觉）
 

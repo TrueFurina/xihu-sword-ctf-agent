@@ -31,7 +31,7 @@ m = pow(c, inverse(e, (p-1)*(q-1)), n) if gcd(e, phi) == 1 else None
 ```
 
 ## 验证（真实解出记录）
-- 10696 TheoremPlus：flag = DASCTF{Ot2N63D_n8L6kJt_f40V61m_zS1O8L7}——离线推导解出（未平台验证——accepted=0）——c 值修正（完整 616 位自动提取——之前手抄 618 位错）
+- 10696 TheoremPlus：flag = DASCTF{<redacted>}——离线推导解出（未平台验证——accepted=0）——c 值修正（完整 616 位自动提取——之前手抄 618 位错）
 
 ## 失败模式
 - c 手抄错 → m 乱码（必须自动提取——10696 教训）

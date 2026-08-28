@@ -73,6 +73,7 @@ class PlatformPoller:
         max_retry_submit: int = 2,
         use_shared_progress: bool = True,
         solve_timeout: float = 900.0,  # 单题解题硬超时（默认 15min，防一题卡死阻塞整场）
+        race_controller=None,  # race-intelligence 控制器（plan() 动态分配并发/聚焦；None=硬编码）
     ) -> None:
         """
         Args:
@@ -82,6 +83,7 @@ class PlatformPoller:
             max_retry_submit: 提交失败重试次数
             use_shared_progress: 启用跨会话共享进度（防重复攻坚）
             solve_timeout: 单题 solver 硬超时（秒），防一题卡死阻塞整场轮询
+            race_controller: race-intelligence 控制器（plan() 输出并发/聚焦；None=硬编码调度）
         """
         self.platform = platform
         self.solver = solver
@@ -91,6 +93,7 @@ class PlatformPoller:
         # 跨题并发上限（架构 A4 修复：此前 getattr(self,"max_concurrency") 永远 None
         # → run_once 硬编码 or 2，配置不生效；现由 env 可调，默认仍 2 保稳）
         self.max_concurrency = max(1, int(os.getenv("CTF_AGENT_MAX_CONCURRENCY", "2")))
+        self._race_controller = race_controller  # race-intelligence（None=硬编码调度）
         self._processed: set[str] = set()      # 已处理题目 ID（去重）
         self._records: dict[str, PollRecord] = {}  # 审计记录
         # P0-4 修复（2026-08-21 赛后）：失败题重试队列——瞬时 429/详情拉取失败
@@ -171,6 +174,21 @@ class PlatformPoller:
             pass
         # 跨题并发（提速：多题并行解题，受 max_concurrency 限制防 LLM 限流）
         max_conc = getattr(self, "max_concurrency", None) or 2
+        # race-intelligence 接入（2026-08-28 B 实现）：plan() 输出动态资源分配——
+        # 并发数 + 聚焦题覆盖硬编码默认；fail-open（控制器异常/缺失不阻塞解题）。
+        if getattr(self, "_race_controller", None) is not None:
+            try:
+                _alloc = self._race_controller.plan(new_ones)
+                _conc = int(getattr(_alloc, "concurrency", 0) or 0)
+                if _conc > 0:
+                    max_conc = max(1, min(_conc, 8))
+                _focus = getattr(_alloc, "focus", None) or []
+                if _focus:
+                    _focus_set = set(_focus)
+                    # 稳定排序：聚焦题在前（组内保持原 _rank 顺序），非聚焦题在后
+                    new_ones.sort(key=lambda ch: getattr(ch, "id", "") not in _focus_set)
+            except Exception as exc:  # noqa: BLE001 - race-intelligence 故障降级硬编码
+                logger.warning("race-intelligence plan 异常（降级硬编码调度）: %s", exc)
         sem = asyncio.Semaphore(max_conc)
 
         async def _limited(ch):

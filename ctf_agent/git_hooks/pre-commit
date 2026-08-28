@@ -109,6 +109,7 @@ echo "── ⑥ 快速回归（防错体系核心测试）──"
     tests/test_doc_consistency.py tests/test_facts.py \
     tests/test_reviewer_gate.py tests/test_task_board.py \
     tests/test_coupling_cluster.py tests/test_closeout.py \
+    tests/test_antifraud.py \
     -q --no-header
 
 # ── ⑦ 文档一致性真实扫描（2026-08-23，堵 P1-6"三方谎言"复发）──
@@ -125,3 +126,17 @@ if [ -f "$(git rev-parse --git-path MERGE_HEAD 2>/dev/null)" ]; then
     echo "── ⑧ merge 全量门禁（merge 进行中：KPI 不降断言 + 全量 pytest）──"
     "$PY" scripts/_merge_gate.py
 fi
+
+# ── ⑩ 反注水法令（写死，2026-08-27 用户严令：禁止一切注水，严厉惩罚）──
+# 每次 commit 都跑（含非 merge 提交）：KPI 水位写死锚校验 + 泄露式假验证扫描 +
+# 暂存区泄露扫描 + 授权题块走私检测 + 基线篡改检测。任一命中 → 永久记入违规账并阻断提交。
+# 这是「禁止注水」从文档宣言升级为写死机器执法的落点，fail-closed。
+echo "── ⑩ 反注水法令（写死，fail-closed）──"
+"$PY" scripts/_antifraud.py --pre-commit
+
+# ── ⑪ 目录结构守卫（2026-08-28：防 agent 散写文件堆积）──
+# 拦截向仓库根目录 / deliverables 根 / idea-stage 根 新增散落文件（白名单除外，fail-closed）。
+# 仅检查本次新增（--diff-filter=A），不误伤既有/重命名；自身异常 fail-open（不阻断提交）。
+# 规则与白名单见仓库根 AGENTS.md；手动全量自检：python scripts/check_structure.py --all
+echo "── ⑪ 目录结构守卫 ──"
+"$PY" scripts/_structure_guard.py

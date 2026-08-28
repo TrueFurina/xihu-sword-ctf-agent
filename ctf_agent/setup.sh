@@ -22,12 +22,28 @@ for _arg in "$@"; do
     [ "$_arg" = "--e2e" ] && E2E=1
 done
 
-# 1. 建 venv（若不存在）
-if [ ! -f "$PY" ]; then
-    echo "[1/4] 建立项目内 .venv..."
-    "C:/Users/Lenovo/.workbuddy/binaries/python/versions/3.13.12/python.exe" -m venv .venv
+# 1. 建 venv（若不存在或已损坏）
+#    2026-08-26 质检修复：旧逻辑只看 [ -f "$PY" ]，但 venv 的 python.exe 是 shim——
+#    base interpreter（miniconda3）被删后 shim 文件仍在、只是运行时报
+#    "did not find executable"，[ -f ] 误判"存在"导致永不重建、无法自愈。
+#    现改为三重校验：① python.exe 存在 ② pyvenv.cfg 的 home 指向真实存在
+#    ③ 兜底实际跑一次 import sys。任一失败即重建（旧 .venv 备份而非删除）。
+_VENV_OK=0
+if [ -f "$PY" ]; then
+    _PY_HOME="$(sed -n 's/^home = //p' .venv/pyvenv.cfg 2>/dev/null | tr -d '\r' | head -1)"
+    if [ -n "$_PY_HOME" ] && [ -e "$_PY_HOME/python.exe" ]; then
+        _VENV_OK=1
+    elif "$PY" -c "import sys" >/dev/null 2>&1; then
+        _VENV_OK=1
+    fi
+fi
+if [ "$_VENV_OK" = "1" ]; then
+    echo "[1/4] .venv 已存在且可用"
 else
-    echo "[1/4] .venv 已存在"
+    echo "[1/4] 建立/重建项目内 .venv（原 .venv 缺失或损坏）..."
+    # 旧损坏 venv 备份而非删除（项目「绝对不删」红线）
+    [ -d .venv ] && mv .venv ".venv.broken_$(date +%Y%m%d_%H%M%S)"
+    "C:/Users/Lenovo/.workbuddy/binaries/python/versions/3.13.12/python.exe" -m venv .venv
 fi
 
 # 2. 装依赖

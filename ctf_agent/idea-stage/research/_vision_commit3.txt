@@ -1,0 +1,6 @@
+✅ 暂存区密钥扫描通过（无 ak_live_/sk-/DASCTF_TOKEN 明文）
+✅ 暂存区诚实口径扫描通过（无假水位表述）
+✅ lease: scope 内提交（4 文件），已续租（gu）
+── ⑥ 快速回归（防错体系核心测试）──
+........................................................................ [ 78%]
+....................                                                     [100%][safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":299,"threshold":50,"scope":"turn","targets":["\\\\?\\C:\\Users\\Lenovo\\AppData\\Local\\Temp\\pytest-of-Lenovo\\garbage-74db5c64-a112-4a8a-bed0-d6659670d5ca"],"targetCount":1}

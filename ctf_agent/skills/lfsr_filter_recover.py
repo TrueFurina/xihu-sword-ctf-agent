@@ -104,11 +104,22 @@ def solve_lfsr_filter(mask1, mask2, out):
 
 
 if __name__ == "__main__":
+    import os
+    import sys
     # 西湖论剑2021 FilterRandom 官方数据（自测）
     M1 = 17638491756192425134
     M2 = 14623996511862197922
+    # 真题源码路径（仓库内部;2026-08-27 将功补过尝试重建,但原始 FilterRandom.py 公开渠道不可得,缺失则优雅 SKIP）
+    SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data/questions_real/_attachments/xihu2021/FilterRandom.py")
+    # ── 仓库完整性防护: 内部真题源码缺失即优雅退出(不裸崩) ──
+    if not os.path.isfile(SRC):
+        print("=== 内部真题源码缺失 (INTERNAL-SOURCE-MISSING) ===")
+        print(f"  缺失: {SRC}")
+        print("=== 说明: 附件应位于仓库 data/questions_real/_attachments/xihu2021/FilterRandom.py (2026-08-27 将功补过尝试重建),")
+        print("===       但原始源码公开渠道不可得,缺失则优雅跳过。skill 函数 solve_lfsr_filter() 仍可对任意 mask/out 调用,不计入 KPI。退出码 2。")
+        sys.exit(2)
     import re
-    txt = open(r"E:/Program/Cybersecurity/比赛真题/西湖论剑2021中国杭州网络安全技能大赛/CRYPTO/FilterRandom.py", encoding="utf-8").read()
+    txt = open(SRC, encoding="utf-8").read()
     block = txt.split("'''")[1]
     lines = [l.strip() for l in block.strip().splitlines() if l.strip()]
     out = lines[2].strip()

@@ -30,7 +30,7 @@ p = gcd(W*W - hint, n)                      # hint 解 p（W/gcd 法）
 ```
 
 ## 验证（真实解出记录）
-- 10733 How_many_rot：flag（ROT13 编码 QNFPGS{...}——解码 DASCTF{rabbits...}）——离线推导解出（未平台验证——accepted=0）
+- 10733 How_many_rot：flag（ROT13 编码 QNFPGS{...}——解码 DASCTF{<redacted>}）——离线推导解出（未平台验证——accepted=0）
 
 ## 失败模式
 - c 手抄错 → m 乱码（必须自动提取——10696 教训）

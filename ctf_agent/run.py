@@ -35,7 +35,8 @@ _intervention = InterventionCoordinator()
 
 
 def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None,
-                 model_override: Optional[str] = None, validate_locally: bool = True):
+                 model_override: Optional[str] = None, validate_locally: bool = True,
+                 skip_presolve: bool = False):
     """构建求解器（反馈循环 + 主 Agent + 监督）。
 
     Args:
@@ -49,6 +50,9 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
                           False（平台单解模式）无本地 ground truth，仅做格式校验，
                           正确性由 poller 提交后 accepted 回流判定。P0-1 修复：
                           用显式开关取代 is_correct=lambda f: True 恒真判定。
+        skip_presolve: True 时跳过确定性预扫（presolve），强制走主 Agent 全链路——
+                      用于回归集饱和场景（真题集 14/15 被 presolve 直出，主 Agent 改进
+                      测不到），构造「必须走主 Agent」的子集做 A/B 对比。
 
     Returns:
         solver callable(question, attempt, correction) -> AgentOutput dict
@@ -76,7 +80,7 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     from core.main_agent import MainAgent
     from core.supervisor_agent import SupervisorAgent
     from llm.client import ai_chat_json, get_model_for_attempt
-    from scheduler.budget import BUDGET_STOP, BudgetTracker
+    from scheduler.budget import BUDGET_STOP, BudgetExceeded, BudgetTracker
     from verify.feedback import FeedbackLoop
     from verify.flag_checker import FlagChecker
 
@@ -166,6 +170,14 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
             box["prompt_tokens"] += int(usage.get("prompt_tokens") or 0)
             box["completion_tokens"] += int(usage.get("completion_tokens") or 0)
             box["total_tokens"] += int(usage.get("total_tokens") or 0)
+            # 步级硬停（2026-08-28 Claim 1 超调整改）：已记账 + 本次 attempt 累计
+            # ≥ 单题 cap → 立即抛 BudgetExceeded 终止该题（不再等 attempt 结束才
+            # record/check，超调从「一整次 attempt」收敛到「单次 LLM 调用」）。
+            _qid = box.get("question_id")
+            if _qid:
+                _used = budget.usage(_qid) + box["total_tokens"]
+                if _used >= budget.config.per_question_token_budget:
+                    raise BudgetExceeded(_qid, _used, budget.config.per_question_token_budget)
         return data
 
     checker = FlagChecker()
@@ -210,6 +222,7 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
         # plan/reason/supervise 多次 LLM 调用 usage 经 ContextVar 累计，
         # 结束后求和记入 budget（不再只记最后一次 / 不再依赖并发失真的全局 _LAST_USAGE）。
         _usage_box = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        _usage_box["question_id"] = question.id  # 步级硬停需要题号定位 budget.usage
         _usage_tok = _usage_cv.set(_usage_box)
         try:
             out = await agent.solve(question, attempt=attempt, hint=hint, correction=correction)
@@ -230,8 +243,10 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
         try:
             from core.presolve import presolve, presolve_candidates
 
-            _pflag = await presolve(question, registry=registry, sandbox=sandbox,
-                                    answers=answers)
+            _pflag = None
+            if not skip_presolve:
+                _pflag = await presolve(question, registry=registry, sandbox=sandbox,
+                                        answers=answers)
             if _pflag:
                 # 2026-08-22 锐评「差最后一步」修复：presolve 多候选透传——
                 # 提交迭代逐候选尝试，避免「解出但 flag 提取失败/单候选猜错」
@@ -808,7 +823,16 @@ def run_platform(use_mock: bool, once: bool = False, interval: float = 30.0) -> 
             ]
         return out
 
-    poller = PlatformPoller(platform=platform, solver=_solve_with_log)
+    # race-intelligence 接入（2026-08-28 B 实现）：live 链路动态资源分配（并发/聚焦）。
+    # 控制器缺失/异常 → 降级硬编码调度（fail-open），不阻塞平台对战。
+    race_controller = None
+    try:
+        from core.race_orchestrator import RaceController
+        race_controller = RaceController()
+    except Exception as exc:  # noqa: BLE001 - 控制器不可用不阻塞对战
+        print(f"ℹ️ race-intelligence 控制器不可用（{exc}），降级硬编码调度")
+    poller = PlatformPoller(platform=platform, solver=_solve_with_log,
+                            race_controller=race_controller)
 
     if once:
         print(f"平台模式：拉题→解题→提交（单轮） @ {platform.base_url}")
