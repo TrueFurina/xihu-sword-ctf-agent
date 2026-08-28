@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>西湖论剑 CTF-Agent · 深度分析与评价（2026-08-27）</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --ink: #1f2430;
+    --sub: #5a6478;
+    --line: #e3e7ee;
+    --brand: #1d4ed8;
+    --brand-soft: #eaf0fd;
+    --red: #dc2626;
+    --red-soft: #fdecec;
+    --amber: #d97706;
+    --amber-soft: #fdf3e3;
+    --green: #16a34a;
+    --green-soft: #e9f7ee;
+    --purple: #7c3aed;
+    --purple-soft: #f1eafd;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif; line-height: 1.7; font-size: 15px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 28px 80px; }
+
+  /* Header */
+  .hero { background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #3b82f6 100%); color: #fff; border-radius: 16px; padding: 36px 40px; margin-bottom: 28px; position: relative; overflow: hidden; }
+  .hero::after { content: ""; position: absolute; right: -60px; top: -60px; width: 260px; height: 260px; border-radius: 50%; background: rgba(255,255,255,0.08); }
+  .hero .tag { display: inline-block; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); padding: 3px 14px; border-radius: 999px; font-size: 12.5px; letter-spacing: 1px; margin-bottom: 14px; }
+  .hero h1 { font-size: 28px; font-weight: 700; margin-bottom: 10px; }
+  .hero p { font-size: 14.5px; opacity: 0.92; max-width: 720px; }
+  .hero .meta { margin-top: 16px; font-size: 12.5px; opacity: 0.75; }
+
+  /* Verdict banner */
+  .verdict { background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--amber); border-radius: 12px; padding: 22px 26px; margin-bottom: 28px; box-shadow: 0 1px 3px rgba(16,24,40,0.05); }
+  .verdict h2 { font-size: 16px; margin-bottom: 8px; }
+  .verdict p { color: var(--sub); font-size: 14.5px; }
+  .verdict b { color: var(--ink); }
+
+  /* Section */
+  .sec { margin-bottom: 36px; }
+  .sec-title { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid var(--line); }
+  .sec-title .no { background: var(--brand); color: #fff; width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+
+  /* KPI cards */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 10px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(16,24,40,0.04); }
+  .kpi .num { font-size: 30px; font-weight: 800; line-height: 1.15; }
+  .kpi .lbl { font-size: 12.5px; color: var(--sub); margin-top: 4px; }
+  .kpi .note { font-size: 11.5px; color: var(--sub); opacity: 0.8; margin-top: 2px; }
+  .kpi.red .num { color: var(--red); } .kpi.green .num { color: var(--green); } .kpi.brand .num { color: var(--brand); } .kpi.amber .num { color: var(--amber); } .kpi.purple .num { color: var(--purple); }
+
+  /* Score table */
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(16,24,40,0.05); font-size: 14px; }
+  th, td { padding: 11px 16px; text-align: left; border-bottom: 1px solid var(--line); }
+  th { background: #f1f4f9; font-weight: 600; font-size: 13px; color: var(--sub); }
+  tr:last-child td { border-bottom: none; }
+  .bar-wrap { width: 140px; background: #eef1f6; border-radius: 6px; height: 10px; overflow: hidden; }
+  .bar { height: 100%; border-radius: 6px; }
+  .grade { font-weight: 700; padding: 2px 10px; border-radius: 6px; font-size: 12.5px; display: inline-block; }
+  .gA { background: var(--green-soft); color: var(--green); }
+  .gB { background: var(--brand-soft); color: var(--brand); }
+  .gC { background: var(--amber-soft); color: var(--amber); }
+  .gD { background: var(--red-soft); color: var(--red); }
+
+  /* Analysis blocks */
+  .dim { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.04); }
+  .dim h3 { font-size: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .dim .score-pill { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
+  .dim p { color: var(--sub); font-size: 14px; margin-bottom: 8px; }
+  .dim p b { color: var(--ink); }
+  .dim ul { margin: 6px 0 8px 20px; color: var(--sub); font-size: 14px; }
+  .dim li { margin-bottom: 4px; }
+  .good { background: var(--green-soft); color: var(--green); padding: 1px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  .bad { background: var(--red-soft); color: var(--red); padding: 1px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+
+  /* Contradictions */
+  .contra { background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--red); border-radius: 12px; padding: 18px 24px; margin-bottom: 14px; }
+  .contra h3 { font-size: 15.5px; margin-bottom: 8px; }
+  .contra h3 .n { color: var(--red); margin-right: 8px; }
+  .contra p { color: var(--sub); font-size: 14px; }
+  .contra p b { color: var(--ink); }
+
+  /* Timeline */
+  .tl { position: relative; padding-left: 28px; }
+  .tl::before { content: ""; position: absolute; left: 8px; top: 6px; bottom: 6px; width: 2px; background: var(--line); }
+  .tl-item { position: relative; margin-bottom: 18px; }
+  .tl-item::before { content: ""; position: absolute; left: -26px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--brand); border: 3px solid var(--brand-soft); }
+  .tl-item.red::before { background: var(--red); border-color: var(--red-soft); }
+  .tl-item.green::before { background: var(--green); border-color: var(--green-soft); }
+  .tl-item .t { font-weight: 600; font-size: 14.5px; }
+  .tl-item .d { color: var(--sub); font-size: 13.5px; margin-top: 3px; }
+
+  /* Action list */
+  .todo { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 24px; margin-bottom: 12px; }
+  .todo .p { display: inline-block; font-weight: 800; font-size: 12px; padding: 2px 10px; border-radius: 6px; margin-bottom: 6px; }
+  .todo.p0 { border-left: 5px solid var(--red); } .todo.p0 .p { background: var(--red-soft); color: var(--red); }
+  .todo.p1 { border-left: 5px solid var(--amber); } .todo.p1 .p { background: var(--amber-soft); color: var(--amber); }
+  .todo.p2 { border-left: 5px solid var(--brand); } .todo.p2 .p { background: var(--brand-soft); color: var(--brand); }
+  .todo p { color: var(--sub); font-size: 14px; }
+
+  .foot { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--sub); font-size: 12.5px; }
+  .hl { background: var(--amber-soft); padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ HERO ============ -->
+  <div class="hero">
+    <span class="tag">深度分析与评价 · 以磁盘实测为准</span>
+    <h1>西湖论剑 CTF-Agent 项目全息评估</h1>
+    <p>一个「确定性优先、LLM 兜底」的开源 CTF Agent 框架：测试赛 7/7 全解出、初赛正式赛 64 题 0 accepted、赛后 8 天诚实化整改至离线核验 9 题。本文从战略、技术、能力、治理、诚实性、安全、开源七个维度拆解其真实水位、结构性矛盾与下一步路径。</p>
+    <div class="meta">评估日期：2026-08-27 · 数据来源：磁盘实测（git 日志 / 台账 / 质检报告 / 代码 / 测试）· 评估人：Gu（GStack）</div>
+  </div>
+
+  <!-- ============ VERDICT ============ -->
+  <div class="verdict">
+    <h2>⚖️ 一句话总评</h2>
+    <p><b>方法论价值高于实战战绩，诚实性价值高于能力水位。</b>这个项目在「如何做一个诚实、可复现、可治理的 CTF 求解框架」上交出了远超同类的高分答卷，但在「AI Agent 本应擅长的开放推理」上交了白卷（LLM 真推理贡献 = 0）。它目前更像一个<b>高质量的确定性密码学/静态分析工具箱 + 治理实验场</b>，而不是一个能在真实比赛中持续产出 flag 的智能体。综合评分 <b style="color:var(--amber)">6.4 / 10（B-）</b>，其中诚实性 9.0 是全场最高分，比赛战绩 3.0 是最低分。</p>
+  </div>
+
+  <!-- ============ KPI ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">1</span>核心水位（2026-08-27 实测口径）</div>
+    <div class="kpis">
+      <div class="kpi brand"><div class="num">9</div><div class="lbl">offline_verified（唯一 KPI）</div><div class="note">严格真题离线核验 · 8/27 方案 A 收敛 5→9</div></div>
+      <div class="kpi red"><div class="num">0</div><div class="lbl">平台 accepted</div><div class="note">初赛 64 题 0 accepted · 无开放赛事</div></div>
+      <div class="kpi amber"><div class="num">14/15</div><div class="lbl">真题集 presolve 覆盖</div><div class="note">静态分析器直出，非「解出」声明</div></div>
+      <div class="kpi red"><div class="num">0</div><div class="lbl">LLM 真推理贡献</div><div class="note">全部解出为确定性管线</div></div>
+      <div class="kpi purple"><div class="num">51</div><div class="lbl">确定性 skills</div><div class="note">run(params)-&gt;dict 统一接口</div></div>
+      <div class="kpi green"><div class="num">314</div><div class="lbl">真实测试基线</div><div class="note">314 passed / 14 skipped（8/27 重建 venv 后锁定）</div></div>
+    </div>
+    <div class="kpis">
+      <div class="kpi amber"><div class="num">3/33</div><div class="lbl">正式赛真题离线核验</div><div class="note">10732 PKCS#1 / 10733 高偶指数 RSA / 10735 pcap 盲注</div></div>
+      <div class="kpi red"><div class="num">0/10</div><div class="lbl">web 真实赛事解出</div><div class="note">工具链 8 类路由均为自产练兵场验证</div></div>
+      <div class="kpi"><div class="num">1万+</div><div class="lbl">核心代码行</div><div class="note">676 py 文件 · core 10.3k 行</div></div>
+      <div class="kpi green"><div class="num">5 道</div><div class="lbl">硬门禁</div><div class="note">Test / E2E / Network / Secret / Write-lease</div></div>
+    </div>
+  </div>
+
+  <!-- ============ SCORES ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">2</span>九维评分</div>
+    <table>
+      <tr><th style="width:18%">维度</th><th style="width:10%">评分</th><th style="width:8%">评级</th><th style="width:24%">水位</th><th>一句话判断</th></tr>
+      <tr><td><b>战略定位</b></td><td>8.0</td><td><span class="grade gA">A-</span></td><td><div class="bar-wrap"><div class="bar" style="width:80%;background:var(--green)"></div></div></td><td>deterministic-first 反共识定位正确，开源 + 诚实披露的姿势罕见</td></tr>
+      <tr><td><b>技术架构</b></td><td>7.5</td><td><span class="grade gB">B+</span></td><td><div class="bar-wrap"><div class="bar" style="width:75%;background:var(--brand)"></div></div></td><td>分层清晰、门禁完备，但能力分布严重偏科（crypto 1274 行 vs web 290 行）</td></tr>
+      <tr><td><b>真实能力</b></td><td>5.0</td><td><span class="grade gC">C</span></td><td><div class="bar-wrap"><div class="bar" style="width:50%;background:var(--amber)"></div></div></td><td>静态分析器覆盖 14/15，但 LLM 推理 0、web 真实 0、accepted 0</td></tr>
+      <tr><td><b>工程治理</b></td><td>6.5</td><td><span class="grade gB">B-</span></td><td><div class="bar-wrap"><div class="bar" style="width:65%;background:var(--brand)"></div></div></td><td>四层治理方法论是最大产出，但执行层反复失守（在飞改动 N 次、git 事故 3 次）</td></tr>
+      <tr><td><b>诚实性</b></td><td>9.0</td><td><span class="grade gA">A</span></td><td><div class="bar-wrap"><div class="bar" style="width:90%;background:var(--green)"></div></div></td><td>0 解出如实写、虚高 7→5 主动挤水、README 顶部挂 disclaimer——全场最高分</td></tr>
+      <tr><td><b>安全</b></td><td>5.5</td><td><span class="grade gC">C+</span></td><td><div class="bar-wrap"><div class="bar" style="width:55%;background:var(--amber)"></div></div></td><td>真 flag 脱敏做得好，但 PAT 泄露 2 次、ak_live 曾进 git 历史、周更令牌未解耦</td></tr>
+      <tr><td><b>文档知识管理</b></td><td>6.0</td><td><span class="grade gB">B-</span></td><td><div class="bar-wrap"><div class="bar" style="width:60%;background:var(--brand)"></div></div></td><td>文档极其丰富但通胀复发：KPI 曾 4 套数字并存、_INDEX 锚点漂移</td></tr>
+      <tr><td><b>开源价值</b></td><td>7.0</td><td><span class="grade gB">B</span></td><td><div class="bar-wrap"><div class="bar" style="width:70%;background:var(--brand)"></div></div></td><td>公开仓工程化文档齐全，但公开仓与本地沙箱分裂、SSRF break 修复未同步</td></tr>
+      <tr><td><b>比赛战绩</b></td><td>3.0</td><td><span class="grade gD">D</span></td><td><div class="bar-wrap"><div class="bar" style="width:30%;background:var(--red)"></div></div></td><td>测试赛 7/7 800 分（独立赛事）vs 初赛 64 题 0 accepted 0 提交——冰火两重天</td></tr>
+      <tr><td><b>综合</b></td><td>6.4</td><td><span class="grade gB">B-</span></td><td><div class="bar-wrap"><div class="bar" style="width:64%;background:linear-gradient(90deg,var(--brand),var(--amber))"></div></div></td><td>方法论沉淀合格，实战兑现不合格</td></tr>
+    </table>
+  </div>
+
+  <!-- ============ DEEP DIVE ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">3</span>分维度深度分析</div>
+
+    <div class="dim">
+      <h3>3.1 战略定位 <span class="score-pill gA">A-</span></h3>
+      <p><b>最正确的判断：反共识。</b>「Most CTF agents are just an LLM with a shell. This one is the opposite」——README 开篇就点破了行业通病。确定性优先（presolve 静态分析 → 51 skills → LLM 最后兜底）意味着<b>可复现、可调试、成本可控、不吹牛</b>，这四点在开源安全工具里是真正的护城河。</p>
+      <p><b>最致命的误判：把测试赛当战斗力信号。</b>测试赛 7/7 800 分（独立已闭赛事）被长期当作「能打」的证据，掩盖了正式赛链路（幽灵变量、多进程互踩、403 WAF、LLM 熔断）从未真正在赛时验证过的事实。8/21 初赛 0 解出不是偶然，是「演练环境与实战环境脱节」的必然结果。</p>
+      <p><b>当前定位漂移：</b>初赛已出局、无开放赛事，项目事实转入「开源方法论输出 + 来年复赛备战」轨道（已有《明年复赛夺冠作战计划》），但 README 仍以参赛叙事为主，两套叙事并存。</p>
+    </div>
+
+    <div class="dim">
+      <h3>3.2 技术架构 <span class="score-pill gB">B+</span></h3>
+      <p><b>亮点：</b>supervisor 架构（计划 → 步预算 → 工具优先 → 失败分类）、presolve 单点收敛（消除 5 处重复嗅探）、白名单 LLM + 401/402 熔断 + 墙钟止损、沙盒 AST 白名单 + 子进程隔离、5 道硬门禁全部 fail-closed。这些工程决策的成熟度远超一般 CTF 脚本项目，`test_deterministic_chains`、`test_merge_gate_failclosed` 等测试命名即见方法论。</p>
+      <p><b>硬伤：</b></p>
+      <ul>
+        <li><span class="bad">偏科</span> crypto_toolkit 1274 行 / math_engine 913 行 vs web_toolkit 仅 290 行——能力结构是「密码学工具箱」而非「CTF 全科 agent」</li>
+        <li><span class="bad">监督者单薄</span> supervisor_agent 仅 196 行，LLM 环节在真题集上贡献 0——「智能体」名不副实</li>
+        <li><span class="bad">数据断链</span> HGAME2022 三题的外部源目录已消失、附件无备份，台账中 4 条外部真题不可复核</li>
+        <li><span class="bad">环境脆弱</span> .venv 曾指向已删除的 miniconda3 导致全链路击穿，8/26 才补上 setup.sh 三重自愈校验</li>
+      </ul>
+    </div>
+
+    <div class="dim">
+      <h3>3.3 真实能力（诚实口径）<span class="score-pill gC">C</span></h3>
+      <p>能力 = 静态分析器覆盖度，这是项目自己承认的。把数字拆开看：</p>
+      <ul>
+        <li>真题集 14/15 是 <span class="hl">presolve 直出</span>（其中 reverse_js / gongye_web2 是源码 grep 明文，2ms/7ms）——代表「模板覆盖度」，不构成「解出」</li>
+        <li>offline_verified = 9 中，5 道（specialcurve2/10732/10733/vnctf/10735）是完整攻击链独立核验，扎实；4 道（anwang/ezrsa/simplelegendre/ezmult）是 8/27 凌晨方案 A 从「presolve 确定性管线」迁入——真实密码学变换、flag 已落盘、双源验证，<b>技术上成立，但口径经历了「不算 → 算」的放宽</b>（详见矛盾 3）</li>
+        <li>正式赛真题 33 道只攻下 3 道，web 类 0 道——对「西湖论剑决赛」这个真实目标而言，能力覆盖不到 10%</li>
+      </ul>
+      <p><b>结论：这是一个称职的 crypto/misc 离线解题工具箱，尚未成为通用的 CTF agent。</b></p>
+    </div>
+
+    <div class="dim">
+      <h3>3.4 工程治理 <span class="score-pill gB">B-</span></h3>
+      <p><b>方法论（本项目最大产出）：</b>TOP0 总账（登记优先/写前持租约/完工回填/在飞禁令）+ 多智能体协同纲领 + CTDE 协议 + git hook 执法层，四层治理闭环。「单一事实源原则」「当文档与记忆冲突时以台账 commit 证据为准」——这套框架本身就是可复用的多智能体协作规范。</p>
+      <p><b>执行层失守记录（白纸黑字）：</b></p>
+      <ul>
+        <li>在飞改动禁令「已两次中招」→ 8/26 质检又抓到 MM 夹生文件 → <b>本次评估再次发现 4 个未提交 M + 4 个未跟踪目录</b>（config.py 模型切换 + research-wiki 更新，改动本身合理，但未走登记-租约-提交流程）</li>
+        <li>git 事故 3 次：8/22 对象库损坏重建、8/25 checkout 误操作 prune 掉整条 master 提交链、8/26 坏 multi-pack-index 制造「数百对象缺失」假阳性——<b>同一仓库 8 天内三次伤筋动骨</b></li>
+        <li>收尾报告（8/26 23:06）宣称「工作树干净」，本次实测并非如此——报告与现实的时差本身就是治理问题</li>
+      </ul>
+      <p><b>判断：机器执法层（hook）有效，人的纪律层（多会话自觉登记）反复失效。</b>治理文档的「仪式密度」已经高于「执行实效」。</p>
+    </div>
+
+    <div class="dim">
+      <h3>3.5 诚实性 <span class="score-pill gA">A</span></h3>
+      <p>这是本项目<b>最值得公开传播的价值</b>：</p>
+      <ul>
+        <li>README 顶部挂 Honesty disclaimer，明示「0 accepted，不声称 LLM 自主推理」——同类项目几乎没有敢这么写的</li>
+        <li>台账四套防线：平台 accepted 与离线核验严格区分、明文 flag 一律 &lt;REDACTED sha256&gt;、verified_flags.json gitignore、merge_gate 棘轮只升不降</li>
+        <li>8/25 自查把「虚高 7」主动挤水回「真实 5」，8/27 再收敛到 9——<b>口径在收紧与放宽之间来回，但每一轮都留有书面裁定与证据</b></li>
+        <li>撤销记录完整：benchmark 37/49、web 10/10（本地硬编码靶机）、manifest 直接给答案——全部白纸黑字撤销</li>
+      </ul>
+      <p>代价：诚实挤掉了「好看」。但这恰恰是项目未来最硬的资产——<b>在 AI 安全领域，可信度比数字大</b>。</p>
+    </div>
+
+    <div class="dim">
+      <h3>3.6 安全 <span class="score-pill gC">C+</span></h3>
+      <ul>
+        <li><span class="good">好</span> 真 flag 脱敏链路完整（.gitignore 加固 3 轮，防嵌套否定规则覆盖）、密钥扫描门禁、git 历史清理</li>
+        <li><span class="bad">坏</span> PAT 泄露 2 次：ghp_pCpo…（已吊销，8/26 18:07 复探 401）与 ghp_wGOy…（<b>待用户手动轮换，风险登记在册</b>）；ak_live 曾明文进 git 历史；周更自动化令牌与被暴露 token 未解耦，下次周日同步可能 401 停更</li>
+        <li><span class="bad">结构性风险</span> 本地沙箱 master 含明文真 flag 附件，与公开仓长期分裂——任何误推都会泄露真题真值，目前靠纪律而非机制约束</li>
+      </ul>
+    </div>
+
+    <div class="dim">
+      <h3>3.7 文档与知识管理 <span class="score-pill gB">B-</span></h3>
+      <p>文档量惊人（deliverables 79 文件、research-wiki 14 篇），方法论沉淀充分；但 RDD（文档通胀）反复发作：KPI 曾同时存在 13/14/15 三套口径、_INDEX 声称根目录 8 项实测 11+、总账锚点「父目录非 git 仓库」被实测推翻（父目录就是仓库根，research-wiki 已入库）。<b>文档的更新速度追不上仓库的演化速度</b>——这本身就是多会话并发时代的核心治理难题，项目没有彻底解决。</p>
+    </div>
+
+    <div class="dim">
+      <h3>3.8 开源价值 <span class="score-pill gB">B</span></h3>
+      <p>公开仓 `TrueFurina/xihu-sword-ctf-agent` 布局规范（根级 tools/verify/web + ARCHITECTURE.md + CONTRIBUTING + issue 模板）、真值已脱敏、CI 全绿。但存在双仓分裂：公开仓 main（c7dfc42）缺 SSRF break 修复（本地 7703a89 已含），周更自动化是唯一的同步通道——<b>这个单点通道的令牌还有风险（3.6）</b>。PR #104（awesome-ai-agents-security）挂着未动，纪律上「不灌水」是对的。</p>
+    </div>
+  </div>
+
+  <!-- ============ CONTRADICTIONS ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">4</span>五大结构性矛盾（锐评）</div>
+
+    <div class="contra">
+      <h3><span class="n">矛盾 1</span>「AI CTF Agent」之名 vs「LLM 推理 0」之实</h3>
+      <p>项目名带 agent，架构有 supervisor/main_agent/LLM 客户端，但真题集上 <b>LLM 真推理贡献 = 0</b>，初赛 0 解出时 LLM 链路还整体熔断。真实能力 = 51 个确定性 skill + 正则 + 静态审计。这不丢人——但定位必须更早、更狠地说清：<b>这是「确定性求解器框架 + LLM 兜底接口」，不是「AI 智能体」</b>。继续用 agent 叙事，就会持续被「为什么 AI 不推理」拷问；改用「工具箱」叙事，9/14-15 的覆盖度反而体面。</p>
+    </div>
+
+    <div class="contra">
+      <h3><span class="n">矛盾 2</span>治理仪式密度 vs 执行实效失衡</h3>
+      <p>四层治理、六门禁、TOP0 总账、租约、棘轮——方法论密度接近「治理秀」级别；但 8 天内：git 事故 3 次、在飞改动至少 4 次、KPI 4 套数字并存、收尾报告与实际状态不符。机器 hook 拦得住 commit，拦不住「改不提交、改不登记、改文档不更新」。治理的终极问题不是写多少规范，而是<b>每个并发会话是否真的先登记再动手</b>——现状是这套纪律只在 Gu 亲自坐镇时生效。</p>
+    </div>
+
+    <div class="contra">
+      <h3><span class="n">矛盾 3</span>KPI 口径的「严格性通胀」：5 → 9 的逻辑张力</h3>
+      <p>8/26 质检：台账 5 是唯一真值，8/10 是纸面数字。8/27 凌晨方案 A：把 4 道 presolve 直出题迁入台账 → 9。技术上都对（这 4 题是真攻击链、flag 落盘、双源验证），但台账第四节曾白纸黑字「presolve 抽答案不算解题数」（针对 12/15 中 7 道 flag{} 格式题）。两处口径存在张力：<b>「presolve 直出」到底算不算 offline_verified？按攻击链算，4 道该进；按「非 LLM 推理」算，9 道全都不该进。</b>现在缺一条可机器判定的边界规则（例如：flag_scan 类 grep 不算；密码学变换类算），否则下次又会漂。</p>
+    </div>
+
+    <div class="contra">
+      <h3><span class="n">矛盾 4</span>比赛窗口关闭后的真空期</h3>
+      <p>初赛出局、无开放赛事，「解出」永远无法转化为平台 accepted。项目在「复盘过去（西湖论剑）」与「备战未来（明年复赛）」之间摇摆：既没有当下的竞技目标，也没有清晰的年度路线图（只有一份 4 周打 81.9% 的冲刺方案和一份明年夺冠计划）。<b>真空期最危险的不是没进展，而是用文档密度制造进展幻觉。</b></p>
+    </div>
+
+    <div class="contra">
+      <h3><span class="n">矛盾 5</span>web 短板是数据问题，不是工具问题</h3>
+      <p>报告反复说「web 工具链已非瓶颈，缺真实靶机/赛题」——对，但这不是免责声明，而是数据工程欠账：crypto 有 15 道真题集 + 附件可供离线训练，web 为什么没有同规模的真题 benchmark？因为收集、脱敏、编排历史 web 真题的工作没人做。<b>「没有赛」从来不是理由，crypto 的 15 道就是手工攒出来的。</b>web 0/10 的真实根因是数据投入不足。</p>
+    </div>
+  </div>
+
+  <!-- ============ TIMELINE ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">5</span>时间线复盘（17 天从奠基到诚实化）</div>
+    <div class="tl">
+      <div class="tl-item"><div class="t">8/10–8/17 · 奠基与跑分迭代</div><div class="d">骨架 → 推理内核 → 沙盒 → 看板 → LLM 联调；解出率 0 → 22.2% → 50% → 59.1%（本地沙盒口径）</div></div>
+      <div class="tl-item"><div class="t">8/18–8/20 · provider 矩阵与锐评整改</div><div class="d">7 个白名单 provider、16 模型竞速、抢一血战略；三轮外部锐评触发拆上帝模块 + 测试化整改；赛前「全绿」</div></div>
+      <div class="tl-item red"><div class="t">8/21 14:00–17:00 · 初赛正式赛：64 题 0 accepted 0 提交</div><div class="d">根因：环境残留幽灵变量 + 多进程互踩 + 403 WAF 风控 + LLM 链路 401/402 熔断。测试赛 7/7 的假象被彻底击穿——赛时铁律从未在真实平台验证过</div></div>
+      <div class="tl-item"><div class="t">8/22 · 赛后 P0 + git 灾后重建</div><div class="d">0 解出真因复盘；发现 git 对象库损坏，重建仓库（史前 251 commits 仅存于 bundle）</div></div>
+      <div class="tl-item"><div class="t">8/23–8/25 · 诚实化整改 + 真题集 benchmark</div><div class="d">台账三套防线落地；虚高 7 挤水回 5；presolve 真值验证 14/15；vnctf 图像采样 + 视觉 LLM OCR 闭环；README 挂 Honesty disclaimer</div></div>
+      <div class="tl-item"><div class="t">8/26 · 深度质检 + 环境重建 + web 工具化</div><div class="d">质检抓出致命 R1（.venv 断链）+ R2（KPI 分裂）；重建 venv 锁 314 测试基线；web_toolkit 补 SSRF/TRAVERSAL 并接入主 Agent 真实链路；PAT 泄露处置（一枚已吊销）</div></div>
+      <div class="tl-item green"><div class="t">8/27 凌晨 · KPI 口径收敛（方案 A）</div><div class="d">anwang/ezrsa/simplelegendre/ezmult 迁入台账 → offline_verified 5 → 9；dnui_keyboard（题面泄露）剔除；README 统一到 9</div></div>
+    </div>
+  </div>
+
+  <!-- ============ NEXT ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">6</span>下一步行动（按 ROI 排序）</div>
+
+    <div class="todo p0">
+      <span class="p">P0 · 安全收口（用户手动）</span>
+      <p>到 GitHub 控制台吊销并轮换 <b>ghp_wGOy…</b> PAT；确认周更自动化（automation-1787735803591）的 $GITHUB_TOKEN 与被暴露 token 解耦，否则下次周日 21:00 同步将 401 停更。这是当前唯一高于一切代码动作的项。</p>
+    </div>
+    <div class="todo p0">
+      <span class="p">P0 · 收口本次实测的在飞改动</span>
+      <p>当前工作树有 4 个未提交 M（ctf_agent/config.py 的 qwen3.7-flash 免费模型切换 + research-wiki 3 文件）和 4 个未跟踪项（idea-stage/、research-wiki/ideas/、papers/）。改动内容合理，但必须走「登记 → 租约 → 提交」流程，不能让「改不提交」第 N 次成为下一份质检报告的素材。</p>
+    </div>
+    <div class="todo p1">
+      <span class="p">P1 · 给 offline_verified 定一条机器可判定的边界规则</span>
+      <p>解决矛盾 3：在台账写死「flag_scan/grep 明文类 = 不算；密码学变换类 = 算；题面直接给答案 = 不算」，并让 merge_gate 按规则数数。9 这个数字从此不再依赖凌晨裁定，而是规则的自然结果。</p>
+    </div>
+    <div class="todo p1">
+      <span class="p">P1 · 建 web/misc 真题 benchmark（数据工程，非写代码）</span>
+      <p>参考 crypto 的 15 道攒法：从历年公开赛事收集 web 真题（源码包 + 靶机快照），脱敏编排成 data/questions_real/web/，让 web_toolkit 的 8 类路由有真实对象可打。这是把 web 0/10 从「没赛可打」变成「可离线练」的唯一路径。</p>
+    </div>
+    <div class="todo p2">
+      <span class="p">P2 · 让 LLM 推理贡献从 0 破冰</span>
+      <p>用 10732/10733/10735 这类「已离线解出」的题做闭环教材：让 main_agent 的 LLM 环节在给定思路提示下完成完整攻击链并产出 flag（哪怕 1 题），量化「LLM 环节能接住 presolve 之后 20% 的活」——这决定来年复赛是否值得以 agent 名义参赛。</p>
+    </div>
+    <div class="todo p2">
+      <span class="p">P2 · 文档收敛 + 双仓同步机制化</span>
+      <p>刷新 _INDEX.md（根目录实测 11 项）；把「本地沙箱永不 push 公开仓」从纪律升级为机制（例如公开仓发布走专门的脱敏导出脚本，替代人工 sync_to_public.py 单点）；SSRF break 修复尽早经周更通道合入公开仓。</p>
+    </div>
+  </div>
+
+  <div class="foot">
+    本报告基于 2026-08-27 磁盘实测（git 日志 / REAL_SOLVES_LEDGER / 质检报告 / 收尾报告 / 代码统计 / 测试收集），不采信二手汇报。所有数字均可在仓库内复核。未做任何写操作。
+  </div>
+</div>
+</body>
+</html>

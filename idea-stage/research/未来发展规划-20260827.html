@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>西湖论剑 CTF-Agent · 未来发展规划（2026-08-27 制定）</title>
+<style>
+  :root {
+    --bg: #f7f8fa; --card: #ffffff; --ink: #1f2430; --sub: #5a6478; --line: #e3e7ee;
+    --brand: #1d4ed8; --brand-soft: #eaf0fd;
+    --red: #dc2626; --red-soft: #fdecec;
+    --amber: #d97706; --amber-soft: #fdf3e3;
+    --green: #16a34a; --green-soft: #e9f7ee;
+    --purple: #7c3aed; --purple-soft: #f1eafd;
+    --teal: #0d9488; --teal-soft: #e6f7f5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif; line-height: 1.75; font-size: 15px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 32px 28px 80px; }
+
+  .hero { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #1d4ed8 100%); color: #fff; border-radius: 16px; padding: 38px 42px; margin-bottom: 24px; position: relative; overflow: hidden; }
+  .hero::after { content: ""; position: absolute; right: -80px; top: -80px; width: 300px; height: 300px; border-radius: 50%; background: rgba(255,255,255,0.07); }
+  .hero .tag { display: inline-block; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.35); padding: 3px 14px; border-radius: 999px; font-size: 12.5px; letter-spacing: 1px; margin-bottom: 14px; }
+  .hero h1 { font-size: 30px; font-weight: 800; margin-bottom: 10px; }
+  .hero p { font-size: 14.5px; opacity: 0.92; max-width: 780px; }
+  .hero .meta { margin-top: 16px; font-size: 12.5px; opacity: 0.75; }
+  .hero .pill-row { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .hero .pill { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); padding: 4px 14px; border-radius: 999px; font-size: 12.5px; }
+
+  .sec { margin-bottom: 40px; }
+  .sec-title { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 800; margin-bottom: 6px; }
+  .sec-title .no { background: var(--brand); color: #fff; width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .sec-sub { color: var(--sub); font-size: 13.5px; margin-bottom: 16px; padding-left: 42px; }
+
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 26px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(16,24,40,0.05); }
+  .box h3 { font-size: 16px; margin-bottom: 10px; }
+  .box h3 .hl2 { color: var(--brand); }
+  .box p, .box li { color: var(--sub); font-size: 14px; }
+  .box p b, .box li b { color: var(--ink); }
+  .box ul { margin: 6px 0 8px 20px; }
+  .box li { margin-bottom: 5px; }
+
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(16,24,40,0.05); font-size: 13.5px; margin-bottom: 14px; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #f1f4f9; font-weight: 700; font-size: 13px; color: var(--sub); }
+  tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); }
+
+  .tagp { display: inline-block; font-weight: 800; font-size: 11.5px; padding: 1px 10px; border-radius: 999px; margin-right: 6px; }
+  .t-red { background: var(--red-soft); color: var(--red); }
+  .t-amber { background: var(--amber-soft); color: var(--amber); }
+  .t-green { background: var(--green-soft); color: var(--green); }
+  .t-brand { background: var(--brand-soft); color: var(--brand); }
+  .t-purple { background: var(--purple-soft); color: var(--purple); }
+  .t-teal { background: var(--teal-soft); color: var(--teal); }
+
+  .okr { border: 1px solid var(--line); border-left: 5px solid var(--brand); border-radius: 12px; background: var(--card); padding: 16px 22px; margin-bottom: 12px; }
+  .okr .o { font-weight: 800; font-size: 15.5px; margin-bottom: 6px; }
+  .okr .o .score { font-size: 12px; font-weight: 700; color: var(--brand); margin-left: 8px; }
+  .okr .kr { font-size: 13.5px; color: var(--sub); padding: 2px 0 2px 16px; position: relative; }
+  .okr .kr::before { content: "▸"; position: absolute; left: 0; color: var(--brand); }
+  .okr .kr b { color: var(--ink); }
+  .okr .kr .from { color: var(--sub); }
+  .okr .kr .to { color: var(--green); font-weight: 700; }
+  .okr .kr .via { color: var(--amber); }
+
+  .phase { border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.05); }
+  .phase .ph-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .phase .ph-name { font-size: 16.5px; font-weight: 800; }
+  .phase .ph-time { font-size: 12.5px; background: #f1f4f9; padding: 2px 12px; border-radius: 999px; color: var(--sub); }
+  .phase .ph-goal { font-size: 13.5px; color: var(--sub); margin-bottom: 8px; }
+  .phase .ph-goal b { color: var(--ink); }
+  .phase .ph-exit { background: var(--green-soft); border-left: 4px solid var(--green); padding: 8px 14px; border-radius: 8px; font-size: 13px; color: #14532d; margin-top: 8px; }
+  .phase .ph-exit b { font-weight: 800; }
+
+  .battle { border: 1px solid var(--line); border-left: 5px solid var(--amber); border-radius: 12px; background: var(--card); padding: 18px 24px; margin-bottom: 14px; }
+  .battle h3 { font-size: 15.5px; margin-bottom: 8px; }
+  .battle h3 .n { color: var(--amber); margin-right: 8px; }
+  .battle p, .battle li { color: var(--sub); font-size: 14px; }
+  .battle p b, .battle li b { color: var(--ink); }
+  .battle ul { margin: 6px 0 8px 20px; }
+  .battle li { margin-bottom: 4px; }
+  .battle .meas { background: #f1f4f9; border-radius: 8px; padding: 8px 14px; font-size: 13px; margin-top: 8px; color: var(--sub); }
+  .battle .meas b { color: var(--ink); }
+
+  .risk { border: 1px solid var(--line); border-left: 5px solid var(--red); border-radius: 12px; background: var(--card); padding: 16px 22px; margin-bottom: 12px; }
+  .risk h4 { font-size: 14.5px; margin-bottom: 6px; }
+  .risk h4 .lv { font-size: 11.5px; font-weight: 800; padding: 1px 9px; border-radius: 999px; margin-right: 8px; }
+  .risk p { color: var(--sub); font-size: 13.5px; }
+  .risk p b { color: var(--ink); }
+
+  .milestone { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .ms { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .ms .m-time { font-size: 12px; font-weight: 800; color: var(--brand); }
+  .ms .m-name { font-size: 14px; font-weight: 700; margin: 4px 0 6px; }
+  .ms .m-crit { font-size: 12.5px; color: var(--sub); }
+  .ms .m-crit b { color: var(--ink); }
+
+  .decide { background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--purple); border-radius: 12px; padding: 16px 24px; margin-bottom: 12px; }
+  .decide h4 { font-size: 15px; margin-bottom: 6px; }
+  .decide p { color: var(--sub); font-size: 14px; }
+  .decide .opts { margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .decide .opt { background: #f1f4f9; border-radius: 8px; padding: 6px 14px; font-size: 12.5px; color: var(--ink); border: 1px solid var(--line); }
+
+  .foot { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--sub); font-size: 12.5px; }
+  .note-line { background: var(--amber-soft); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: #7c4a03; margin-bottom: 14px; }
+  .note-line b { font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ HERO ============ -->
+  <div class="hero">
+    <span class="tag">未来发展规划 · V1.0 · 以磁盘实测为基线</span>
+    <h1>从「确定性工具箱」到「国内赛制第一 CTF-Agent」</h1>
+    <p>基于 2026-08-27 深度分析（综合 6.4/10，五大结构性矛盾）制定。本规划回答五个问题：项目要成为什么？如何让 LLM 推理从 0 破冰？如何把 web 0/10 从短板变成护城河？如何让治理从「仪式」变成「机制」？如何用 12 个月为 2027 复赛建立可验证的竞争力？</p>
+    <div class="pill-row">
+      <span class="pill">主路径：2027 西湖论剑复赛</span>
+      <span class="pill">学术主线：IDEA-1 消融实验</span>
+      <span class="pill">铁律：KPI 机器判定</span>
+      <span class="pill">反 RDD：文档有生命周期</span>
+    </div>
+    <div class="meta">制定：2026-08-27 · 基线数据：offline_verified=9 / accepted=0 / LLM 推理 0 / web 0-10 / 测试 314 · 关联文档：深度分析-20260827、明年复赛作战计划-20260824、IDEA_REPORT-20260827</div>
+  </div>
+
+  <!-- ============ 0. 前提 ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">0</span>规划前提（先立规则，再谈路线）</div>
+    <div class="sec-sub">任何规划若前提不成立，都是空中楼阁。以下 4 条是硬约束。</div>
+
+    <div class="box">
+      <h3>0.1 事实基线（全部磁盘实测，不可争议）</h3>
+      <table>
+        <tr><th style="width:26%">指标</th><th style="width:14%">现值</th><th>备注</th></tr>
+        <tr><td>offline_verified（唯一 KPI）</td><td><b>9</b></td><td>严格真题 9 + 外部真题 4（不计 KPI）；HGAME 3 题源目录已失效不可复核</td></tr>
+        <tr><td>平台 accepted</td><td><b>0</b></td><td>初赛 64 题 0 accepted 0 提交；无开放赛事</td></tr>
+        <tr><td>LLM 真推理贡献</td><td><b>0</b></td><td>所有解出均为确定性管线</td></tr>
+        <tr><td>真题集 presolve 覆盖</td><td><b>14/15</b></td><td>15 题 = 9 crypto + 1 misc + 3 reverse + 2 web（含源码 grep 类）</td></tr>
+        <tr><td>正式赛真题离线核验</td><td><b>3/33</b></td><td>10732 / 10733 / 10735</td></tr>
+        <tr><td>web 真实赛事解出</td><td><b>0</b></td><td>工具链 8 类路由均为自产练兵场验证</td></tr>
+        <tr><td>测试基线 / skills / 核心代码</td><td><b>314 pass / 51 / 10.3k 行</b></td><td>crypto_toolkit 1274 行 vs web_toolkit 290 行（偏科）</td></tr>
+        <tr><td>git / 治理</td><td><b>4 M + 4 ?? 在飞</b></td><td>master 领先 origin/open-clean 数十笔未推；8 天内 git 事故 3 次</td></tr>
+        <tr><td>LLM 链路</td><td><b>已恢复</b></td><td>qwen3.7-flash 等 5 免费源可达（8/27 01:2x 实测）；deepseek 付费 key 已充 200 通</td></tr>
+      </table>
+    </div>
+
+    <div class="box">
+      <h3>0.2 战略假设：把不可控目标换成可控目标</h3>
+      <p><b>「赢 2027 复赛」是不可控目标</b>（对手、题目、平台风控、运气）。可控的是：<b>在 40+ 道真题上的解出率、LLM 推理贡献数、成本、可复现性、可审计性</b>。本规划全部目标均可控、可测、可验收。<b>赢是这些指标的副产品，不是规划对象。</b></p>
+    </div>
+
+    <div class="box">
+      <h3>0.3 决策分支：决赛窗（8/31 前晋级）</h3>
+      <p>初赛 0 accepted，晋级概率≈0，但 8/31 未到，保留最小对冲：<b>若 9/1 确认未晋级（预期）→ 全力执行本规划主路径；若意外晋级（9 月底决赛）→ 冻结 Phase 1 的非赛部分，启用《赛时可靠性战役》E1-E3 专项，2 周内完成赛时链路加固 + 模拟赛。</b>两个分支共享 Phase 0（安全/口径/收口），无冲突。</p>
+    </div>
+
+    <div class="box">
+      <h3>0.4 四条铁律（违反即回炉）</h3>
+      <ul>
+        <li><b>KPI 单一口径</b>：唯一 KPI = merge_gate 机器数出的 offline_verified。任何文档、commit、口头不得自创数字。</li>
+        <li><b>诚实红线</b>：一切「解出」必须答得上「真题集真实链路解出几道」；web 短板未解前不报「全题型通杀」。</li>
+        <li><b>反 RDD</b>：每份新文档必须有生命周期（制定日 + 复审日 + 归档条件）；规划执行完即归档，不堆文档。</li>
+        <li><b>机器判定优先</b>：口径、门禁、在飞检查全部进 hook/脚本，不依赖会话自觉。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============ 1. 战略定位 ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">1</span>战略定位（我们到底要成为什么）</div>
+    <div class="sec-sub">解决上一轮「矛盾 1」：agent 之名 vs 工具箱之实。</div>
+
+    <div class="box">
+      <h3>1.1 定位修正</h3>
+      <p>从「CTF 参赛 AI Agent」修正为：<b class="hl2">「国内赛制优先、可复现、可审计、成本可控的 CTF-Agent 开源框架 + 真题评测基准」</b>。</p>
+      <p>理由：① 参赛战绩不可控（0 accepted 已证明）；② 开源框架 + 评测基准是「确定性工具 + 诚实治理」资产的正确变现方式（打分最高的两个维度）；③ 与 IDEA-1（三级熔断 + 结构化归因 + 并发）天然契合——它正是框架级叙事，不是参赛级叙事。</p>
+    </div>
+
+    <div class="box">
+      <h3>1.2 三层价值结构（答辩/开源叙事统一用这套）</h3>
+      <table>
+        <tr><th style="width:16%">层</th><th style="width:44%">内容</th><th>度量</th></tr>
+        <tr><td><span class="tagp t-brand">能力层</span></td><td>确定性 51 skills + LLM 升级链路 + 结构化错误归因，解出真实真题</td><td>offline_verified / LLM 贡献数 / 真题覆盖</td></tr>
+        <tr><td><span class="tagp t-green">工程层</span></td><td>五硬门禁、四层治理、沙盒隔离、Windows 原生、零 Docker 依赖</td><td>测试基线 / 在飞改动 0 / git 事故 0</td></tr>
+        <tr><td><span class="tagp t-purple">学术层</span></td><td>40 题真题评测集 + IDEA-1 消融实验（熔断/归因/并发独立贡献）</td><td>消融 4 组数据 / 评测集规模 / 论文素材</td></tr>
+      </table>
+    </div>
+
+    <div class="box">
+      <h3>1.3 差异化锚点（vs 开源竞品，源自 12 项目调研）</h3>
+      <ul>
+        <li><b>行业唯一</b>：Windows 无 Docker 全兼容 + 40 道西湖论剑真题评测（IDEA_REPORT 已验证 novelty）</li>
+        <li><b>行业首个</b>：三级预算熔断（单题/全局/重试）+ 结构化错误归因 + 监督裁决双引擎</li>
+        <li><b>护城河</b>：国内题型专项（国产 RSA 变种 / SSTI 过滤绕过 / zip 伪加密 / 流量自定义字段）——verialabs/hydra 原生不覆盖</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============ 2. 目标体系 ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">2</span>目标体系（OKR 化，全部可测量可验收）</div>
+    <div class="sec-sub">5 个目标，覆盖能力 / 数据 / 工程 / 治理 / 影响力五条线。</div>
+
+    <div class="okr">
+      <div class="o">O1 · 真实能力翻倍 <span class="score">[能力层]</span></div>
+      <div class="kr">KR1：offline_verified <span class="from">9</span> → <span class="to">20+</span>（+11，全部机器判定 + 台账可复核）</div>
+      <div class="kr">KR2：LLM 真推理贡献 <span class="from">0</span> → <span class="to">≥8</span>（8 题由 main_agent LLM 链路独立解出，非 presolve 直出）</div>
+      <div class="kr">KR3：web 真题解出 <span class="from">0</span> → <span class="to">≥5</span>（在新建的 web 真题集上）</div>
+      <div class="kr">KR4：真题集覆盖 <span class="from">14/15</span> → <span class="to">38/40+</span>（评测集扩到 40 题后）</div>
+    </div>
+
+    <div class="okr">
+      <div class="o">O2 · 评测资产（数据工程，web 短板的根解）<span class="score">[数据层]</span></div>
+      <div class="kr">KR1：真题评测集 <span class="from">15 题</span> → <span class="to">40+ 题</span>（西湖论剑历年 + 强网杯/CISCN/公开赛事，全部脱敏 + 真值 sha256）</div>
+      <div class="kr">KR2：web benchmark <span class="from">0</span> → <span class="to">10-15 题</span>（源码包 + 靶机快照，可离线打）</div>
+      <div class="kr">KR3：IDEA-1 消融实验 4 组跑完（基线 / +熔断 / +归因 / 全方案），数据落盘</div>
+    </div>
+
+    <div class="okr">
+      <div class="o">O3 · 工程信誉（可复现、可审计的底座）<span class="score">[工程层]</span></div>
+      <div class="kr">KR1：测试基线 <span class="from">314</span> → <span class="to">400+</span>（每新增 skill/模块 ≥1 测试）</div>
+      <div class="kr">KR2：在飞改动 <span class="from">当前 4 M + 4 ??</span> → <span class="to">连续 30 天 0</span>（机器扫描 + 退出检查）</div>
+      <div class="kr">KR3：git 事故 <span class="from">8 天 3 次</span> → <span class="to">连续 90 天 0</span>（危险操作 SOP + 防护脚本）</div>
+    </div>
+
+    <div class="okr">
+      <div class="o">O4 · 治理机制化（告别「靠自觉」）<span class="score">[治理层]</span></div>
+      <div class="kr">KR1：offline_verified 边界规则写死进 merge_gate（flag_scan 类不算 / 密码学变换类算 / 题面泄露不算）</div>
+      <div class="kr">KR2：双仓脱敏导出脚本替代人工 sync（公开仓更新零人工、零泄露风险）</div>
+      <div class="kr">KR3：文档生命周期管理（_INDEX 自动刷新，过期文档自动标归档）</div>
+    </div>
+
+    <div class="okr">
+      <div class="o">O5 · 开源影响力与复赛准备 <span class="score">[影响力层]</span></div>
+      <div class="kr">KR1：公开仓 README 定位修正（工具箱/基准叙事），移除参赛叙事歧义</div>
+      <div class="kr">KR2：1 篇技术文章或评测报告（40 题评测 + 消融数据）——既是开源内容也是答辩素材</div>
+      <div class="kr">KR3：2027 复赛参赛准备完成（赛时链路加固 + 每月模拟赛 + 答辩三件套）</div>
+    </div>
+  </div>
+
+  <!-- ============ 3. 阶段路线图 ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">3</span>五阶段路线图（每阶段有出口标准）</div>
+    <div class="sec-sub">总跨度 12 个月（2026-08-27 → 2027-08）。每阶段出口标准全绿才能进入下一阶段。</div>
+
+    <div class="phase">
+      <div class="ph-head">
+        <span class="ph-name">Phase 0 · 紧急收口期</span>
+        <span class="ph-time">2026-08-27 → 09-03（1 周）</span>
+        <span class="tagp t-red">P0</span>
+      </div>
+      <div class="ph-goal"><b>目标：</b>消灭所有已知红牌，把地基夯实。不新增任何能力目标。</div>
+      <ul>
+        <li>① 用户手动轮换 <b>ghp_wGOy…</b> PAT；确认周更自动化 token 解耦（防周日 401 停更）</li>
+        <li>② 收口 8 个在飞改动（config.py qwen3.7-flash + research-wiki 3 文件 + 4 个未跟踪项），走登记-租约-提交</li>
+        <li>③ offline_verified 边界规则定稿并进 merge_gate（解决矛盾 3）</li>
+        <li>④ git 健康：悬空 symlink、孤儿对象、worktree 残留清理；危险操作 SOP 文档化</li>
+        <li>⑤ _INDEX.md / 总账锚点刷新（根目录实测 11 项；父目录=仓库根）</li>
+      </ul>
+      <div class="ph-exit"><b>出口标准：</b>PAT 已轮换 ✔ 在飞改动 = 0 ✔ merge_gate 按新规则数出 9（或裁定值）✔ git fsck 干净 ✔ 文档锚点与磁盘一致 ✔</div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-head">
+        <span class="ph-name">Phase 1 · 数据与评测期</span>
+        <span class="ph-time">2026-09-04 → 09-30（4 周）</span>
+        <span class="tagp t-amber">P1</span>
+      </div>
+      <div class="ph-goal"><b>目标：</b>解决「web 0/10 是数据欠账」（矛盾 5）；建立评测基准；LLM 破冰第一题。</div>
+      <ul>
+        <li>① <b>web 真题集建设</b>：从历年公开赛事（强网杯/CISCN/西湖论剑 + 已归档 10716-10748 中 web 题）采集 10-15 题，脱敏编排（描述 + 附件 + 真值 sha256）</li>
+        <li>② <b>真题评测集扩量</b>：15 → 25+ 题（新增 reverse/pwn/misc 各若干）</li>
+        <li>③ <b>LLM 破冰第一题</b>：用 10733（高偶指数 RSA，已离线解出）做端到端教材——禁用 presolve 该题路由，让 main_agent LLM 从附件推理出完整攻击链并产出 flag</li>
+        <li>④ 消融实验基线组先跑（无熔断无归因的当前版本 = baseline）</li>
+        <li>⑤ 8/31 决赛窗结果确认后锁定主路径</li>
+      </ul>
+      <div class="ph-exit"><b>出口标准：</b>web 真题集 ≥10 题可跑 ✔ 评测集 ≥25 题 ✔ LLM 破冰 ≥1 题（flag 落盘 + 台账记录）✔ 消融 baseline 数据落盘 ✔</div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-head">
+        <span class="ph-name">Phase 2 · LLM 真推理攻坚期</span>
+        <span class="ph-time">2026-10-01 → 11-30（2 个月）</span>
+        <span class="tagp t-amber">P1</span>
+      </div>
+      <div class="ph-goal"><b>目标：</b>攻矛盾 1 的核心——让「agent」名副其实。LLM 贡献从 1 → 5+。</div>
+      <ul>
+        <li>① <b>无 presolve 兜底训练集</b>：抽 8-10 道题强制裸推理，按「工具缺失 / 提示词退化 / 模型上限」三类失败归因，定向补</li>
+        <li>② <b>结构化错误归因落地</b>（IDEA-1 核心）：5 类错误分类（僵局/方向错/幻觉/工具失败/环境）+ error_category/key_info/suggestion 定向修正反馈</li>
+        <li>③ <b>升级链路实战化</b>：轻量首解 → 连续失败升级重型（deepseek-reasoner / qwen-max-thinking）→ 监督者止损换题</li>
+        <li>④ 监督者重设计（当前仅 196 行）：加入裁决规则表、红牌信号、教训沉淀（IDEA-3 Consolidator 机制）</li>
+      </ul>
+      <div class="ph-exit"><b>出口标准：</b>LLM 贡献 ≥5 题 ✔ 失败归因覆盖率 ≥80% 的题有结构化记录 ✔ 升级链路在真题集上实测有效（成功率提升可量化）✔</div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-head">
+        <span class="ph-name">Phase 3 · 工程化与开源期</span>
+        <span class="ph-time">2026-12-01 → 2027-02-28（3 个月）</span>
+        <span class="tagp t-brand">P2</span>
+      </div>
+      <div class="ph-goal"><b>目标：</b>把「能解」变成「框架级可交付」，公开仓从 v1 升到 v2。</div>
+      <ul>
+        <li>① <b>三级预算熔断</b>（IDEA-1）：单题 token 上限 / 全局预算 / 重试硬上限 / 降级阈值，全参数可配</li>
+        <li>② <b>并发调度</b>：asyncio 信号量并发 + 优先级队列，3 → 10 车道；watchdog 边车（重复 bash / solver spam / idle 检测）</li>
+        <li>③ <b>Windows 打包</b>：零 Docker 依赖安装脚本 + 一键启动；补 PARI/隐写工具链（managed venv 隔离）</li>
+        <li>④ <b>双仓脱敏导出脚本</b>：本地 → 公开仓自动导出（脱敏真 flag / 剔内部文档 / 布局转换），替代人工 sync</li>
+        <li>⑤ 消融实验全 4 组跑完；技术文章/评测报告成稿</li>
+      </ul>
+      <div class="ph-exit"><b>出口标准：</b>熔断/并发/归因三组件可独立开关（消融可跑）✔ 公开仓 v2（新布局 + 文档 + 评测集）✔ 消融 4 组数据完整 ✔</div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-head">
+        <span class="ph-name">Phase 4 · 复赛冲刺期</span>
+        <span class="ph-time">2027-03-01 → 08-31（6 个月）</span>
+        <span class="tagp t-purple">P3</span>
+      </div>
+      <div class="ph-goal"><b>目标：</b>40 题全覆盖 + 赛时可靠性 + 答辩三件套。为 2027 复赛（预计 8 月）做好一切可控准备。</div>
+      <ul>
+        <li>① <b>评测集 40 题全覆盖</b>：presolve 覆盖率 ≥90%，LLM 贡献 ≥8</li>
+        <li>② <b>赛时可靠性专项</b>（E1-E3）：赛时链路测试（幽灵变量/多进程/403 WAF 专项回归）、环境快照与回滚、每月一次全链路模拟赛</li>
+        <li>③ <b>答辩三件套</b>：架构讲解 15min 版 + 诚实数据包（总账/消融/评测集）+ 现场演示脚本（看板/门禁/诚实扫描）</li>
+        <li>④ 赛时预案文档（provider 熔断 / 平台异常 / 资源抢占的分级响应）</li>
+      </ul>
+      <div class="ph-exit"><b>出口标准：</b>40 题覆盖 ≥90% ✔ 连续 3 次模拟赛无 0 解出 ✔ 答辩彩排 2 轮 ✔ 赛时预案走查 1 轮 ✔</div>
+    </div>
+  </div>
+
+  <!-- ============ 4. 关键战役 ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">4</span>五大战役详案（主线深挖）</div>
+    <div class="sec-sub">阶段路线图是时间维度，战役是深度维度。每条战役含问题/动作/测量/失败信号。</div>
+
+    <div class="battle">
+      <h3><span class="n">战役 A</span>LLM 破冰（0 → 8）—— 最高杠杆，决定「agent」名实</h3>
+      <p><b>问题：</b>LLM 真推理贡献 0 是五大矛盾之首。不是没接模型（5 免费源 + deepseek 已通），是主 Agent 从没在真题上完成过一轮完整推理。</p>
+      <ul>
+        <li><b>A1 闭环教材</b>：10732 / 10733 / 10735 三题已离线解出，逆向为「LLM 推理路线图」（提示词 + 中间产物 + 工具调用序列），作为验收基准</li>
+        <li><b>A2 无兜底训练集</b>：抽 8-10 题禁用 presolve 路由，强制裸推理，三类失败归因（工具缺失/提示词退化/模型上限）</li>
+        <li><b>A3 结构化归因</b>：每轮失败产出 error_category + key_info + suggestion，下一轮定向修正——把「再试一次」变「告诉它错在哪」</li>
+        <li><b>A4 升级链路</b>：轻量（qwen3.7-flash 免费）→ 失败×2 → 重型（deepseek-reasoner）→ 仍失败 → 监督者止损</li>
+      </ul>
+      <div class="meas"><b>测量：</b>LLM 贡献题数（台账）· 每题 token 成本（预算熔断后 ≤ 1 元/题）· 平均步数（目标 ≤ 20 步/题）· <b>失败信号：</b>2 周内破冰题仍为 0 → 降级为「纯工具链叙事」，砍掉 agent 宣传语</div>
+    </div>
+
+    <div class="battle">
+      <h3><span class="n">战役 B</span>数据工程（web 0/10 的根解）—— 从「没赛可打」到「可离线练」</h3>
+      <p><b>问题：</b>矛盾 5：web 短板是数据欠账不是工具问题。crypto 的 15 道真题是手工攒的，web 为什么没有？</p>
+      <ul>
+        <li><b>B1 采集</b>：西湖论剑历年 web 题（含已归档 10716-10748）+ 强网杯/CISCN/公开赛事 web 题；优先源码包题（可离线审计），次选靶机快照（可本地重建）</li>
+        <li><b>B2 脱敏编排流水线</b>：描述 + 附件 + flag 真值 sha256（复用现有 verify_real_questions.py 守卫），杜绝明文真值入库</li>
+        <li><b>B3 实测驱动补强</b>：web_toolkit 290 行 → 600+；8 类路由（SSTI/反序列化/JWT/CMD/BACKUP/TRAVERSAL/SQLi/SSRF）在真实题上逐类验证；补源码审计适配器（CMS 后门/CVE 指纹）</li>
+      </ul>
+      <div class="meas"><b>测量：</b>web 真题集规模（目标 10-15）· web 真题解出数（目标 ≥5）· <b>失败信号：</b>11 月前 web 真题集 <5 题 → 该战役降权，评估外部数据源合作（如公开 CTF 归档站）</div>
+    </div>
+
+    <div class="battle">
+      <h3><span class="n">战役 C</span>评测与学术（IDEA-1 落地）—— 把工程优化变成可验证的差异化</h3>
+      <p><b>问题：</b>IDEA_REPORT 评审指出 R1 学术新颖性有限、R3 需消融证明组件独立贡献——不跑实验，「行业首个」就是自封。</p>
+      <ul>
+        <li><b>C1 消融 4 组</b>：baseline（现版）vs +三级熔断 vs +结构化归因 vs 全方案；在 40 题评测集上跑</li>
+        <li><b>C2 记录维度</b>：解出率、token 消耗、平均解题时间、幻觉 flag 数——每组都要</li>
+        <li><b>C3 成本对比</b>：全方案 vs 无熔断的 token 差（这是评委/开源用户最关心的一行数字）</li>
+        <li><b>C4 产出</b>：技术报告/评测博客（O5-KR2），也是复赛答辩的硬数据</li>
+      </ul>
+      <div class="meas"><b>测量：</b>4 组实验全部落盘 · 报告成稿 · <b>失败信号：</b>消融证明「熔断/归因无增益」→ 诚实发表负结果（负结果在 CTF-agent 领域同样是稀缺内容），并重新设计组件</div>
+    </div>
+
+    <div class="battle">
+      <h3><span class="n">战役 D</span>治理机制化 —— 让「第 N 次中招」成为历史</h3>
+      <p><b>问题：</b>矛盾 2：hook 拦得住 commit，拦不住改不登记、改不提交、改文档不更新。8 天内 git 事故 3 次、在飞改动 4+ 次。</p>
+      <ul>
+        <li><b>D1 在飞零容忍</b>：pre-commit 扫描 + 会话退出检查脚本（检测 MM/未登记改动，阻断收尾）；总账「完工回填」改机器校验</li>
+        <li><b>D2 危险操作 SOP</b>：checkout 跨分支 / reset / rebase / gc 前的 check-list 脚本（上次 checkout 事故就是无保护操作）；高危命令包一层 wrapper 拦截</li>
+        <li><b>D3 口径机器化</b>：offline_verified 边界规则（flag_scan 类不算 / 密码学变换类算 / 题面泄露不算）直接写进 merge_gate 计数逻辑</li>
+        <li><b>D4 文档生命周期</b>：_INDEX 自动比对目录树；90 天未更新且被新文档取代的 → 自动标「已归档」</li>
+      </ul>
+      <div class="meas"><b>测量：</b>在飞改动连续 30 天 0 · git 事故连续 90 天 0 · merge_gate 规则回归测试 5 条 · <b>失败信号：</b>任何一项复发 → 当天根因分析 + 补机器防线，不写新规范（规范已够多）</div>
+    </div>
+
+    <div class="battle">
+      <h3><span class="n">战役 E</span>赛时可靠性 —— 明年复赛的生死线</h3>
+      <p><b>问题：</b>8/21 初赛 0 解出的根因不是能力，是赛时链路（幽灵变量/多进程互踩/403 WAF/LLM 熔断）从未真实验证。测试赛 7/7 是假信号。</p>
+      <ul>
+        <li><b>E1 赛时链路专项测试</b>：模拟赛时环境（干净 env + 多并发 + 限速 + 代理抖动），回归「幽灵变量/多进程互踩/403 风控」三类事故</li>
+        <li><b>E2 环境快照与回滚</b>：赛前生成 venv + 配置 + provider 快照，赛时 5 分钟内可回滚到已知良好态</li>
+        <li><b>E3 模拟赛制度</b>：Phase 4 起每月一次全链路模拟（拉题→解题→提交→报告），用真题集抽题，跑分记录归档——只有模拟赛能证明「能打」</li>
+        <li><b>E4 provider 熔断演练</b>：白名单 failover 顺序（qwen,tokenhub,xfyun,moonshot,ark,mimo,deepseek）每季度实测一遍</li>
+      </ul>
+      <div class="meas"><b>测量：</b>模拟赛解出率 / 赛时链路回归测试通过率 / <b>失败信号：</b>任意一次模拟赛出现 0 解出或链路断裂 → 当日根因修复，模拟赛不合格不计入连续记录</div>
+    </div>
+  </div>
+
+  <!-- ============ 5. 资源与成本 ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">5</span>资源与成本预算</div>
+    <div class="sec-sub">诚实面对成本——这是项目过去最失控的维度之一。</div>
+    <div class="box">
+      <table>
+        <tr><th style="width:22%">资源</th><th style="width:40%">预算</th><th>管控机制</th></tr>
+        <tr><td><b>LLM token</b></td><td>默认走 qwen3.7-flash 免费源（99.97% 额度剩余）；付费 deepseek 仅作重型升级兜底，月度上限 ¥50</td><td>三级熔断（单题/全局/重试）+ 降级阈值；超限自动切免费源</td></tr>
+        <tr><td><b>时间</b></td><td>假设每周 10-15 小时（Phase 0/1 需连续投入，Phase 2 后可放缓至每周 5-8 小时）</td><td>每阶段出口标准是时间盒的验收阀；连续 2 周无进展 → 阶段自动冻结重排</td></tr>
+        <tr><td><b>存储</b></td><td>真题集 + 附件 + 靶机快照预计 5-10 GB（本地）</td><td>附件不入 git；_attachments 继续 gitignore；快照放 _archive 不污染工作树</td></tr>
+        <tr><td><b>外部依赖</b></td><td>PARI/7z/stegano 等工具链装 managed venv，不碰用户全局环境</td><td>setup.sh 三重自愈校验（已修复）保持</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ 6. 风险登记 ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">6</span>风险登记（新规划自身的风险，不含已知旧风险）</div>
+    <div class="sec-sub">规划不是免责声明——每个风险都有触发信号与对冲。</div>
+
+    <div class="risk">
+      <h4><span class="lv t-red">高</span>LLM 破冰失败（战役 A 证伪）</h4>
+      <p><b>触发：</b>Phase 1 结束（9/30）破冰题仍为 0。<b>对冲：</b>立即降级为「纯工具链叙事」——公开仓删除 agent 宣传语，改称 deterministic solver framework；O1-KR2 目标从 8 调整为 0（诚实优先于好听）。这会让项目更小，但更真实。</p>
+    </div>
+
+    <div class="risk">
+      <h4><span class="lv t-red">高</span>无赛可打的验证缺口（accepted 永远无法闭环）</h4>
+      <p><b>本质：</b>offline_verified 再高，也无法证明「平台上能 accepted」——8/21 已证明两者可完全脱节。<b>对冲：</b>模拟赛制度（E3）是唯一近似手段；答辩口径坚持「离线核验 + 模拟赛」，永不把离线数字冒充平台战绩（诚实红线已锁死）。</p>
+    </div>
+
+    <div class="risk">
+      <h4><span class="lv t-amber">中</span>token 成本失控（熔断未落地前提前开跑 LLM 训练）</h4>
+      <p><b>触发：</b>Phase 2 在熔断未实现时大量跑重型模型。<b>对冲：</b>Phase 1 破冰只用免费源 + 单题硬上限；熔断（Phase 3）落地前，LLM 训练量控制在每周 ≤ 20 题。</p>
+    </div>
+
+    <div class="risk">
+      <h4><span class="lv t-amber">中</span>双仓再次分叉（本地 9 分与公开仓 v1 脱节）</h4>
+      <p><b>触发：</b>脱敏导出脚本（Phase 3）交付前公开仓停更 > 1 个月。<b>对冲：</b>Phase 0 先确认周更自动化令牌有效；Phase 1-2 期间公开仓以「周更自动同步」维持呼吸，重大修复（如 SSRF break）手动补推。</p>
+    </div>
+
+    <div class="risk">
+      <h4><span class="lv t-amber">中</span>规划执行依赖 Gu 在场（治理单点）</h4>
+      <p><b>触发：</b>Gu 不在场期间会话又绕过流程。<b>对冲：</b>D1 机器扫描 + D2 高危命令 wrapper 让「不依赖自觉」成立；规划本身登记进总账，成为所有会话的引用锚点。</p>
+    </div>
+
+    <div class="risk">
+      <h4><span class="lv t-green">低</span>消融实验证伪（熔断/归因无增益）</h4>
+      <p><b>处置：</b>负结果同样是开源稀缺内容（诚实性 A 级资产）；技术文章改发负结果 + 归因分析，答辩数据如实呈现。</p>
+    </div>
+  </div>
+
+  <!-- ============ 7. 里程碑 ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">7</span>里程碑总表</div>
+    <div class="milestone">
+      <div class="ms">
+        <div class="m-time">M0 · 2026-09-03</div>
+        <div class="m-name">地基收口</div>
+        <div class="m-crit"><b>出口：</b>PAT 轮换 · 在飞改动 0 · 口径规则进 merge_gate · fsck 干净</div>
+      </div>
+      <div class="ms">
+        <div class="m-time">M1 · 2026-09-30</div>
+        <div class="m-name">数据与破冰</div>
+        <div class="m-crit"><b>出口：</b>web 真题集 ≥10 · 评测集 ≥25 · LLM 破冰 ≥1 · 消融 baseline 落盘</div>
+      </div>
+      <div class="ms">
+        <div class="m-time">M2 · 2026-11-30</div>
+        <div class="m-name">LLM 攻坚</div>
+        <div class="m-crit"><b>出口：</b>LLM 贡献 ≥5 · 归因覆盖率 ≥80% · 升级链路实测有效</div>
+      </div>
+      <div class="ms">
+        <div class="m-time">M3 · 2027-02-28</div>
+        <div class="m-name">框架 v2</div>
+        <div class="m-crit"><b>出口：</b>熔断/并发/归因可独立开关 · 公开仓 v2 · 消融 4 组完整 · 技术文章成稿</div>
+      </div>
+      <div class="ms">
+        <div class="m-time">M4 · 2027-08-31</div>
+        <div class="m-name">复赛就绪</div>
+        <div class="m-crit"><b>出口：</b>40 题覆盖 ≥90% · 3 次模拟赛无 0 解出 · 答辩彩排 2 轮</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 8. 决策清单 ============ -->
+  <div class="sec">
+    <div class="sec-title"><span class="no">8</span>待拍板决策（需要用户确认后执行）</div>
+
+    <div class="decide">
+      <h4>D1 · 战略定位修正</h4>
+      <p>是否接受把公开叙事从「CTF 参赛 AI Agent」改为「国内赛制优先的可复现 CTF-Agent 框架 + 真题评测基准」？<b>推荐接受</b>——这是对 0 accepted 事实的诚实响应，也是 9.0 分诚实性资产的正确变现。</p>
+      <div class="opts"><span class="opt">✅ 接受（推荐）</span><span class="opt">❌ 保留参赛叙事</span></div>
+    </div>
+
+    <div class="decide">
+      <h4>D2 · IDEA-1 是否作为年度学术主线</h4>
+      <p>三级熔断 + 结构化归因 + 并发（8 天增量改造 + 消融 4 组）是否立项？<b>推荐立项</b>——它与既有代码基础 90% 重合，是差异化与论文素材的来源。</p>
+      <div class="opts"><span class="opt">✅ 立项（推荐）</span><span class="opt">❌ 只做能力不做学术</span></div>
+    </div>
+
+    <div class="decide">
+      <h4>D3 · 时间与 token 预算承诺</h4>
+      <p>Phase 0-1（9 月）需要每周 10-15 小时连续投入 + 每月 token 预算 ≤ ¥50（免费源为主）。是否可承诺？若只能每周 5 小时，Phase 1/2 顺延 1 个月。</p>
+      <div class="opts"><span class="opt">每周 10-15h（推荐）</span><span class="opt">每周 5h</span><span class="opt">不固定，按事件驱动</span></div>
+    </div>
+
+    <div class="decide">
+      <h4>D4 · 决赛窗对冲</h4>
+      <p>8/31 前若意外晋级（概率≈0），是否接受「冻结 Phase 1 非赛部分、2 周赛时加固」的预案？</p>
+      <div class="opts"><span class="opt">✅ 接受预案（推荐）</span><span class="opt">不参赛，全力长期规划</span></div>
+    </div>
+
+    <div class="decide">
+      <h4>D5 · 在飞改动的处置授权</h4>
+      <p>当前 8 个在飞改动（config.py qwen3.7-flash 切换 + research-wiki 更新 + idea-stage）是否授权收口提交（走登记-租约-双门禁）？</p>
+      <div class="opts"><span class="opt">✅ 授权收口（推荐）</span><span class="opt">保留原会话处理</span></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    本规划 V1.0 由 Gu 基于 2026-08-27 磁盘实测制定。配套文档：《深度分析与评价-20260827.html》（现状）、《明年复赛夺冠作战计划-20260824.md》（技术细节）、《IDEA_REPORT-20260827.md》（差异化调研）。执行后每阶段收口时回写本规划（版本号 +1），过时内容归档，不追加章节堆砌。
+  </div>
+</div>
+</body>
+</html>

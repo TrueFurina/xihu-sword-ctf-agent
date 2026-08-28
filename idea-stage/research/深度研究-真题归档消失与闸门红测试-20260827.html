@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>深度研究：外部真题归档消失 + 闸门红测试 —— 事实核查与根因判定</title>
+<style>
+  :root {
+    --bg: #f7f8fa; --card: #ffffff; --ink: #1f2328; --muted: #57606a;
+    --line: #d0d7de; --red: #cf222e; --green: #1a7f37; --amber: #9a6700;
+    --blue: #0969da; --purple: #8250df; --tag-bg: #f6f8fa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.7; padding: 32px 16px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 26px; margin-bottom: 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 22px 26px; margin-bottom: 18px; }
+  h2 { font-size: 19px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--line); }
+  h3 { font-size: 15px; margin: 14px 0 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 10px 0; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--tag-bg); font-weight: 600; white-space: nowrap; }
+  code { background: var(--tag-bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; font-family: Consolas, "Courier New", monospace; }
+  pre { background: #0d1117; color: #e6edf3; border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; margin: 10px 0; }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-right: 6px; }
+  .p-ok { background: #dafbe1; color: #1a7f37; }
+  .p-fail { background: #ffebe9; color: #cf222e; }
+  .p-warn { background: #fff8c5; color: #9a6700; }
+  .p-info { background: #ddf4ff; color: #0969da; }
+  .verdict { border-left: 4px solid var(--blue); padding: 10px 14px; background: #f6f8fa; border-radius: 0 8px 8px 0; margin: 10px 0; }
+  .verdict.red { border-left-color: var(--red); }
+  .verdict.green { border-left-color: var(--green); }
+  .verdict.amber { border-left-color: var(--amber); }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  .timeline { position: relative; padding-left: 24px; }
+  .timeline::before { content: ""; position: absolute; left: 8px; top: 4px; bottom: 4px; width: 2px; background: var(--line); }
+  .tl-item { position: relative; margin-bottom: 14px; }
+  .tl-item::before { content: ""; position: absolute; left: -21px; top: 7px; width: 10px; height: 10px; border-radius: 50%; background: var(--blue); }
+  .tl-item.warn::before { background: var(--amber); }
+  .tl-item.crit::before { background: var(--red); }
+  .tl-time { font-weight: 700; font-size: 13px; color: var(--blue); }
+  .tl-item.warn .tl-time { color: var(--amber); }
+  .tl-item.crit .tl-time { color: var(--red); }
+  .tl-desc { font-size: 13.5px; color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+  .stat { display: inline-block; font-size: 30px; font-weight: 800; margin-right: 8px; }
+  .kpi-box { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+  .kpi-item { flex: 1; min-width: 150px; background: var(--tag-bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; text-align: center; }
+  .kpi-item .num { font-size: 24px; font-weight: 800; }
+  .kpi-item .lbl { font-size: 12px; color: var(--muted); }
+  .foot { color: var(--muted); font-size: 12px; text-align: center; margin-top: 24px; }
+  .crit-note { background: #ffebe9; border: 1px solid #ffb3b0; border-radius: 8px; padding: 12px 16px; margin: 10px 0; font-size: 13.5px; }
+  .ok-note { background: #dafbe1; border: 1px solid #7ee787; border-radius: 8px; padding: 12px 16px; margin: 10px 0; font-size: 13.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>🔬 深度研究：外部真题归档消失 + 闸门红测试</h1>
+<div class="sub">事实核查 · 事故链还原 · 根因判定 · 处置建议 ｜ 2026-08-27 12:2x ｜ 基于磁盘实测（非凭记忆）</div>
+
+<div class="card">
+<h2>一、执行摘要：评估报告的六个论断，逐条裁决</h2>
+<table>
+<tr><th style="width:34%">评估报告论断</th><th style="width:10%">裁决</th><th>实测依据</th></tr>
+<tr>
+  <td>「外部真题归档 <code>E:/Program/Cybersecurity/比赛真题/</code>（1.5GB）<b>整个目录不存在了</b>」</td>
+  <td><span class="pill p-warn">部分不实</span></td>
+  <td><code>E:/Program/Cybersecurity/</code> <b>健在</b>（106 项，mtime=8/26 11:50:33）。消失的只是 <b>「比赛真题」子目录</b>。报告"整个目录不存在"的描述过度。</td>
+</tr>
+<tr>
+  <td>「verify 断链的根源」</td>
+  <td><span class="pill p-ok">成立</span></td>
+  <td>实测 <code>verify_hgame2022_rsa.py</code> / <code>verify_anwang_misc3.py</code> 均 FileNotFoundError（附件路径失效）。断链属实。</td>
+</tr>
+<tr>
+  <td>「4 个 offline_verified 条目的可复现性证据悬空」</td>
+  <td><span class="pill p-fail">不成立</span></td>
+  <td>台账口径（8/27 定稿）：HGAME×3 + 安网 misc3 是 <b>E 类外部真题，不计入严格 KPI</b>（merge_gate 按标题「外部真题」自动排除）。<b>offline_verified=9 全部来自自包含题库</b>，零依赖外部归档。</td>
+</tr>
+<tr>
+  <td>「棘轮没塌」</td>
+  <td><span class="pill p-ok">成立</span></td>
+  <td>KPI 通道附件已内联 <code>data/questions_real/_attachments/</code>（相对路径），实测 <code>merge_gate --kpi-only</code> 口径不受影响。</td>
+</tr>
+<tr>
+  <td>「test_baseline_exists_and_ok 确定性失败——改判定代码不改判定测试」</td>
+  <td><span class="pill p-ok">成立</span></td>
+  <td>实测复现：合成台账无 A/B 标注 → 分类器返回 C → 计数 0 &lt; 基线 5 → AssertionError。</td>
+</tr>
+<tr>
+  <td>「test_conn_refused_classified flaky（套件内失败、单跑通过）」</td>
+  <td><span class="pill p-warn">部分成立</span></td>
+  <td>单跑 3 连过 + <b>全量套件本次也绿</b>（1 failed / 317 passed / 16 skipped）。flaky 属实但本次未复现套件内失败；根因是异常消息字符串分类的脆弱性。</td>
+</tr>
+<tr>
+  <td>「git log 里没有任何事故记录、没有任何人报案」</td>
+  <td><span class="pill p-fail">不成立</span></td>
+  <td>台账 8/27 三条均已标注「⚠️ 2026-08-26 外部源目录已失效，附件无备份」。监督信号也记录了源失效。有报案，但<b>报案与 git 提交脱节</b>（目录不在 git 管理内）。</td>
+</tr>
+</table>
+
+<div class="crit-note">
+<strong>🔴 比"归档消失"更严重的发现（报告遗漏）：</strong>
+监督干预信号-20260826 声称「真题集自包含化(55e2888)：15 题附件内联至 <code>_attachments/</code>，脱离外部依赖——<b>HGAME 3 题跨机可复现</b>」。但：① 提交 <code>55e2888</code> 在 git 中<b>不存在</b>（8/25-8/26 提交被 prune）；② <code>_attachments/</code> 里<b>没有 HGAME 附件</b>；③ 当前 verify 脚本仍硬编码外部路径。「HGAME 3 题跨机可复现」是<b>未兑现的声称</b>——要么该提交丢失了这部分内容，要么从未内联过。台账（诚实）与监督信号（乐观）自相矛盾，<b>台账是对的</b>。
+</div>
+</div>
+
+<div class="card">
+<h2>二、重大发现 1：外部真题归档消失 —— 事故链还原</h2>
+
+<h3>2.1 消失的是什么</h3>
+<p><code>E:/Program/Cybersecurity/比赛真题/</code>（含 HGAME2022 / 2022安网杯 / VNCTF2022 / 玄盾杯 / 强网杯青少年 等历年真题，~1.5GB）。verify 脚本与 <code>data/questions/</code> 混合集共 17 处引用该路径。</p>
+
+<h3>2.2 排除项（已逐一实测）</h3>
+<table>
+<tr><th>假设</th><th>验证方法</th><th>结果</th></tr>
+<tr><td>移动到别处</td><td>全盘（C/D/E）搜 HGAME/比赛真题/安网杯/真题 关键词</td><td><span class="pill p-fail">排除</span> 零残留</td></tr>
+<tr><td>回收站删除</td><td>解析 1504 个 <code>$I</code> 元数据（UTF-16 原始路径）+ 1476 个 <code>$R</code> 数据条目</td><td><span class="pill p-fail">排除</span> 回收站 8/26 有 2309 条删除记录但<b>全是开发产物</b>（.py/.json/.lock），最大残留仅 31.5MB，无比赛真题</td></tr>
+<tr><td>发布副本带走</td><td><code>/e/tmp/xihu_pub*</code> / <code>xihu_sync_staging</code> / <code>repo_restore</code> / <code>c01_verify</code> 全部排查</td><td><span class="pill p-fail">排除</span> 发布树已剔除 <code>_attachments</code>，无真题附件</td></tr>
+<tr><td>archive 快照备份</td><td><code>_archive/wt-p0closeout/</code>（8/26 02:54 快照）等全量查找</td><td><span class="pill p-fail">排除</span> 快照只有 questions_real 内联附件，无 HGAME/安网附件</td></tr>
+<tr><td>git 历史中曾存在</td><td>fsck --lost-found + 全 refs 扫描</td><td><span class="pill p-warn">部分</span> 55e2888 无对象；真题集 KPI 固化提交 927e0c9 等 8/25-8/26 中间提交被 prune，无从考证</td></tr>
+</table>
+
+<div class="verdict red">
+<strong>判定：</strong>归档在本地<b>所有可能位置均无残留 → 本地不可恢复</b>。删除方式为<b>永久删除或脚本级清理</b>（绕过回收站），时间窗锁定 <b>2026-08-26 11:50:33</b>（Cybersecurity 目录 mtime 即该时刻，说明当时发生了目录级增删）。8/26 当天存在磁盘紧张历史（E 盘 91%、D 盘 95%、C 盘 84%）与 git 事故处置背景，疑似清理误删。
+</div>
+
+<h3>2.3 完整时间线</h3>
+<div class="timeline">
+  <div class="tl-item"><span class="tl-time">08-25 20:11</span><div class="tl-desc"><code>verify_hgame_rsa.py</code> 创建（引用外部路径）——当时目录存在</div></div>
+  <div class="tl-item"><span class="tl-time">08-26 03:16</span><div class="tl-desc"><code>verify_hgame2022_rsa.py</code> / <code>verify_anwang_misc3.py</code> 创建，3/3 复现通过（目录仍存在）</div></div>
+  <div class="tl-item crit"><span class="tl-time">08-26 11:50:33</span><div class="tl-desc"><b>Cybersecurity 目录 mtime 变更 ——「比赛真题」被删/移的时间窗</b>。无 git 记录（目录不在 git 管理内），无回收站记录</div></div>
+  <div class="tl-item"><span class="tl-time">08-26 15:28 / 17:15</span><div class="tl-desc">回收站两波共 2309 条删除（全部开发产物，与真题无关）</div></div>
+  <div class="tl-item"><span class="tl-time">08-26 15:48</span><div class="tl-desc">git 历史重建 <code>a25173d</code>（8/25-8/26 提交被 prune，55e2888 无从考证）——<b>监督信号的"自包含化"声明与 git 事实脱节</b></div></div>
+  <div class="tl-item"><span class="tl-time">08-27</span><div class="tl-desc">台账三条 E 类题块标注「源失效待找回」——诚实但为时已晚，无恢复动作</div></div>
+</div>
+
+<h3>2.4 影响面（精确核算）</h3>
+<div class="kpi-box">
+  <div class="kpi-item"><div class="num" style="color:var(--green)">9</div><div class="lbl">严格 KPI（offline_verified）<br><b>零影响</b>——自包含题库</div></div>
+  <div class="kpi-item"><div class="num" style="color:var(--green)">14/15</div><div class="lbl">presolve 覆盖度<br><b>零影响</b></div></div>
+  <div class="kpi-item"><div class="num" style="color:var(--amber)">4</div><div class="lbl">E 类外部真题备查条目<br>复现能力断（不计 KPI）</div></div>
+  <div class="kpi-item"><div class="num" style="color:var(--red)">31</div><div class="lbl">剩余正式赛真题弹药库<br>原材料来源断（10716-10748）</div></div>
+</div>
+<p><b>真正的损失不是 KPI，是路线</b>：①「扩大正式赛真题解出」是 ROI 最高的进攻路线，弹药库没了；② 4 条 E 类备查的 verify 裸崩（FileNotFoundError 而非优雅报错）。</p>
+</div>
+
+<div class="card">
+<h2>三、重大发现 2：闸门测试红 —— 实跑验证</h2>
+
+<h3>3.1 全量实测结果（tests/ 全量，2026-08-27）</h3>
+<table>
+<tr><th>测试</th><th>报告声称</th><th>本次实测</th><th>根因</th></tr>
+<tr>
+  <td><code>test_baseline_exists_and_ok</code></td>
+  <td><span class="pill p-fail">确定性失败</span></td>
+  <td><span class="pill p-fail">复现失败</span>（0 &lt; 基线 5）</td>
+  <td>分类器升级（2d85984）后 <code>_classify_entry</code> 默认 C 不计；合成台账 <code>_fake_ledger</code> 生成标题 <code>### 题{i}</code> 无 A/B 标注 → 计数 0。改判定代码未同步改判定测试。<b>修法：合成台账标题加 A 类标注</b></td>
+</tr>
+<tr>
+  <td><code>test_conn_refused_classified</code></td>
+  <td><span class="pill p-warn">flaky（套件内失败）</span></td>
+  <td><span class="pill p-ok">本次全绿</span>（单跑 3 连过 + 全量通过）</td>
+  <td>依赖 <code>httpx</code> 异常消息含 <code>"10061"</code>/<code>"connection refused"</code> 字符串分类。Windows 中文错误消息变体或偶发网络栈状态可能导致分类漂移。建议改为按异常类型 <code>isinstance(exc, ConnectionError)</code> 分类</td>
+</tr>
+</table>
+
+<div class="verdict green">
+<strong>裁决：</strong>红测试 1 的判断完全正确（第三次同类配对失误，且这次是"改判定代码不改判定测试"，最该根治）。红测试 2 的 flaky 定性正确，但"套件内失败"本次未复现——需持续观察。
+</div>
+
+<h3>3.2 附加发现：merge_gate 门禁当前被在飞改动拦截</h3>
+<p>实测 <code>merge_gate --kpi-only</code> 输出：<b>「工作树有 4 处已跟踪在飞改动」</b>（<code>skills/jpeg_png_embedded.py</code> + research-wiki×3）。与"工作树干净"的既有认知不符——在飞改动治理仍在反复。</p>
+</div>
+
+<div class="card">
+<h2>四、根因分层与责任判定</h2>
+<table>
+<tr><th>层级</th><th>根因</th><th>责任归属</th></tr>
+<tr><td>事故层（数据丢失）</td><td>8/26 磁盘清理/事故处置中误删「比赛真题」子目录，绕过回收站，无备份、无留痕</td><td>清理执行者（未知会话/脚本），无监控兜底</td></tr>
+<tr><td>治理层（无报案闭环）</td><td>外部依赖资产<b>无清单、无版本管理、无 closeout 检查</b>；台账标注了"失效"但没有触发恢复动作或事故报告</td><td>治理流程缺口（非个人失误）</td></tr>
+<tr><td>声称层（记录失真）</td><td>监督信号「55e2888 自包含化、HGAME 跨机可复现」与 git 事实/磁盘事实矛盾——记录未以磁盘为准</td><td>记录方（乐观声称），违反"接手以磁盘实测为准"教义</td></tr>
+<tr><td>工程层（红测试）</td><td>改判定逻辑不同步更新判定测试（第三次）；flaky 测试依赖字符串分类</td><td>实现者 + 测试设计</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2>五、处置建议（按优先级）</h2>
+<ol>
+  <li><b>P0 恢复弹药库（用户决策）</b>：本地不可恢复。两条路：① 检查网盘/移动硬盘是否有「比赛真题」备份；② 从公开渠道重新收集 HGAME2022 / 安网杯真题附件（HGAME 是公开赛，writeup 与附件网上可寻）。<b>RSA1 的 n 与因子已在 verify 脚本中硬编码</b>，缺的是 e/c 与其余附件——收集到后立刻回填 verify 并跑通。</li>
+  <li><b>P0 修红测试（10 分钟）</b>：<code>_fake_ledger</code> 标题加「A类·完整攻击链」标注；flaky 测试改按异常类型分类。同 commit 提交。</li>
+  <li><b>P1 建立外部依赖资产清单</b>：把「外部路径 → 用途 → 关键内容（如 e/c/n）→ 备份位置」登记进 closeout 检查，缺失即拦截。verify 脚本改 fail-closed 优雅报错（文件缺失时输出「外部源已失效」而非裸崩）。</li>
+  <li><b>P1 修正监督信号记录</b>：「55e2888 自包含化」声称与事实不符——要么补做 HGAME 附件内联（从新收集的附件），要么明确撤回该声称。台账已诚实，保持。</li>
+  <li><b>P2 pre-commit 防再犯</b>：判定代码改动（_classify_entry 等）必须同 commit 带判定测试，用 git diff 检测"改了 X 却没改 test_X"。</li>
+</ol>
+</div>
+
+<div class="card">
+<h2>六、一句话结论</h2>
+<div class="verdict red">
+<strong>评估报告两大致命发现，一真一虚：</strong>「闸门测试红」的判断<b>精准且应根治</b>（第三次同病）；「归档消失」的<b>事实成立但定性过重</b>——KPI 零影响（9 项全自包含），真正损失是 31 道题的进攻弹药库和 4 条 E 类备查的复现能力。而报告遗漏了最严重的问题：<b>监督信号声称"自包含化完成"与 git/磁盘事实脱节——记录失真比数据丢失更危险</b>，因为后者让你以为防线还在。
+</div>
+</div>
+
+<div class="foot">深度研究报告 · 基于磁盘实测 · 2026-08-27 · 西湖论剑 CTF-Agent 项目</div>
+</div>
+</body>
+</html>
