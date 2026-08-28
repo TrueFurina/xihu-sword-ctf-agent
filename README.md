@@ -68,12 +68,17 @@ Configuration is environment-variable driven (see `config.py`): `DASCTF_TOKEN`, 
 
 ## Honest KPI
 
-Benchmark on the `data/questions_real/` corpus (15 historical real problems), run through the **real** tool chain:
+The single machine-enforced KPI is **`offline_verified`** — the number of *historical real problems* for which a complete, reproducible attack chain produced a flag matching the problem's ground-truth `flag_sha256` (see `REAL_SOLVES_LEDGER.md`, guarded by the merge-gate ratchet in `scripts/_merge_gate.py` so it can only go up, never down).
 
 | Metric | Result |
 |--------|--------|
-| Deterministic pipeline (presolve direct solve) | **14 / 15 (93.3%)** |
-| LLM autonomous-reasoning contribution | **0 / 1** (the 1 miss is a dataset defect, not a capability gap) |
+| **offline_verified** (strict real-problem KPI) | **9** |
+| Deterministic pipeline coverage (`data/questions_real/` 15) | **14 / 15** (presolve direct-solve coverage — NOT a "solved" claim) |
+| LLM autonomous-reasoning contribution | **0** (all 9 verified solves are deterministic presolve/tooling; zero LLM reasoning) |
+
+> ⚠️ **What `offline_verified=9` does and does NOT mean.** It is the count of *real past-CTF problems* (provenance=`real_past_ctf`, sha256-verified, machine-counted by `scripts/_merge_gate.py count_offline_verified`) solved by a **reproducible deterministic pipeline** — a real engineering milestone, but **NOT a capability measurement**. These problems' writeups are public and almost certainly in LLM pre-training corpora (contamination risk — see `data/results/CTF-Agent深度评审报告_20260828.md` G1). LLM autonomous-reasoning contribution is **0/9**. Treat 9 as "template coverage of memorizable public problems," never as "reasoning ability." (Note: `real_crypto_ezrsa` / `real_crypto_simplelegendre` / `real_crypto_exciting_inverse` were historically solved manually but are **not currently reproducible** by the deterministic pipeline — they were removed from the strict KPI on 2026-08-28 after `presolve` returned `None` for all three; see `KNOWN_GAP`.)
+
+> **LLM reasoning break-ice experiment (not counted in KPI)**: With `scripts/_llm_breaking_ice.py --no-internal-presolve` (presolve shortcuts disabled, LLM forced to reason), `10/15` historical problems were solved by `main_agent_llm` autonomous reasoning (crypto×6 / reverse×3 / web×1; all sha256-verified). This proves real LLM reasoning capability exists, but it is **not** counted in `offline_verified` — that KPI only admits strict sha256-verified solves, and the 9 it holds are presolve-deterministic. Details in `MEMORY.md`.
 
 Interpretation: **capability = static-analyzer coverage**, not LLM reasoning. To solve more problem types, write more deterministic skills. We say this plainly because over-claiming is the easiest way to embarrass an open-source security tool.
 

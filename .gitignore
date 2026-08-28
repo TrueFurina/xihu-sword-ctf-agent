@@ -14,6 +14,7 @@ ctf_agent/监督者提示词-v3-final.md
 .atomcode/
 .wt_p1_vnctf/
 .wt-*/
+wt-*/
 .tools/
 *.wt_*
 
@@ -106,4 +107,38 @@ ctf_agent/solutions/
 ctf_agent/docs/DLP_独立性声明.md
 ctf_agent/Readme.txt
 ctf_agent/data/results/
-ctf_agent/docs/
+ctf_agent/docs/*
+!ctf_agent/docs/internal/
+
+# ---------- 12. ARIS 自动科研工作流（junction 与可再生物，不入库） ----------
+.claude/
+.aris/
+
+# ---------- 13. 明文 flag / 内部归档 / 调试工具链 / 交付草稿（绝不入库） ----------
+# 明文 flag 解题产物（flag_ssti.txt 等含 DASCTF{}/flag{} 明文，绝不外泄）
+/ctf_agent/flag_ssti.txt
+/ctf_agent/flag_*.txt
+# 历史归档 / Ghidra 调试工具链 / 交付草稿（非项目源码，本地保留）
+/_archive/
+/_tools_ghidra/
+/deliverables/
+
+# ---------- 14. 真题集附件 / 散落明文 flag（含真 flag，绝不入库，纵深防御） ----------
+# _attachments 下含 flag.txt / flag.png / 赛题源码包等明文真 flag，一旦 push 即泄露
+ctf_agent/data/questions_real/_attachments/
+# 任意层级的明文 flag 文件（DASCTF{}/flag{} 明文，绝不外泄）
+**/flag.txt
+**/flag.png
+**/*.flag
+
+# ---------- 15. 反注水违规账（必须入库，不可忽略——注水行为的永久惩罚记录） ----------
+# violations.jsonl 是写死法令的"严厉惩罚"落点，必须纳入版本控制、可被审计追责，
+# 绝不允许被任何忽略规则吞掉。若上方规则意外命中，以下否定优先。
+!ctf_agent/governance/**
+
+# ---------- 16. 运行日志（项目内归档，不入库；避免污染 git 体积） ----------
+# logs/ 已按 AGENTS.md 收进项目文件夹（含 c-drive-archive 从 C 盘回收的散落日志），但属运行时产物不入库
+/logs/
+
+# ---------- 16. pytest 临时运行目录（测试产物，绝不入库） ----------
+ctf_agent/.pytest_tmp*
