@@ -163,5 +163,31 @@ def check_external_deps() -> list:
     return missing
 
 
+# ── git 钩子双份一致性检查（2026-08-29 防漂移固化：git_hooks/ 生效副本 vs scripts/hooks/ 源文件 ──
+# 曾发生"生效副本含反注水法令⑩、源文件缺 12 行"的静默漂移（人工 diff 才发现的第三次红测试根因）。
+# 收尾时逐文件比对双份，不一致=漂移告警，防"生效与源不同步"复发。──
+HOOK_NAMES = ["commit-msg", "post-commit", "post-merge", "pre-commit", "pre-merge-commit"]
+
+
+def check_hooks_sync() -> list:
+    """比对 git_hooks/ 与 scripts/hooks/ 双份钩子文件，返回不一致清单。"""
+    drifted = []
+    live_dir = os.path.join(ROOT, "git_hooks")
+    src_dir = os.path.join(ROOT, "scripts", "hooks")
+    for name in HOOK_NAMES:
+        live = os.path.join(live_dir, name)
+        src = os.path.join(src_dir, name)
+        if not os.path.isfile(live) or not os.path.isfile(src):
+            drifted.append(f"{name}: 一侧缺失（live={os.path.isfile(live)} src={os.path.isfile(src)}）")
+            continue
+        try:
+            with open(live, "rb") as fa, open(src, "rb") as fb:
+                if fa.read() != fb.read():
+                    drifted.append(f"{name}: 双份内容不一致（生效副本与源文件漂移）")
+        except OSError as exc:
+            drifted.append(f"{name}: 读取失败 {exc}")
+    return drifted
+
+
 if __name__ == "__main__":
     sys.exit(main())

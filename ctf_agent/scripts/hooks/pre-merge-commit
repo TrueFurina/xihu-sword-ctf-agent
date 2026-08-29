@@ -15,3 +15,9 @@ fi
 
 cd "$ROOT"
 "$PY" scripts/_merge_gate.py
+
+# 反注水法令（写死，2026-08-27 用户严令）：merge 级全量执法。
+# 在 _merge_gate 之后再次核验——KPI 写死水位 + 泄露式假验证 + 授权走私 + 基线篡改。
+# 任一注水企图 → 永久记入违规账并中止合并（fail-closed）。
+echo "── 反注水法令（merge 级全量执法，fail-closed）──"
+"$PY" scripts/_antifraud.py

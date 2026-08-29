@@ -25,6 +25,11 @@ fi
 cd "$ROOT"
 "$PY" scripts/_honesty_scan.py --commit-msg-file "$MSG_ABS"
 
+# ── 反注水法令（写死，2026-08-27 用户严令）：commit message 执法 ──
+# 以「LLM 推理贡献 / 破冰 / 从 0 突破」等声称包装泄露式假验证（预植答案 / 硬编码真 flag）
+# 即构成注水，永久记入违规账并拒绝提交（fail-closed）。
+"$PY" scripts/_antifraud.py --commit-msg-file "$MSG_ABS"
+
 # ── ⑨ 任务板登记闸（2026-08-24 并发有序化闸1，堵"裸奔提交"；2026-08-28 包工头强化）──
 # commit message 必须满足其一：
 #   (a) 含 T-xx（TASK_BOARD 认领的任务 id）——功能/修复/解题类必须挂任务；
