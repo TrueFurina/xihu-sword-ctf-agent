@@ -3,8 +3,10 @@
 import glob, zlib, os
 from PIL import Image
 
-d = r"E:\Program\西湖论剑\ctf_agent\data\tmp_dryrun\10793\out"
-fn = glob.glob(d + r"\*.png")[0]
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(_HERE)
+d = os.path.join(_ROOT, "data", "tmp_dryrun", "10793", "out")
+fn = glob.glob(os.path.join(d, "*.png"))[0]
 data = open(fn, "rb").read()
 
 i = 8

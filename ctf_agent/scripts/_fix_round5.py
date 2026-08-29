@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Round-5 深度修复脚本（指导老师锐评落地）。
 
+⚠️ 历史一次性脚本（2026-08-22 已执行）——仅保留作考古参考，不要重跑。
 只做精确字符串替换 + 计数断言，不做任何模糊改写。
 改完打印每个文件的 OK/FAIL，FAIL 即退出非零。
 """
+import os
 import sys
 
-ROOT = "E:\\Program\\西湖论剑\\ctf_agent"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if not os.path.isfile(os.path.join(ROOT, "skills", "rsa_fermat_factor.py")):
+    sys.exit("历史修复脚本，仅在ctf_agent根目录下有意义，已不建议重跑")
 
 
 def edit(path: str, old: str, new: str, occ: int = 1):

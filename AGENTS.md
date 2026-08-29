@@ -2,6 +2,9 @@
 
 > 本文件是**所有 AI 协作者（含未来会话/子 agent）的强制约定**。先读后写。
 > 与之配套的机器执法：`ctf_agent/scripts/_structure_guard.py`（pre-commit 自动拦截 + `scripts/check_structure.py` 手动自检）。
+>
+> **⚠️ 核心治理铁律（三铁律/KPI/门禁机制）见 `ctf_agent/AGENTS.md`**——本文件只管目录放置规则，
+> 工件可信/裁判分离/启动门禁等治理红线以 `ctf_agent/AGENTS.md` 为唯一真值，开工前必读两份。
 
 ## 0. 一句话原则
 
@@ -20,11 +23,11 @@
 | `logs/` | 一切 agent 运行日志（**项目内**） | 跑批记录、自检输出 |
 | `research-wiki/`（已并入 `idea-stage/research-wiki/`） | — | — |
 | `_archive/` `_tools_ghidra/` `recovered_external`（已并入 `_archive/recovered_external/`） | 归档/工具/恢复材料 | 大型，勿动 |
-| 根目录仅允许 | `README.md` `CLAUDE.md` `LICENSE` `AGENTS.md` | 其余一律禁止 |
+| 根目录仅允许 | `README.md` `README.zh.md` `CLAUDE.md` `LICENSE` `AGENTS.md` `REAL_SOLVES_LEDGER.md` `requirements.txt` `协同任务总账-TOP0.md`（根级白名单由 `ctf_agent/scripts/_structure_guard.py:ROOT_ALLOW` 机器校验，文档与代码一致）| 其余一律禁止 |
 
 ## 2. 硬规则（违反即被 pre-commit 拒绝）
 
-1. **禁止根级平铺**：仓库根只能有 `README.md` / `CLAUDE.md` / `LICENSE` / `AGENTS.md`。任何 `*.md/*.txt/*.html/*.json/...` 一律进对应子目录。
+1. **禁止根级平铺**：仓库根只允许 `README.md` / `README.zh.md` / `CLAUDE.md` / `LICENSE` / `AGENTS.md` / `REAL_SOLVES_LEDGER.md` / `requirements.txt` / `协同任务总账-TOP0.md`（白名单以 `ctf_agent/scripts/_structure_guard.py:ROOT_ALLOW` 为唯一真值）。任何其他 `*.md/*.txt/*.html/*.json/...` 一律进对应子目录。
 2. **禁止 `deliverables/` 平铺**：交付物必须进 `deliverables/` 的 7 个子目录之一（唯一例外 `deliverables/overview.md`）。
 3. **禁止 `idea-stage/` 平铺**：科研产物进 `proposals/` `research/` `refine-logs/` `research-wiki/`；根层仅留 `IDEA_REPORT.md` 与已放置的评估文件。
 4. **日志不出项目**：所有运行日志写 `logs/`（或 `.workbuddy/memory/` 这种项目内目录），**禁止**写 `C:\Users\Lenovo\...`、`Desktop`、`Downloads`。

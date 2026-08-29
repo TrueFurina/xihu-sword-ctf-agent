@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import sys
 from dataclasses import dataclass, field
+from typing import Optional
 
 # 净化告警去重（同一组合只打一次，防每步 LLM 调用刷屏）
 _SANITIZE_WARNED: set = set()

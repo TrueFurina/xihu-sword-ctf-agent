@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import re
 import shlex
+import shutil
 from typing import Optional
 
 from tools.base import ToolAdapter, ToolOutput
@@ -28,6 +29,7 @@ from tools.base import ToolAdapter, ToolOutput
 # 常见 bkcrack 位置（本机 / 决赛机）
 _BKCRACK_CANDIDATES = [
     os.environ.get("BKCRACK", ""),
+    shutil.which("bkcrack") or "",
     # 纯 ASCII 路径（2026-08-22 质检修复：项目路径含中文「西湖论剑」，
     # Windows cmd 按 GBK 解析导致 exe 执行失败——bkcrack 必须放纯 ASCII 目录）
     "C:/Users/Lenovo/bkcrack_161/bkcrack.exe",

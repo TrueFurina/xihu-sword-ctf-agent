@@ -11,7 +11,8 @@
 param([switch]$Uninstall)
 
 $TaskName = "Top0Watchdog"
-$PS = "E:\Program\西湖论剑\ctf_agent\scripts\_watchdog_top0.ps1"
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$PS = Join-Path $ScriptDir "_watchdog_top0.ps1"
 $Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PS`""
 
 if ($Uninstall) {

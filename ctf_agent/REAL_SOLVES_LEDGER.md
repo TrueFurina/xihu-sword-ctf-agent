@@ -111,14 +111,14 @@
   3. 明文 m 是 ROT13 编码（`QNFPGS{…}` = rot13(`DASCTF{<REDACTED>`），题名 "How many rot" 即提示）→ ROT13 解码得规范 flag。
 - **可复现命令**：
   ```bash
-  cd E:/Program/西湖论剑/ctf_agent
+  # 在 ctf_agent/ 目录下执行
   .venv/Scripts/python.exe scripts/verify_10733.py
   ```
 - **备注**：仓库 `skills/crypto_high_exponent.py` 已覆盖该攻击模板（`factor_from_hint` + `recover_via_odd_subgroup` + rot 解码）。
 
 ### 4. real_misc_vnctf_flag 【A类·完整攻击链】（VNCTF2022 · flag · 北京奥运图标杂色点）
 
-- **来源**：`data/questions_real/misc/real_misc_vnctf_flag.json` + 附件 `E:/Program/Cybersecurity/比赛真题/VNCTF2022公开赛/MISC/flag/flag.png`（3920×2205）
+- **来源**：`data/questions_real/misc/real_misc_vnctf_flag.json` + 附件（本地赛题库路径 `E:/Program/Cybersecurity/比赛真题/VNCTF2022公开赛/MISC/flag/flag.png`，3920×2205）
 - **类型**：misc / 图像杂色点网格采样隐写（**非 LSB**——标准 RGB-LSB 提取返回空）
 - **状态**：✅ offline_verified（2026-08-24 本机解出 + 官方 writeup 原文确认）；**2026-08-25 起 presolve 确定性管线已可自动化解出**（skills/misc_grid_resample 重采样 + qwen-vl-max 视觉 OCR 兜底 + flag_sha256 严格校验），`_verify_presolve_truth.py` 已验 15/15 命中本题。
 - **flag**：`<vnctf{…} sha256=7d9ce4e1a4e7369e>`
@@ -128,14 +128,14 @@
   3. 网格间隔取证：杂色点 x 间隔 50（10 次）、y 间隔 31（7 次），与官方 `w//50, h//31` 参数一致。
 - **可复现命令**：
   ```bash
-  cd E:/Program/西湖论剑/ctf_agent
+  # 在 ctf_agent/ 目录下执行（仓库根相对路径）
   .venv/Scripts/python.exe -c "
   from PIL import Image
-  img = Image.open('E:/Program/Cybersecurity/比赛真题/VNCTF2022公开赛/MISC/flag/flag.png')
+  img = Image.open('<本地赛题库路径>/VNCTF2022公开赛/MISC/flag/flag.png')
   img.resize((79, 71), Image.NEAREST).show()
   "
   ```
-- **备注**：图像杂色点网格采样（黑底 + 均匀分布色点，非 LSB）；本环境 tesseract 读不出该像素字体 → 原 presolve 只出"人眼可读揭示图"不读字；2026-08-25 接入白名单视觉 LLM（qwen-vl-max，dashscope 端点）做 OCR 兜底，以题目自带 flag_sha256 校验才返回，确定性可复现、不谎报。教训——"疑似 LSB 隐写"题面有误导，R1 工具优先（先查公开 writeup）比盲目跑 LSB 提取更有效。
+- **备注**：图像杂色点网格采样（黑底 + 均匀分布色点，非 LSB）；本环境 tesseract 读不出该像素字体 → 原 presolve 只出"人眼可读揭示图"不读字；2026-08-25 接入白名单视觉 LLM（qwen-vl-max，dashscope 端点）做 OCR 兜底，以题目自带 flag_sha256 校验才返回，确定性可复现、不谎报。教训——"疑似 LSB 隐写"题面有误导，R1 工具优先（先查公开 writeup）比盲目跑 LSB 提取更有效。附件路径为本地赛题库，不入库。
 
 ### 5. 10735（MISC-02 【A类·完整攻击链】 · 正式赛真题 · logbool 流量包 SQL 布尔盲注）
 
@@ -149,7 +149,7 @@
   3. content 以 `Rar!` 魔数开头 → hex 转 RAR5 包；用 password=`timeemitloggol` 解压（本机 7-Zip 23.01）得 `flag.txt` → flag。
 - **可复现命令**：
   ```bash
-  cd E:/Program/西湖论剑/ctf_agent
+  # 在 ctf_agent/ 目录下执行（附件缺失，当前不可复现——待补附件后固化 verify 脚本）
   # 1) 解析 pcap（scapy）还原三字段；2) content hex→rar；3) 7z x -p<password> 解压
   ```
 - **备注**：题面 flag 字段为空（待解）；解压工具链：本机无 unrar/7z → 下载官方 7-Zip 23.01（`tools/_7z/full/7z.exe`，bsdtar 解 SFX）。R1 工具优先（公开 writeup 同题 `202509_NBWS_logbool` 路线）节省了大量盲试。

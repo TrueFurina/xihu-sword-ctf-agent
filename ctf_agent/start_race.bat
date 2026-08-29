@@ -2,7 +2,7 @@
 rem ============================================================
 rem  Xihu Lunjian CTF-Agent - Race Starter (P0-1)
 rem  Entry  : scripts\_race_start.py --compete
-rem  Log    : data\results\race_20260821.log
+rem  Log    : data\results\race.log (append)
 rem  Env    : baidu qianfan real LLM + whitelist enforced
 rem  Note   : platform token from CTF_AGENT_PLATFORM_TOKEN /
 rem           DASCTF_TOKEN env or Windows registry (setx)
@@ -39,7 +39,7 @@ if not exist "%PY%" (
 if not exist "data\results" mkdir "data\results"
 
 echo [%date% %time%] Starting race mode: scripts\_race_start.py --compete
-"%PY%" scripts\_race_start.py --compete > data\results\race_20260821.log 2>&1
+"%PY%" scripts\_race_start.py --compete >> data\results\race.log 2>&1
 set EXIT_CODE=%ERRORLEVEL%
-echo [%date% %time%] Race process exited with code %EXIT_CODE% (see data\results\race_20260821.log)
+echo [%date% %time%] Race process exited with code %EXIT_CODE% (see data\results\race.log)
 exit /b %EXIT_CODE%

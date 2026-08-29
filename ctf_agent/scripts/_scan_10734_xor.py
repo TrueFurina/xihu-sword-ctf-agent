@@ -3,9 +3,11 @@
 滞后差不变式：重复密钥(长L) XOR 下 T[i]^T[i+L] = P[i]^P[i+L]，与密钥内容/相位无关。
 对每个 L 扫 "DASCTF{" 的 lag-L 签名，命中后现场爆破密钥并输出解码结果。
 """
-import sys
+import sys, os
 
-PATH = r"E:\Program\西湖论剑\ctf_agent\data\race_extract\10734\deep\ubuntu flag.lime"
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(_HERE)
+PATH = os.path.join(_ROOT, "data", "race_extract", "10734", "deep", "ubuntu flag.lime")
 P = b"DASCTF{"
 CHUNK = 64 << 20
 

@@ -1,4 +1,10 @@
-ROOT = "E:\\Program\\西湖论剑\\ctf_agent"
+"""⚠️ 历史一次性修复脚本（2026-08-22 已执行）——仅保留作考古参考，不要重跑。"""
+import os
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if not os.path.isfile(os.path.join(ROOT, "run.py")):
+    sys.exit("历史修复脚本，仅在ctf_agent根目录下有意义，已不建议重跑")
 
 
 def edit(path, old, new, occ=1):

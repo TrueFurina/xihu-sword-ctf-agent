@@ -10,7 +10,7 @@ import glob
 import hashlib
 from pathlib import Path
 
-ROOT = Path("E:/Program/西湖论剑/ctf_agent")
+ROOT = Path(__file__).resolve().parent.parent
 QDIR = ROOT / "data" / "questions_real"
 VF = ROOT / "data" / "results" / "verified_flags.json"
 RX = __import__("re").compile(r"^[0-9a-fA-F]{64}$")

@@ -2,7 +2,9 @@
 """10734: 高效滞后差扫描（mmap + 限制 L 1..6）"""
 import mmap, struct, os
 
-PATH = r"E:\Program\西湖论剑\ctf_agent\data\race_extract\10734\deep\ubuntu flag.lime"
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(_HERE)
+PATH = os.path.join(_ROOT, "data", "race_extract", "10734", "deep", "ubuntu flag.lime")
 P = b"DASCTF{"
 
 def sig_for_l(L):

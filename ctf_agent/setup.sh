@@ -43,7 +43,13 @@ else
     echo "[1/4] 建立/重建项目内 .venv（原 .venv 缺失或损坏）..."
     # 旧损坏 venv 备份而非删除（项目「绝对不删」红线）
     [ -d .venv ] && mv .venv ".venv.broken_$(date +%Y%m%d_%H%M%S)"
-    "C:/Users/Lenovo/.workbuddy/binaries/python/versions/3.13.12/python.exe" -m venv .venv
+    # 自动探测系统 python3（优先 PATH 中的 python，不硬编码个人路径）
+    _SYS_PY="$(command -v python3 || command -v python || echo "")"
+    if [ -z "$_SYS_PY" ]; then
+        echo "❌ 未找到 python3/python，请先安装 Python 3.11+ 并加入 PATH"
+        exit 1
+    fi
+    "$_SYS_PY" -m venv .venv
 fi
 
 # 2. 装依赖

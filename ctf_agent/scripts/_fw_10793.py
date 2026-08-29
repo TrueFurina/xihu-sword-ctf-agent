@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """10793: Fireworks 私有 chunk 提取分析"""
-import glob, zlib
+import glob, zlib, os
 
-d = r"E:\Program\西湖论剑\ctf_agent\data\tmp_dryrun\10793\out"
-fn = glob.glob(d + r"\*.png")[0]
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(_HERE)
+d = os.path.join(_ROOT, "data", "tmp_dryrun", "10793", "out")
+fn = glob.glob(os.path.join(d, "*.png"))[0]
 data = open(fn, "rb").read()
 i = 8
 chunks = []
@@ -28,7 +30,7 @@ prvw = next((p for t, p in chunks if t == "prVW"), b"")
 try:
     pv = zlib.decompress(prvw)
     print("prVW decompressed:", len(pv), pv[:16])
-    open(d + r"\_prvw.bin", "wb").write(pv)
+    open(os.path.join(d, "_prvw.bin"), "wb").write(pv)
 except Exception as ex:
     print("prVW zlib fail:", ex)
 
@@ -39,6 +41,6 @@ for name in ("mkTS", "mkBT", "mkBS"):
     try:
         out = zlib.decompressobj().decompress(blob)
         print("  zlib ok:", len(out), out[:40])
-        open(d + f"\\_{name}.bin", "wb").write(out)
+        open(os.path.join(d, f"_{name}.bin"), "wb").write(out)
     except Exception as ex:
         print("  zlib fail:", str(ex)[:80])

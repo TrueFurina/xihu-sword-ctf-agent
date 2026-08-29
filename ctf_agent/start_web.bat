@@ -2,7 +2,7 @@
 rem ============================================================
 rem  Xihu Lunjian CTF-Agent - Web Dashboard Starter (P0-1)
 rem  Entry  : run.py --mode web (port 8000)
-rem  Log    : data\results\web_20260821.log
+rem  Log    : data\results\web.log (append)
 rem  Env    : baidu qianfan real LLM + whitelist enforced
 rem ============================================================
 set CTF_AGENT_USE_REAL_LLM=1
@@ -24,7 +24,7 @@ if not exist "%PY%" (
 if not exist "data\results" mkdir "data\results"
 
 echo [%date% %time%] Starting web dashboard: run.py --mode web (port 8000)
-"%PY%" run.py --mode web > data\results\web_20260821.log 2>&1
+"%PY%" run.py --mode web >> data\results\web.log 2>&1
 set EXIT_CODE=%ERRORLEVEL%
-echo [%date% %time%] Web process exited with code %EXIT_CODE% (see data\results\web_20260821.log)
+echo [%date% %time%] Web process exited with code %EXIT_CODE% (see data\results\web.log)
 exit /b %EXIT_CODE%

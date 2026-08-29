@@ -29,8 +29,10 @@
 param([switch]$Once)
 
 $ErrorActionPreference = "Continue"
-$RepoRoot = "E:\Program\西湖论剑\ctf_agent"
-$Top0     = "E:\Program\西湖论剑\协同任务总账-TOP0.md"
+# 自动推导路径（脚本位于 ctf_agent/scripts/，故 RepoRoot = 父目录的父目录）
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoRoot = Split-Path -Parent $ScriptDir
+$Top0     = Join-Path (Split-Path -Parent $RepoRoot) "协同任务总账-TOP0.md"
 $WatchDirs = @("scripts","tools","skills","core","ctfplatform","tests","AGENTS.md")
 $Exclude  = @(".git",".venv","__pycache__","node_modules",".pytest_cache")
 $DebounceMs = 1500

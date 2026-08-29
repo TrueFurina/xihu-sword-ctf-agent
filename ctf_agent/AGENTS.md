@@ -27,12 +27,12 @@
 
 ## 唯一 KPI（外部真值，不可自造尺子）
 
-- KPI = 真题解出数 / 真题总数。考场 = `data/questions_real/`（**45 道**历年真题+正式赛真题，已版本化入库；结构 crypto15/misc20/reverse8/web2）。唯一真值源 = `scripts/_merge_gate.py count_offline_verified`（实跑计数 fail-closed），当前 = **13**（详见 `REAL_SOLVES_LEDGER.md` 第二节）。
+- KPI = 真题解出数 / 真题总数。考场 = `data/questions_real/`（**45 道**历年真题+正式赛真题，已版本化入库；结构 crypto15/misc20/reverse8/web2）。唯一真值源 = `scripts/_merge_gate.py count_offline_verified`（实跑计数 fail-closed），当前 = **9**（A 类 5 + B 类 4；详见 `REAL_SOLVES_LEDGER.md` 第二节；2026-08-28 诚实校准后 ezrsa/simplelegendre/exciting_inverse 移出严格 KPI）。
 - 真实链路命令：`python -m eval.benchmark --questions-dir data/questions_real --provider baidu,qwen`
   （报告带 `solved_by` 字段拆 presolve/LLM；presolve 静态分析器直出不计 LLM 功劳）。
 - 历史外部真值基线：DASCTF 平台真题离线全量 5/60 = 8%（平台 accepted=0）。
-- 自产题/本地靶场一律不计分。事实层 = tag `verified-2026-08-24` + `REAL_SOLVES_LEDGER.md`（git log 是考古层）。
-- **LLM 推理能力已突破 0**：`knowledge/writeup_rag.py` + `scripts/demo_llm_rag_solve.py` 证明 LLM+RAG 能基于检索到的历年 writeup 独立推理复现真实题目 flag（10733 端到端验证，flag 已核对一致）。13 道严格解目前仍由 presolve/工具直出；writeup_rag 是让未解题也能由 LLM 推理攻克的下阶段主线。
+- 自产题/本地靶场一律不计分。事实层 = `data/results/KPI_BASELINE.json` + `REAL_SOLVES_LEDGER.md`（git log 是考古层）。
+- **LLM 真推理贡献当前 = 0**：9 道严格解均由 presolve/工具直出。`knowledge/writeup_rag.py` 提供 RAG 检索能力，`scripts/demo_llm_rag_solve.py` 已清理泄露式假验证（2026-08-27 严格纠正），为 genuine LLM 推理铺路；让未解题由 LLM 独立推理攻克是下阶段主线，当前尚未有 LLM 独立解出的严格真题证据。
 
 ## 机器配套（防错不靠自觉）
 

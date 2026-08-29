@@ -33,6 +33,18 @@ logger = logging.getLogger(__name__)
 _PRESOLVE_ATTEMPTED = "_presolve_attempted"
 _PRESOLVE_CANDIDATES = "_presolve_candidates"  # 2026-08-22 锐评：多候选提取透传（提交迭代用）
 
+# 导入失败去重：同一模块只打一次 warning，避免每道题都刷屏
+_IMPORT_FAIL_LOGGED: set[str] = set()
+
+
+def _warn_import_once(skill_name: str, exc: Exception) -> None:
+    """skill/agent 导入失败：首次 warning（暴露 bug/缺依赖），后续 debug 防刷屏。"""
+    if skill_name in _IMPORT_FAIL_LOGGED:
+        logger.debug("[presolve] 导入 %s 失败(已告警): %s", skill_name, exc)
+        return
+    _IMPORT_FAIL_LOGGED.add(skill_name)
+    logger.warning("[presolve] 导入 %s 失败（skill 缺失/语法错误/依赖未装）: %s", skill_name, exc)
+
 # flag 格式统一正则（多格式：flag{}/DASCTF{}/ctf{}）
 _FLAG_RE = re.compile(r"(?:flag|dasctf|ctf)\{[^}\s]{3,}\}", re.IGNORECASE)
 
@@ -71,7 +83,8 @@ def _flag_candidates_from_text(text: str, max_c: int = 8) -> list:
             if full not in out:
                 out.append(full)
         return out
-    except Exception:  # noqa: BLE001 - 提取失败回退单正则
+    except Exception as exc:  # noqa: BLE001 - 提取失败回退单正则
+        _warn_import_once("tools.flag_extract_guard", exc)
         m = _FLAG_RE.search(str(text or ""))
         return [m.group(0)] if m else []
 
@@ -272,8 +285,7 @@ async def _try_math_engine(question) -> Optional[str]:
             _save_candidates(question, [str(flag)])
             return str(flag)
     except Exception as exc:  # noqa: BLE001 - 引擎故障不阻塞
-        logger.debug("[presolve:math_engine] %s 异常: %s",
-                     getattr(question, "id", "?"), exc)
+        _warn_import_once("agents.math_engine", exc)
     return None
 
 
@@ -305,7 +317,8 @@ async def _try_fast_solve(question) -> Optional[str]:
                                 kind, tag, getattr(question, "id", "?"), flag[:60])
                     _save_candidates(question, [flag])
                     return flag
-            except Exception:  # noqa: BLE001 - 单模板失败继续下一个
+            except Exception as exc:  # noqa: BLE001 - 单模板失败继续下一个
+                _warn_import_once("agents.crypto_toolkit.fast_solve", exc)
                 continue
     return None
 
@@ -438,8 +451,7 @@ async def _try_jpeg_png_embedded(question) -> Optional[str]:
                 _save_candidates(question, [str(flag)])
                 return str(flag)
         except Exception as exc:  # noqa: BLE001
-            logger.debug("[presolve:jpeg_png_embedded] %s 异常: %s",
-                         getattr(question, "id", "?"), exc)
+            _warn_import_once("skills.jpeg_png_embedded", exc)
     return None
 
 
@@ -455,7 +467,7 @@ def _vision_read_flag(question, png_path: str) -> Optional[str]:
     try:
         from llm.client import ai_vision
     except Exception as exc:  # noqa: BLE001
-        logger.debug("[presolve:vision] 导入 ai_vision 失败: %s", exc)
+        _warn_import_once("llm.client.ai_vision", exc)
         return None
     ans = ai_vision(
         "这张图片里是否显示 flag{...} 形式的文字？若是，请只输出该 flag 原文"
@@ -510,8 +522,7 @@ async def _try_keyboard_path(question) -> Optional[str]:
                 _save_candidates(question, [str(flag)])
                 return str(flag)
         except Exception as exc:  # noqa: BLE001
-            logger.debug("[presolve:keyboard_path] %s 异常: %s",
-                         getattr(question, "id", "?"), exc)
+            _warn_import_once("skills.crypto_keyboard_path", exc)
     return None
 
 

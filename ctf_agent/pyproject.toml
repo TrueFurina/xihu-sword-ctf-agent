@@ -4,16 +4,34 @@ version = "0.1.0"
 description = "西湖论剑 AI-Agent 自动解 CTF 系统（1主1监架构，解出率优先）"
 requires-python = ">=3.13"
 dependencies = [
+    # 核心异步/HTTP
     "aiohttp>=3.9",
-    "fastapi>=0.110",
     "httpx>=0.27",
+    # Web dashboard
+    "fastapi>=0.110",
     "uvicorn>=0.29",
+    # 密码学/数学
+    "gmpy2>=2.1",
+    "pycryptodome>=3.20",
+    "sympy>=1.13",
+    "numpy>=2.0",
+    # 图像处理（misc 隐写/视觉）
+    "pillow>=10.0",
+    # 数据验证
+    "pydantic>=2.0",
+    # Pygments（代码高亮/日志）
+    "Pygments>=2.18",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-timeout>=2.2",
+]
+# 可选：本地 OCR（tesseract 需系统级安装，未装则视觉兜底走 LLM）
+vision = [
+    "pytesseract>=0.3.10",
+    "pymupdf>=1.24",
 ]
 
 [tool.setuptools]
