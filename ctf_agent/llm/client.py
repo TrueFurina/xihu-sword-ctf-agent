@@ -561,7 +561,9 @@ def get_model_for_attempt(attempt: int, provider: Optional[str] = None) -> str:
             # 默认轻量模型，重型深推理永不触发（高难题解不出）。
             heavy_map = {
                 "deepseek": "deepseek-reasoner",   # 官方 R1：正式赛高难题深推理主源
-                "qwen": "deepseek-v4-pro-0813",    # 百炼免费重型（实测 HTTP 200）
+                "qwen": "kimi-k3",                 # 2026-08-29：deepseek-v4-pro-0813 免费额度已耗尽
+                #（403 Free quota exhausted，用户明确"别用 pro 太贵"），改用 kimi-k3（1M tokens
+                # 免费额度 0 已用 100% 剩余，08-28 实测 HTTP 200 + 重型升级无 403 验证通过）
                 "tokenhub": "deepseek-v4-pro",     # 腾讯 TokenHub 免费重型
             }
             if provider in heavy_map:
