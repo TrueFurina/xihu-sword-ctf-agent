@@ -102,4 +102,10 @@ class RaceController:
         step = _Step(obs or "", err.get("category"))
         state = BudgetState(budget_total=total, budget_used=used)
         result = reflect(state, [step], confidence=conf)
+        # 沉溺保护升级（2026-08-29 换题决策完整化）：信心低于阈值且已重试 ≥1 次
+        # → SWITCH（换题），不再等墙钟/死循环才放弃——赛智「信心低于阈值换题」落地。
+        # ABANDON（预算反思）优先；SWITCH 对 benchmark 的 run_benchmark 是无操作
+        # （仅处理 ABANDON），对 FeedbackLoop/live 链路是提前换题。
+        if result.decision != "ABANDON" and conf < self.confidence_floor and attempt_index >= 1:
+            return "SWITCH"
         return result.decision

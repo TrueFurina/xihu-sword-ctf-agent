@@ -36,7 +36,7 @@ _intervention = InterventionCoordinator()
 
 def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None,
                  model_override: Optional[str] = None, validate_locally: bool = True,
-                 skip_presolve: bool = False):
+                 skip_presolve: bool = False, race_controller=None):
     """构建求解器（反馈循环 + 主 Agent + 监督）。
 
     Args:
@@ -196,7 +196,7 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     # （P0-1 修复：正确性归 poller accepted 回流，不把「格式合法」伪装成「已校验正确」）
     if is_correct is None and answers and validate_locally:
         is_correct = lambda f: f in answers.values()  # noqa: E731
-    loop = FeedbackLoop(checker=checker, is_correct=is_correct)
+    loop = FeedbackLoop(checker=checker, is_correct=is_correct, race_controller=race_controller)
 
     async def solve_once(question, attempt, correction=None):
         """单次求解（走预算检查 + 主 Agent；由 FeedbackLoop 循环调用）。"""
@@ -629,7 +629,7 @@ def run_web(use_mock: bool) -> None:
 
 
 def build_platform_solver(platform, use_mock: bool = False, cache_dir: str = "data/platform_downloads",
-                          core_solver=None):
+                          core_solver=None, race_controller=None):
     """构造平台求解器：ChallengeInfo → Question（下载附件+注入靶机访问信息）→ 本地核心 solver。
 
     Args:
@@ -648,7 +648,7 @@ def build_platform_solver(platform, use_mock: bool = False, cache_dir: str = "da
     # 平台题：禁用本地正确性校验（平台 submit 的 accepted 才是权威，本地题库答案会误伤 DASCTF{}）。
     # P0-1 修复：原 is_correct=(lambda f: True) 恒真判定 → validate_locally=False（无本地
     # ground truth，仅格式校验；正确性由 poller 提交后 accepted 回流判定，不再把幻觉 flag 当真提交）。
-    core = core_solver or build_solver(use_mock, validate_locally=False)
+    core = core_solver or build_solver(use_mock, validate_locally=False, race_controller=race_controller)
     os.makedirs(cache_dir, exist_ok=True)
 
     async def _download(url: str) -> str:
@@ -810,7 +810,16 @@ def run_platform(use_mock: bool, once: bool = False, interval: float = 30.0) -> 
     # 全局解题步骤记录（赛后生成报告，与流量日志吻合——手册第 8 条）
     # _solve_logs 为模块级全局（本函数写入，报告生成处读取）
     global _solve_logs
-    _core_solver = build_platform_solver(platform=platform, use_mock=use_mock)
+    # race-intelligence 接入（2026-08-29 换题决策完整化）：控制器同时喂给 solver 层
+    # （FeedbackLoop 换题钩子）与 poller 层（plan 分配）。缺失/异常 → fail-open。
+    race_controller = None
+    try:
+        from core.race_orchestrator import RaceController
+        race_controller = RaceController()
+    except Exception as exc:  # noqa: BLE001 - 控制器不可用不阻塞对战
+        print(f"ℹ️ race-intelligence 控制器不可用（{exc}），降级硬编码调度")
+    _core_solver = build_platform_solver(platform=platform, use_mock=use_mock,
+                                         race_controller=race_controller)
 
     async def _solve_with_log(ch) -> dict:
         out = await _core_solver(ch)
@@ -823,14 +832,6 @@ def run_platform(use_mock: bool, once: bool = False, interval: float = 30.0) -> 
             ]
         return out
 
-    # race-intelligence 接入（2026-08-28 B 实现）：live 链路动态资源分配（并发/聚焦）。
-    # 控制器缺失/异常 → 降级硬编码调度（fail-open），不阻塞平台对战。
-    race_controller = None
-    try:
-        from core.race_orchestrator import RaceController
-        race_controller = RaceController()
-    except Exception as exc:  # noqa: BLE001 - 控制器不可用不阻塞对战
-        print(f"ℹ️ race-intelligence 控制器不可用（{exc}），降级硬编码调度")
     poller = PlatformPoller(platform=platform, solver=_solve_with_log,
                             race_controller=race_controller)
 

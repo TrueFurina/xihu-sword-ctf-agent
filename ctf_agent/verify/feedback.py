@@ -43,12 +43,14 @@ class FeedbackLoop:
         step_checker: Optional[StepChecker] = None,
         max_retries: int = 3,
         is_correct: Optional[Callable[[str], bool]] = None,
+        race_controller=None,  # race-intelligence 控制器（换题/放弃决策；None=不启用）
     ) -> None:
         self.checker = checker or FlagChecker()
         self.classifier = classifier or ErrorClassifier()
         self.step_checker = step_checker or StepChecker()
         self.max_retries = max_retries
         self.is_correct = is_correct
+        self.race_controller = race_controller
 
     def _flag_ok(self, flag: str, pattern: Optional[str]) -> bool:
         """格式通过 + 正确性通过（若配置了 is_correct）。"""
@@ -130,7 +132,22 @@ class FeedbackLoop:
                 last_output["validated"] = True
                 return last_output
 
-            # 2. 失败 → 生成结构化修正指令（错误归因）
+            # 2. 失败 → race-intelligence 换题决策（2026-08-29 换题决策完整化）：
+            #    沉溺保护——信心低于阈值且已重试 → 提前换题（不再等墙钟/死循环）；
+            #    ABANDON（预算反思）同样提前终止。live 链路与 benchmark 共用本循环。
+            if self.race_controller is not None:
+                _d = self.race_controller.reflect_on_attempt(
+                    getattr(question, "id", ""), last_output, attempt, retries)
+                if _d in ("SWITCH", "ABANDON"):
+                    last_output["error"] = {
+                        "category": "race_switch" if _d == "SWITCH" else "race_abandon",
+                        "detail": "race-intelligence 换题/放弃决策（信心/预算反思）",
+                    }
+                    last_output["retries"] = attempt
+                    last_output["validated"] = False
+                    return last_output
+
+            # 3. 生成结构化修正指令（错误归因）
             last_output["_question"] = question
             correction = self._build_correction(last_output, attempt)
 
