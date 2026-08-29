@@ -54,11 +54,6 @@ REGRESSION_CHECKS = [
         "cmd": [sys.executable, "scripts/verify_10733.py"],
         "flag_contains": "DASCTF{rabbits6sc5mpl",
     },
-    {
-        "id": "real_misc_vnctf_flag",
-        "cmd": [sys.executable, "scripts/verify_vnctf_flag.py"],
-        "flag_contains": "sha256 与台账承诺一致",
-    },
     # 以下 7 道为确定性管线（presolve）可复现解出，统一经 scripts/_regress_one.py 单题真值比对
     # （与 _verify_presolve_truth.py 同工具层；2026-08-28 实测 9 道全部 REGRESS_PASS）。
     {
@@ -103,6 +98,8 @@ KNOWN_GAP = [
      "reason": "可复现脚本待固化（台账 2026-08-24 声明；攻击链清晰但 _solve_10732.py 散落待固化）"},
     {"id": "10735",
      "reason": "logbool pcap→RAR5→7z 解密链待固化为 verify 脚本（台账 offline_verified，无独立 verifier）"},
+    {"id": "real_misc_vnctf_flag",
+     "reason": "2026-08-29 诚实校准：点阵重采样显字（flag 在图内）需 OCR/视觉模型，文本 LLM 不可解=架构级缺口；verify_vnctf_flag.py 依赖 verified_flags.json 真值库（8/28 results 隔离时未随 KPI_BASELINE 恢复、且从未入库），不可复现。台账状态如实降级，移出回归集（与 MEMORY.md 判断一致）"},
     {"id": "real_crypto_specialcurve2",
      "reason": "不可复现：附件 SpecialCurve2.py 仅为恢复的挑战脚本模板，原 n/HINT/C 实例值每次运行随机生成、已永久丢失；verify_specialcurve2.py 仅做 sha256 自比对（同义反复），不真解题。2026-08-27 诚实校准从严格 KPI 与回归集移除"},
     {"id": "real_crypto_ezrsa",
