@@ -1,0 +1,8 @@
+{
+  "name": "reverse_angr_solver",
+  "purpose": "迷宫/校验类 reverse 的 angr 符号执行求解 skill（vnctf_babymaze 等输入校验/路径求解题）——R1 工具优先（有现成工具绝不自研）；angr 未安装时降级返回依赖提示+方法论文档，不误报（2026-08-30）",
+  "input_spec": "params = {'path': 二进制路径, 'find_addrs'?: 目标地址列表, 'avoid_addrs'?: 避免地址列表}",
+  "output_spec": "{solved, flag, reason, methodology}——angr 求解的输入序列/flag 或依赖缺失降级提示",
+  "categories": ["reverse"],
+  "version": "1.0"
+}

@@ -1,0 +1,8 @@
+{
+  "name": "reverse_router",
+  "purpose": "reverse 附件确定性路由 skill：按文件类型（ELF/Wasm/pyc/APK/JS/UPX/迷宫）magic bytes 分发到对应 reverse skill（reverse_elf_general/pyc_decompile/reverse_go_apk/reverse_js_methodology/reverse_obfuscation/reverse_angr_solver），替代 LLM 盲目猜命令——借鉴 reverse-skill 路由矩阵思路（2026-08-30）",
+  "input_spec": "params = {'path': 附件路径, 'question_id'?: 题目id, 'description'?: 题面(迷宫类触发angr路由)}",
+  "output_spec": "{kind, skill, methodology, hints}——路由目标 skill + 方法论 + 工具提示（angr 未装时降级提示）",
+  "categories": ["reverse"],
+  "version": "1.0"
+}

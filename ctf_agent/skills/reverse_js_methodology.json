@@ -1,0 +1,8 @@
+{
+  "name": "reverse_js_methodology",
+  "purpose": "JS 逆向方法论 skill（real_reverse_js 等前端加密/混淆题）：美化格式化 → 定位 eval/atob/charCodeAt/异或等加密特征 → 反混淆思路 → node 动态执行验证（node 未装时降级静态分析，不误报）——借鉴 JS Reverse MCP / hello_js_reverse_skill 方法论（2026-08-30）",
+  "input_spec": "params = {'path': JS 文件路径, 'question_id'?: 题目id}",
+  "output_spec": "{solved, flag, reason, methodology, suspicious_hits, beautified_sample}——flag 明文/可疑加密点定位/方法论",
+  "categories": ["reverse"],
+  "version": "1.0"
+}
