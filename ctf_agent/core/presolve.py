@@ -219,6 +219,20 @@ async def _try_flag_scan(question, registry) -> Optional[str]:
         out = await registry.run("flag_scan", {"attachments": attach})
         flag = _flag_from_text(out.text) if out.ok else None
         if flag:
+            # 2026-08-31 修复：本题若声明 flag_pattern，候选 flag 必须匹配该格式，
+            # 否则视为附件/脚本中的诱饵（如 ctf{XORed} / CTF{TimeFl...} 等占位或
+            # 部分字符串），防止 presolve 误报"真 flag"导致真题误判 + 真相校验失败。
+            # 仅做"拒绝非匹配候选"，绝不收窄已匹配的真 flag，不影响既有直出。
+            _fp = str(getattr(question, "flag_pattern", "") or "").strip()
+            if _fp:
+                try:
+                    if not re.search(_fp, flag, re.IGNORECASE):
+                        logger.debug(
+                            "[presolve:flag_scan] %s 命中但不符合本题 flag_pattern=%s，丢弃(疑似诱饵): %s",
+                            getattr(question, "id", "?"), _fp, flag[:60])
+                        return None
+                except re.error:
+                    pass
             # 2026-08-22 M3 修复：过滤 Python 格式化字符串模板（如
             # `b'DASCTF{%d-%d}'%(init1,init2)` 在源码注释里的字面量），
             # 防止 flag_scan 误报让 presolve 提前 return 错过 math_engine
@@ -373,8 +387,20 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
             except Exception as _e:
                 logger.debug("[presolve] 并发嗅探异常: %s", _e)
                 continue
-            if _r and _is_plausible_flag(_r) and _passes_answer_check(question, _r, answers):
-                return _r
+            if _r and _is_plausible_flag(_r):
+                # 2026-08-31 修复：本题若声明 flag_pattern，候选 flag 必须匹配该格式，
+                # 否则视为附件/脚本/题面中的诱饵（如 ctf{XORed} / CTF{TimeFl...} 等
+                # 占位或片段字符串），防止 presolve 误报"真 flag"导致真题误判 +
+                # 真相校验失败。仅拒绝非匹配候选，绝不收窄已匹配的真 flag，
+                # 不影响既有 14/15 / 44/93 直出（真 flag 必匹配本题 pattern）。
+                _fp = str(getattr(question, "flag_pattern", "") or "").strip()
+                if _fp and not re.search(_fp, _r, re.IGNORECASE):
+                    logger.debug(
+                        "[presolve] %s 命中但不符合本题 flag_pattern=%s，丢弃(疑似诱饵): %r",
+                        getattr(question, "id", "?"), _fp, _r)
+                    continue
+                if _passes_answer_check(question, _r, answers):
+                    return _r
             if _r and not _is_plausible_flag(_r):
                 logger.debug("[presolve] %s 命中但疑似垃圾/占位 flag，丢弃: %r",
                              getattr(question, "id", "?"), _r)
