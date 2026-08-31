@@ -387,7 +387,8 @@ async def main():
 
     print("\n" + "=" * 70)
     print(f"真题 Dry-Run 报表（共 {total} 题，可验证 {ver_total} 题）")
-    print(f"  raw 命中: {solved}/{total} = {solved / total:.1%}")
+    raw_pct = f"{solved / total:.1%}" if total else "0.0%"
+    print(f"  raw 命中: {solved}/{total} = {raw_pct}")
     if ver_total:
         print(f"  真值判分: {ver_solved}/{ver_total} = {ver_solved / ver_total:.1%}（回归主指标）")
     if fail_class:

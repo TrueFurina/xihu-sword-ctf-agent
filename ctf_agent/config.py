@@ -170,7 +170,7 @@ class AppConfig:
         # 千帆 ernie-3.5 为全系统最强单源（测试赛 72.4% 跑分）+ 当前实测 200 OK。
         # 显式 provider（竞速池）不受此影响；仅影响无显式 provider 的单源模式。
         provider = os.getenv("CTF_AGENT_LLM_PROVIDER", "").strip().lower() or "baidu"
-        base_url, light_model = _resolve_provider_defaults(provider)
+        base_url, light_model, mid_model_def, heavy_model_def = _resolve_provider_defaults(provider)
         # P0 修复（2026-08-21 17:40 赛后）：模型/端点一致性净化——防父进程残留
         # CTF_AGENT_LIGHT_MODEL=deepseek-chat / HEAVY_MODEL=deepseek-reasoner 污染单源模式
         # （16:48 灾难同款根因：模型打错端点 → 404）。残留模型与 provider 默认模型不一致时
@@ -189,13 +189,13 @@ class AppConfig:
                 )
             _env_light = ""
         _env_heavy = os.getenv("CTF_AGENT_HEAVY_MODEL", "").strip()
-        if _env_heavy and _env_heavy != (_env_light or light_model):
+        if _env_heavy and _env_heavy != heavy_model_def:
             _wkey = ("heavy", _env_heavy, provider)
             if _wkey not in _SANITIZE_WARNED:
                 _SANITIZE_WARNED.add(_wkey)
                 _logger.warning(
-                    "⚠️ CTF_AGENT_HEAVY_MODEL=%s 与 provider=%s 默认模型 %s 不一致，已回退默认",
-                    _env_heavy, provider, _env_light or light_model,
+                    "⚠️ CTF_AGENT_HEAVY_MODEL=%s 与 provider=%s 默认重型模型 %s 不一致，已回退默认",
+                    _env_heavy, provider, heavy_model_def,
                 )
             _env_heavy = ""
         return cls(
@@ -205,11 +205,10 @@ class AppConfig:
             llm_api_key=os.getenv("CTF_AGENT_LLM_API_KEY", ""),
             llm_timeout_seconds=_int_env("CTF_AGENT_LLM_TIMEOUT", DEFAULT_TIMEOUT_SECONDS),
             light_model=_env_light or light_model,
-            mid_model=os.getenv("CTF_AGENT_MID_MODEL", "").strip() or "ernie-4.5-turbo-128k",
-            # 2026-08-28：重型默认 ernie-4.5-turbo-128k（大上下文强推理）。
-            # 此前"重型与轻量同源"因千帆仅 ernie-3.5；现免费档有 128k 独立重型档，
-            # 显式固定为 128k（除非 CTF_AGENT_HEAVY_MODEL 覆盖）。
-            heavy_model=_env_heavy or "ernie-4.5-turbo-128k",
+            # 2026-09-01 修复：mid/heavy 随 provider 走（见 _resolve_provider_defaults），
+            # 不再硬编码 ernie-4.5-turbo-128k，避免非 baidu provider 重型升级 404。
+            mid_model=os.getenv("CTF_AGENT_MID_MODEL", "").strip() or mid_model_def,
+            heavy_model=_env_heavy or heavy_model_def,
             vision_model=os.getenv("CTF_AGENT_VISION_MODEL", "").strip() or "ernie-4.5-turbo-vl",
             upgrade_after_attempts=_int_env("CTF_AGENT_UPGRADE_AFTER", 2),
             max_concurrency=_int_env("CTF_AGENT_MAX_CONCURRENCY", DEFAULT_MAX_CONCURRENCY),
@@ -314,71 +313,40 @@ def list_baidu_models(free_only: bool = False, vision_only: bool = False) -> lis
     return [n for n, _ in sorted(items, key=lambda kv: kv[1]["ctx"], reverse=True)]
 
 
-def _resolve_provider_defaults(provider: str) -> tuple[str, str]:
-    """返回 (base_url, 轻量模型名)。"""
-    if provider == "deepseek":
-        # DeepSeek 官方（充值后可用，2026-08-20 验证 deepseek-chat/reasoner HTTP 200）。
-        # 默认 deepseek-chat（V3 对话快）；重型深推理用 deepseek-reasoner（R1，
-        # CTF_AGENT_HEAVY_MODEL 覆盖——正式赛使劲用深推理，目标第一）。
-        return ("https://api.deepseek.com/chat/completions", "deepseek-chat")
-    if provider == "qwen":
-        # 千问 AI 平台 / 阿里云百炼共用 OpenAI 兼容端点。
-        # 默认模型用 qwen3.7-flash（2026-08-26 实测 HTTP 200 可用、快速非思考模型，
-        # 用户账号该模型 1M tokens 免费额度仅用 346 tokens（99.97% 剩余），性价比最高）——
-        # 此前默认 deepseek-v4-pro-0813 虽可用但深推理单题 3-5 分钟且额度消耗快（用户明确
-        # 要求"别用 pro，太贵了"，2026-08-27）；更早的 qwen3.7-plus 免费额度已耗尽（403）。
-        # 需要更强推理时可改用 qwen3.8-max（CTF_AGENT_LIGHT_MODEL 覆盖）。
-        # ⚠️ 重型模型（attempt≥2 升级）：阿里云百炼 deepseek-v4-pro-0813 免费
-        #    100 万 token（2026-08-20 实测 HTTP 200）——正式赛设置：
-        #    CTF_AGENT_LLM_PROVIDER=qwen + CTF_AGENT_HEAVY_MODEL=deepseek-v4-pro-0813
-        #    （深推理模型单题耗时较长，仅高难 crypto/reverse 升级场景按需启用）
-        return (
-            "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-            "qwen3.7-flash",
-        )
-    if provider == "mimo":
-        # 小米 MiMo（限时免费，白名单内）：api.xiaomimimo.com
-        return ("https://api.xiaomimimo.com/v1/chat/completions", "mimo-v2.5-pro")
-    if provider == "baidu":
-        # 百度千帆（白名单内）：2026-08-28 充值后免费档仅 3 个 ernie-4.5-turbo 模型
-        # （用户指定唯一使用）：ernie-4.5-turbo-32k / ernie-4.5-turbo-128k / ernie-4.5-turbo-vl。
-        # 默认 light 返回 32k（快速）；重型升级到 128k 在 main_agent 分级调度中处理。
-        return ("https://qianfan.baidubce.com/v2/chat/completions", "ernie-4.5-turbo-32k")
-    if provider == "glm":
-        # 智谱（白名单内）通用资源包：glm-4.7 500万token/glm-4.5-air 1200万等（2026-08-20 领取）
-        # 通用端点 /api/paas/v4（Coding Plan 才用 /api/coding/paas/v4）
-        return ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.7")
-    if provider == "tencent":
-        # 腾讯混元旧平台（白名单内）——2026-09-30 停服，已无法创建 API Key
-        return ("https://api.hunyuan.cloud.tencent.com/v1/chat/completions", "hunyuan-lite")
-    if provider == "ark":
-        # 字节豆包（白名单内）：ARK key，每天 200 万 token 自动刷新
-        # doubao-seed-2-1-pro-260628 实测可用（2026-08-20）
-        return ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", "doubao-seed-2-1-pro-260628")
-    if provider == "sensenova":
-        # 商汤 SenseNova（✅ 官方白名单内，参赛手册第三节第 15 项）：6.8-flash-lite/u1-fast 等
-        return ("https://api.sensenova.cn/compatible-mode/v2/chat/completions", "sensenova-6.8-flash-lite")
-    if provider == "tokenhub":
-        # 腾讯云 TokenHub（白名单内，初赛合规！）：一个 key 通吃 DeepSeek/Kimi/GLM/混元 Hy
-        # 17/20 模型实测可用（2026-08-20）：hy3/deepseek-v4-pro/deepseek-v4-flash/
-        # kimi-k3/kimi-k2.7-code/kimi-k2.6/glm-5.3/glm-5.2/glm-5.1/glm-5/glm-5-turbo/
-        # glm-5v-turbo/hy-mt2-pro/hy-mt2-plus/hy-mt2-lite/hy-role
-        return ("https://tokenhub.tencentmaas.com/v1/chat/completions", "hy3")
-    if provider == "xfyun":
-        # 讯飞 Spark Lite 永久免费不限量（白名单内）
-        return ("https://spark-api-open.xf-yun.com/v1/chat/completions", "lite")
-    if provider == "siliconflow":
-        # 硅基流动 Qwen2.5-7B 等免费不限量（白名单内）
-        return ("https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen2.5-7B-Instruct")
-    if provider == "moonshot":
-        # 月之暗面 Kimi（白名单内）：kimi-k2.6 实测可用（2026-08-20）
-        return ("https://api.moonshot.cn/v1/chat/completions", "kimi-k2.6")
-    if provider == "openai":
-        # ⚠️ OpenAI 不在西湖论剑白名单！仅供开发测试，初赛误用会被取消资格。
-        # llm/client._check_whitelist 在 CTF_AGENT_ENFORCE_WHITELIST=1 时会阻断调用。
-        return ("https://api.openai.com/v1/chat/completions", "gpt-5.6-luna")
+def _resolve_provider_defaults(provider: str) -> tuple[str, str, str, str]:
+    """返回 (base_url, light_model, mid_model, heavy_model)。
+
+    2026-09-01 修复（P1 能力突破，重型升级 404 根因）：
+    此前仅返回 (base_url, light)，中型/重型模型在 from_env 里硬编码为
+    ernie-4.5-turbo-128k（千帆独占）。当 provider 非 baidu（如 qwen/dashscope）时，
+    main_agent 在 attempt>=2 升级重型会把 ernie 模型打到 dashscope → 404 model_not_found，
+    随后判定"重型升级连续失败"直接放弃止损——crypto/reverse 等需深推理的题永远 0 解出
+    （8/31 dryrun crypto+reverse 0/2 真因：heavy 打到错误端点）。现 mid/heavy 随 provider 走，
+    保证重型升级端点-模型匹配。各 provider 默认模型源自参赛手册白名单 + 实测可用：
+    - baidu：用户 8-28 充值后指定唯一使用的 3 个 ernie-4.5-turbo（32k 轻 / 128k 中重）。
+    - qwen：qwen3.7-flash(轻) / qwen3.8-max(中重，dashscope 真实存在，非 kimi-k3)。
+    - deepseek：deepseek-chat(轻) / deepseek-reasoner(R1 深推理，重型)。
+    - tokenhub：hy3(轻) / deepseek-v4-pro(重型，TokenHub 免费深推理)。
+    """
+    mapping = {
+        "deepseek": ("https://api.deepseek.com/chat/completions", "deepseek-chat", "deepseek-chat", "deepseek-reasoner"),
+        "qwen": ("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen3.7-flash", "qwen3.8-max", "qwen3.8-max"),
+        "baidu": ("https://qianfan.baidubce.com/v2/chat/completions", "ernie-4.5-turbo-32k", "ernie-4.5-turbo-128k", "ernie-4.5-turbo-128k"),
+        "mimo": ("https://api.xiaomimimo.com/v1/chat/completions", "mimo-v2.5-pro", "mimo-v2.5-pro", "mimo-v2.5-pro"),
+        "glm": ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.7", "glm-4.7", "glm-4.7"),
+        "tencent": ("https://api.hunyuan.cloud.tencent.com/v1/chat/completions", "hunyuan-lite", "hunyuan-lite", "hunyuan-lite"),
+        "ark": ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", "doubao-seed-2-1-pro-260628", "doubao-seed-2-1-pro-260628", "doubao-seed-2-1-pro-260628"),
+        "sensenova": ("https://api.sensenova.cn/compatible-mode/v2/chat/completions", "sensenova-6.8-flash-lite", "sensenova-6.8-flash-lite", "sensenova-6.8-flash-lite"),
+        "tokenhub": ("https://tokenhub.tencentmaas.com/v1/chat/completions", "hy3", "hy3", "deepseek-v4-pro"),
+        "xfyun": ("https://spark-api-open.xf-yun.com/v1/chat/completions", "lite", "lite", "lite"),
+        "siliconflow": ("https://api.siliconflow.cn/v1/chat/completions", "Qwen/Qwen2.5-7B-Instruct", "Qwen/Qwen2.5-7B-Instruct", "Qwen/Qwen2.5-7B-Instruct"),
+        "moonshot": ("https://api.moonshot.cn/v1/chat/completions", "kimi-k2.6", "kimi-k2.6", "kimi-k2.6"),
+        "openai": ("https://api.openai.com/v1/chat/completions", "gpt-5.6-luna", "gpt-5.6-luna", "gpt-5.6-luna"),
+    }
+    if provider in mapping:
+        return mapping[provider]
     # 兜底默认走千帆 baidu（P1-9 修复 2026-08-21：单一事实源，与 from_env/dataclass 一致）
-    return ("https://qianfan.baidubce.com/v2/chat/completions", "ernie-3.5-8k-preview")
+    return ("https://qianfan.baidubce.com/v2/chat/completions", "ernie-3.5-8k-preview", "ernie-3.5-8k-preview", "ernie-3.5-8k-preview")
 
 
 def resolve_api_key(provider: str = "") -> str:
@@ -467,7 +435,7 @@ def print_effective_config_snapshot(provider: Optional[str] = None) -> dict:
     _logger = _logging.getLogger(__name__)
     cfg = AppConfig.from_env()
     prov = (provider or cfg.llm_provider or "").lower()
-    base_url, light_model = _resolve_provider_defaults(prov)
+    base_url, light_model, _, _ = _resolve_provider_defaults(prov)
     key = resolve_api_key(prov)
     enforce = os.getenv("CTF_AGENT_ENFORCE_WHITELIST", "0") == "1"
     escape = os.getenv("CTF_AGENT_ESCAPE_PROVIDER", "").strip().lower()

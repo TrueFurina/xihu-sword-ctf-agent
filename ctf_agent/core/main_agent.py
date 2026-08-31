@@ -911,7 +911,7 @@ class MainAgent:
         from config import AppConfig, _resolve_provider_defaults
 
         _prov = self.provider or AppConfig.from_env().llm_provider
-        _, _model = _resolve_provider_defaults(_prov)
+        _, _model, _, _ = _resolve_provider_defaults(_prov)
         provider_label = f"{_prov}/{_model}"
         last = ctx.last_step()
         flag = ctx.candidate_flag

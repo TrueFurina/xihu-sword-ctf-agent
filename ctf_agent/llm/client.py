@@ -551,7 +551,7 @@ def get_model_for_attempt(attempt: int, provider: Optional[str] = None) -> str:
     """
     config = AppConfig.from_env()
     if provider:
-        default_base_url, default_model = _resolve_provider_defaults(provider)
+        default_base_url, default_model, _, _ = _resolve_provider_defaults(provider)
         if attempt >= config.upgrade_after_attempts:
             heavy = os.getenv(f"CTF_AGENT_{provider.upper()}_HEAVY_MODEL", "").strip()
             if heavy:
@@ -561,9 +561,8 @@ def get_model_for_attempt(attempt: int, provider: Optional[str] = None) -> str:
             # 默认轻量模型，重型深推理永不触发（高难题解不出）。
             heavy_map = {
                 "deepseek": "deepseek-reasoner",   # 官方 R1：正式赛高难题深推理主源
-                "qwen": "kimi-k3",                 # 2026-08-29：deepseek-v4-pro-0813 免费额度已耗尽
-                #（403 Free quota exhausted，用户明确"别用 pro 太贵"），改用 kimi-k3（1M tokens
-                # 免费额度 0 已用 100% 剩余，08-28 实测 HTTP 200 + 重型升级无 403 验证通过）
+                "qwen": "qwen3.8-max",             # 2026-09-01 修复：此前误填 kimi-k3（不在 dashscope，
+                # 重型升级 404）。qwen3.8-max 是阿里云百炼真实存在的强推理模型，端点-模型匹配。
                 "tokenhub": "deepseek-v4-pro",     # 腾讯 TokenHub 免费重型
             }
             if provider in heavy_map:
@@ -603,7 +602,7 @@ def _resolve_settings(model: Optional[str], provider: Optional[str] = None) -> d
     # key 必须在逃生切换之后按最终 provider 解析（逃生到新 provider 用新 key）
     api_key = resolve_api_key(provider)
 
-    default_base_url, default_model = _resolve_provider_defaults(provider)
+    default_base_url, default_model, _, _ = _resolve_provider_defaults(provider)
     # 强制白名单模式：非白名单 provider 在解析期即置空端点，
     # 下游 _check_whitelist 会直接阻断（防误配置导致取消比赛资格）。
     # 仅当 CTF_AGENT_ENFORCE_WHITELIST=1 时生效，本地开发（未设）不受影响。

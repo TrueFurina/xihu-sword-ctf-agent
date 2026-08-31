@@ -89,7 +89,7 @@ def check() -> int:
     violations: list[str] = []
     print("\n[3] 逐 provider 核对：")
     for p in active:
-        base_url, _model = _resolve_provider_defaults(p)
+        base_url, _model, _, _ = _resolve_provider_defaults(p)
         in_wl = p in OFFICIAL_WHITELIST_PROVIDERS
         url_in_wl = base_url.rstrip("/") in wl_set
         if not in_wl or not url_in_wl:
@@ -103,7 +103,7 @@ def check() -> int:
     race_defaults = ("baidu", "mimo", "deepseek", "tokenhub", "glm", "ark", "moonshot", "xfyun")
     race_violations = []
     for p in race_defaults:
-        bu, _ = _resolve_provider_defaults(p)
+        bu, _, _, _ = _resolve_provider_defaults(p)
         ok = p in OFFICIAL_WHITELIST_PROVIDERS and bu.rstrip("/") in wl_set
         print(f"  {'✅' if ok else '❌'} race:{p:10s} base={bu}")
         if not ok:

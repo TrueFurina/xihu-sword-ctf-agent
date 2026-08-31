@@ -70,7 +70,7 @@ def _llm_targets() -> list[tuple[str, str]]:
             key = ""
         if not key:
             continue
-        base, _model = _resolve_provider_defaults(prov)
+        base, _model, _, _ = _resolve_provider_defaults(prov)
         if base:
             out.append((prov, base))
     return out

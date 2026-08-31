@@ -27,7 +27,7 @@ def _probe_key() -> str:
     from config import resolve_api_key, _resolve_provider_defaults
 
     key = resolve_api_key("deepseek")
-    base, model = _resolve_provider_defaults("deepseek")
+    base, model, _, _ = _resolve_provider_defaults("deepseek")
     print(f"[1] 配置探测: base={base} model={model} key={'sk-'+key[3:9]+'...' if key else 'NONE'}")
     if not key:
         print("FAIL: 未解析到 DeepSeek Key（检查 DEEPSEEK_API_KEY / 注册表）")

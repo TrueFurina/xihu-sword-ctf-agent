@@ -58,7 +58,7 @@ def _probe_provider_http(pname: str) -> tuple[str, str]:
     if not key:
         return "NOKEY", f"无 {keyenv}"
     try:
-        base_url, model = _resolve_provider_defaults(pname)
+        base_url, model, _, _ = _resolve_provider_defaults(pname)
     except Exception:
         base_url, model = "", ""
     if not base_url:
