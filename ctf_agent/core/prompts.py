@@ -272,6 +272,13 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "js合并": "web_jwt_prototype",
         "压缩包损坏": "zip_filename_chain_decode",
         "维吉尼亚密码": "vigenere_decode",
+        # ── 键盘/坐标类映射（2026-09-01 补：dnui_keyboard 等"键盘坐标→字母"题型，
+        #    skills/crypto_keyboard_path.py 已实证可对真实附件解出 flag，但原映射表缺此项
+        #    → LLM 反思 gap 无法路由到 solver，只能硬推导致 wrong_direction）──
+        "键盘": "crypto_keyboard_path", "keyboard": "crypto_keyboard_path",
+        "坐标": "crypto_keyboard_path", "九宫格": "crypto_keyboard_path",
+        "手机键盘": "crypto_keyboard_path", "telnet": "crypto_keyboard_path",
+        "按键": "crypto_keyboard_path", "键盘布局": "crypto_keyboard_path",
     }
     for keyword, skill_name in skill_map.items():
         if keyword in desc or keyword in " ".join(gaps).lower():
