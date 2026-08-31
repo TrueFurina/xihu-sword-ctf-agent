@@ -125,6 +125,8 @@ class AgentContext:
     # give_up_reason 非空   → 监督裁决放弃（决策错方向）
     _extract_failed: bool = False
     give_up_reason: Optional[str] = None
+    # 放弃前确定性兜底已跑标记（M3 2026-08-29）：每题至多一次，避免重复嗅探
+    _last_chance_done: bool = False
     # 2026-08-24 诚实化：静态分析器（presolve）直出标记，零 LLM 调用时置 True
     solved_by_presolve: bool = False
     # E2（2026-08-25 桶B攻坚）可观测计数：每题 LLM 调用数 / 每步超时次数
@@ -299,6 +301,41 @@ class MainAgent:
         self.e3_enabled = bool(e3_enabled) if e3_enabled is not None \
             else bool(os.getenv("CTF_AGENT_E3", ""))
 
+    # ── 放弃前确定性兜底（M3 2026-08-29）────────────────
+
+    async def _deterministic_last_chance(self, question, ctx: AgentContext) -> Optional[str]:
+        """放弃/墙钟过半前的最后一次确定性兜底（每题至多一次）。
+
+        根因（08-28 破冰回归 7 败逐题分析）：
+        1. 监督常在 steps<5 就裁决 give_up（3 道 wrong_direction 均源于
+           "已升级重型模型仍连续失败"），而「≥5 步强制路由」尚未触发 →
+           确定性工具链根本没机会跑；
+        2. 3 道 TIMEOUT 是墙钟先到，工具链同样没机会跑。
+
+        对策：在两条放弃路径 + 墙钟 60% 处各给一次完整 presolve 机会
+        （force=True 绕开"同题只嗅探一次"的去重，确保真跑）。
+        """
+        if getattr(ctx, "_last_chance_done", False) or getattr(ctx, "candidate_flag", None):
+            return None
+        ctx._last_chance_done = True
+        try:
+            from core.presolve import presolve
+
+            flag = await presolve(question, registry=self.registry, sandbox=self.sandbox,
+                                  answers=None, force=True)
+            if flag:
+                logger.info("[%s] 放弃前确定性兜底命中: %s",
+                            getattr(question, "id", "?"), flag[:60])
+                ctx.candidate_flag = flag
+                ctx.solved_by_presolve = True
+            else:
+                logger.info("[%s] 放弃前确定性兜底未命中，进入放弃流程",
+                            getattr(question, "id", "?"))
+            return flag
+        except Exception as _exc:  # noqa: BLE001 - 兜底失败不阻塞放弃
+            logger.warning("[%s] 放弃前确定性兜底异常: %s", getattr(question, "id", "?"), _exc)
+            return None
+
     # ── 主循环 ──────────────────────────────────────────
 
     async def solve(self, question, attempt: int = 0, hint: Optional[str] = None,
@@ -378,6 +415,11 @@ class MainAgent:
                             self._wallclock_for(question),
                         )
                         break
+                    # M3（2026-08-29）：墙钟 60% 仍未解出 → 确定性兜底提前跑一次。
+                    # 根因：3 道 TIMEOUT 是墙钟先到，确定性工具链全程没机会跑。
+                    if elapsed >= 0.6 * self._wallclock_for(question) and not ctx.candidate_flag:
+                        if await self._deterministic_last_chance(question, ctx):
+                            break
 
                 # ── 人工干预轮询：有新提示则注入（高优先级上下文，修正路径）──
                 if self.coordinator is not None:
@@ -440,12 +482,20 @@ class MainAgent:
                 if ctx.stuck_count >= 2 or self._situation_override_triggered(ctx):
                     verdict = await self._supervise(ctx)
                     if verdict.action == VERDICT_GIVE_UP:
+                        # M3（2026-08-29）：放弃前给确定性工具链最后一次机会——
+                        # 监督常在 steps<5 就裁决放弃，强制路由（≥5 步）尚未触发。
+                        if await self._deterministic_last_chance(question, ctx):
+                            break
                         logger.info("[%s] 监督裁决放弃: %s", question.id, verdict.reason)
                         ctx.give_up_reason = verdict.reason or "监督裁决放弃"
                         break
                     ctx.apply_verdict(verdict)
                     if verdict.action == VERDICT_UPGRADE:
                         if attempt >= 2:
+                            # M3（2026-08-29）：同上，放弃前先确定性兜底
+                            # （此类"已升级仍失败"正是 3 道 wrong_direction 的直接来源）
+                            if await self._deterministic_last_chance(question, ctx):
+                                break
                             logger.info("[%s] 已升级重型模型仍连续失败，放弃止损（换下一题）",
                                         question.id)
                             ctx.give_up_reason = "已升级重型模型仍连续失败"
