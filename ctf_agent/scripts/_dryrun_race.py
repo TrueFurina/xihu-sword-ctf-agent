@@ -13,6 +13,7 @@
 from __future__ import annotations
 import argparse
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -187,17 +188,33 @@ def verify_against_truth(cid: str, out: dict) -> dict:
     """回归判分：有真值的题必须与索引 flag 精确一致，否则视为未解出。
 
     防跨题误判（LLM 输出别的题的真值）——presolve/LLM 命中后统一过这道闸。
+
+    M3 FIX（2026-08-29）：题库 87/92 的真值 flag 是 sha256 脱敏（64 位 hex），
+    须用候选 flag 的 sha256 比对，否则会把"已解出"全误判成"解出但错误"
+    （系统性低估真实解出率）。明文真值仍走 == 精确比对。
     """
     exp = FLAG_MAP.get(cid)
-    if exp and out.get("flag"):
-        if out["flag"] != exp:
-            return {
-                **out,
-                "flag": None,
-                "validated": False,
-                "error": f"flag 与真值不符（预期 {exp[:24]}…）",
-                "wrong_flag": out["flag"],
-            }
+    flag = out.get("flag")
+    if exp and flag:
+        if re.fullmatch(r"[0-9a-fA-F]{64}", exp):
+            # 真值为 sha256 → 校验候选 flag 的哈希
+            if hashlib.sha256(flag.encode("utf-8", "ignore")).hexdigest() != exp.lower():
+                return {
+                    **out,
+                    "flag": None,
+                    "validated": False,
+                    "error": f"flag 与真值(sha256)不符（候选 {flag[:24]}…）",
+                    "wrong_flag": flag,
+                }
+        else:
+            if flag != exp:
+                return {
+                    **out,
+                    "flag": None,
+                    "validated": False,
+                    "error": f"flag 与真值不符（预期 {exp[:24]}…）",
+                    "wrong_flag": flag,
+                }
         out["validated"] = True
     return out
 
