@@ -311,11 +311,22 @@ async def main():
     # 正确性最终以 verify_against_truth 的逐题精确比对为准。
     from run import build_solver
 
-    _truth = set(FLAG_MAP.values())
+    _truth = set(FLAG_MAP.values())                       # 明文真值（精确比对用）
+    _truth_sha = {v.lower() for v in FLAG_MAP.values()
+                  if re.fullmatch(r"[0-9a-fA-F]{64}", v)}   # sha256 脱敏真值
+    # 2026-09-01 P1 修正：87/92 真值是 sha256 占位，必须用候选 flag 的 sha256 比对，
+    # 不能拿明文 flag 与占位 sha256 做精确相等（否则 LLM 解出的真 flag 被 FeedbackLoop 误判幻觉、
+    # 在 verify_against_truth 之前就被置空）。明文真值仍走 == 精确比对。
+    def _is_correct(f):
+        if not f:
+            return False
+        if f in _truth:
+            return True
+        return hashlib.sha256(f.encode("utf-8", "ignore")).hexdigest() in _truth_sha
     solver = build_solver(
         use_mock=False,
         validate_locally=False,
-        is_correct=(lambda f: f in _truth) if _truth else None,
+        is_correct=_is_correct if _truth or _truth_sha else None,
     )
     logger.info("Solver 就绪: provider=%s, 真值表=%d 条",
                 os.environ.get("CTF_AGENT_LLM_PROVIDER", "?"), len(_truth))
@@ -357,8 +368,17 @@ async def main():
     solved = sum(1 for r in results.values() if r.get("flag"))
     # M1.2：可验证题（有真值）的判分 + 4 类失败分布
     ver_total = sum(1 for cid in results if cid in FLAG_MAP)
-    ver_solved = sum(1 for cid, r in results.items()
-                     if cid in FLAG_MAP and r.get("flag") == FLAG_MAP[cid])
+    # 2026-09-01 P1 修正：sha256 脱敏真值须用候选 flag 的 sha256 比对，
+    # 明文真值走 == 精确比对（与 verify_against_truth 口径一致，避免系统性低估解出率）。
+    def _verified(cid, r):
+        exp = FLAG_MAP.get(cid)
+        f = r.get("flag")
+        if not (cid in FLAG_MAP and f):
+            return False
+        if re.fullmatch(r"[0-9a-fA-F]{64}", exp):
+            return hashlib.sha256(f.encode("utf-8", "ignore")).hexdigest() == exp.lower()
+        return f == exp
+    ver_solved = sum(1 for cid, r in results.items() if _verified(cid, r))
     CLASS4 = {
         "wrong_direction": "决策错", "stuck_loop": "决策错",
         "tool_failure": "工具调用错",

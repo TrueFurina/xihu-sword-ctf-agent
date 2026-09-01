@@ -195,7 +195,19 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     # 平台单解模式（validate_locally=False）无本地 ground truth，仅做格式校验
     # （P0-1 修复：正确性归 poller accepted 回流，不把「格式合法」伪装成「已校验正确」）
     if is_correct is None and answers and validate_locally:
-        is_correct = lambda f: f in answers.values()  # noqa: E731
+        # 2026-09-01 P1 修正：sha256 占位题（题库仅存 flag_sha256）须用 sha256 比对，
+        # 不能拿明文 flag 与占位 sha256 做精确相等——否则 LLM 解出的真 flag 被误判幻觉。
+        # 构造精确值集合 + 占位 sha256 集合，O(1) 判定（兼容明文 flag 题）。
+        _valid_exact = {str(q.flag) for q in questions if q.flag}
+        _valid_sha = {str(q.expected_sha256) for q in questions
+                      if getattr(q, "expected_sha256", None)}
+        import hashlib as _hl
+        def is_correct(flag):  # noqa: E731
+            if not flag:
+                return False
+            if flag in _valid_exact:
+                return True
+            return _hl.sha256(str(flag).encode("utf-8")).hexdigest() in _valid_sha
     loop = FeedbackLoop(checker=checker, is_correct=is_correct, race_controller=race_controller)
 
     async def solve_once(question, attempt, correction=None):
