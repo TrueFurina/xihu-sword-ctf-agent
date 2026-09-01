@@ -12,8 +12,13 @@ main_agent 原实现一致（提取不重构）。
 from typing import Optional
 
 
-async def llm_json(system: str, user: str, attempt: int, llm_client=None) -> Optional[dict]:
-    """LLM JSON 调用：优先注入 client（dict 直返/str 解析 JSON），否则默认 ai_chat_json。"""
+async def llm_json(system: str, user: str, attempt: int, llm_client=None, recover_script: bool = False) -> Optional[dict]:
+    """LLM JSON 调用：优先注入 client（dict 直返/str 解析 JSON），否则默认 ai_chat_json。
+
+    recover_script=True 时（仅 plan 步使用）：JSON 解析失败但原文含 python 代码围栏，
+    则当作 script 动作恢复，让 LLM 的"写脚本实算"尝试真正执行，而非被当作不可解析
+    丢弃导致空转/放弃。supervisor/feedback 等要求严格 JSON 的调用方保持默认 False。
+    """
     if llm_client is not None:
         out = await llm_client(system, user, attempt)
         if isinstance(out, dict):
@@ -34,6 +39,19 @@ async def llm_json(system: str, user: str, attempt: int, llm_client=None) -> Opt
             try:
                 return _json.loads(_raw)
             except Exception:  # noqa: BLE001
+                # 2026-09-01 P1：plan 步 JSON 解析失败时，若原文含 python 代码围栏，
+                # 当作 script 动作恢复——让 LLM 的"写脚本实算"尝试真正执行（而非被
+                # 当作不可解析丢弃导致空转/放弃）。仅 recover_script=True 时生效，
+                # 不影响 supervisor/feedback 等要求严格 JSON 的调用方。
+                if recover_script:
+                    _cb = _re.search(r"```(?:python|py)?\s*(.*?)\s*```", out, _re.DOTALL)
+                    if _cb:
+                        _code = _cb.group(1).strip()
+                        if _code:
+                            _code = _code if _code.startswith("python:") else "python: " + _code
+                            return {"action": "script", "code": _code,
+                                    "stage": "exploit", "done": False,
+                                    "_recovered_from_code": True}
                 return None
         return None
     import os as _os
@@ -45,7 +63,7 @@ async def llm_json(system: str, user: str, attempt: int, llm_client=None) -> Opt
     from llm.client import ai_chat_json, get_model_for_attempt
 
     model = get_model_for_attempt(attempt)
-    return ai_chat_json([{"role": "user", "content": user}], system=system, model=model)
+    return ai_chat_json([{"role": "user", "content": user}], system=system, model=model, recover_script=recover_script)
 
 
 async def llm_text(system: str, user: str, attempt: int, llm_client=None) -> str:

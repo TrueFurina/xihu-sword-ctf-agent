@@ -137,8 +137,26 @@ async def plan_step(agent, ctx: AgentContext, attempt: int) -> dict:
         system = crypto_param_hint + "\n" + system
     elif attachment_hint:
         system = attachment_hint + "\n" + system
+    # 2026-09-01 P1 反幻觉实算强制：猜 flag 被丢弃后，下一 plan 必须真实计算
+    if getattr(ctx, "_anti_hallucination", False):
+        _cat = str(getattr(getattr(ctx, "question", None), "category", "") or "").lower()
+        if _cat == "crypto":
+            system += (
+                "\n【反幻觉·强制实算】你前几步提交的 flag 不在任何工具/脚本输出中，"
+                "已被系统判定为幻觉并丢弃。绝对禁止再凭空猜 flag。下一步必须输出 "
+                'action=script，写一段可运行 Python（pycryptodome 等）读取附件中的 '
+                "key/IV/mode 等参数，对密文做真实 AES/RSA/编码解密或数论求解，"
+                "把脚本运行得到的真实结果作为 flag 提交。"
+            )
+        else:
+            system += (
+                "\n【反幻觉·强制实算】你前几步提交的 flag 不在任何工具/脚本输出中，"
+                "已被系统判定为幻觉并丢弃。绝对禁止再凭空猜 flag。下一步必须输出 "
+                "action=script 或 tool，真实执行计算/解码/利用，"
+                "把运行得到的真实结果作为 flag 提交。"
+            )
     user = agent._build_plan_prompt(ctx, attempt)
-    result = await agent._llm_json(system, user, attempt)
+    result = await agent._llm_json(system, user, attempt, recover_script=True)
     if not result:
         if has_attachment and not ctx._attachment_analyzed:
             return {"action": "tool", "tool": "file_analyze",
@@ -349,6 +367,21 @@ def _structured_candidate_texts(output: str) -> list:
     return texts
 
 
+def _mark_hallucination(ctx) -> None:
+    """2026-09-01 P1 能力突破：累计"猜 flag 被丢弃"次数，触发反幻觉强制实算。
+
+    当 LLM 提交不在任何工具/脚本输出中的 flag（幻觉/瞎猜）被 extract_flag 丢弃时，
+    累计命中并置 ctx._anti_hallucination=True，使下一 plan 步被强制改为 action=script
+    真实计算（crypto 走 pycryptodome 解密/数论求解），而非继续空转或再猜。
+    仅作纠偏、不影响正常解路径（真 flag 来自工具输出时不会触发本函数）。
+    """
+    ctx._hallucination_strike = getattr(ctx, "_hallucination_strike", 0) + 1
+    ctx._anti_hallucination = True
+    logger.info("[%s] 反幻觉命中 #%d：flag 不在工具产出，下一 plan 强制实算",
+                getattr(ctx, "question", None) and ctx.question.id or "?",
+                ctx._hallucination_strike)
+
+
 def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
     """从执行结果中提取 flag（优先用 checker，其次正则）。原 MainAgent._extract_flag。
 
@@ -375,6 +408,7 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
                             getattr(ctx, "question", None) and ctx.question.id or "?",
                             flag[:40])
                 ctx._extract_failed = True  # 提取错埋点（2026-08-22 M1.3）
+                _mark_hallucination(ctx)    # 2026-09-01 P1：累计幻觉命中，强制下一步实算
                 return None
             kind = str(act.get("kind") or "")
             act_output = str(act.get("output") or "")
@@ -391,6 +425,7 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
                             getattr(ctx, "question", None) and ctx.question.id or "?",
                             flag[:40])
                 ctx._extract_failed = True  # 提取错埋点（2026-08-22 M1.3）
+                _mark_hallucination(ctx)    # 2026-09-01 P1：累计幻觉命中，强制下一步实算
                 return None
             q = getattr(ctx, "question", None)
             cat = str(getattr(q, "category", "") or "").lower()
@@ -407,6 +442,7 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
                 logger.info("[%s] 强制工具前置：无工具调用证据，flag 拒绝（疑似瞎猜）: %s",
                             getattr(q, "id", "?"), flag[:40])
                 ctx._extract_failed = True  # 提取错埋点（2026-08-22 M1.3）
+                _mark_hallucination(ctx)    # 2026-09-01 P1：累计幻觉命中，强制下一步实算
                 return None
             return flag
     pattern = getattr(ctx.question, "flag_pattern", None) or r"flag\{[^}]+\}"
@@ -415,8 +451,8 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
         if m:
             return m.group(0)
     # ── E1 结构化候选兜底：主输出无匹配时，扫 JSON 候选列表 ──
-    # 仅做模板级校验（格式符占位/flag_pattern 正则），不重复三态工具证据校验
-    # （候选来自 LLM 结构化输出，工具证据判定由上游调用方对最终选定 flag 负责）。
+    # 仅做模板级正则校验（格式符占位/flag_pattern）；候选来自 LLM 结构化输出，
+    # 但附件明文 flag 经正则提取即应接受（X8ccET：d0g3{...} 来自 read 工具落盘 output）。
     for cand in _structured_candidate_texts(output):
         if re.search(r"%[dsfx]", cand):
             continue  # 模板占位，跳过（疑似抄题面）

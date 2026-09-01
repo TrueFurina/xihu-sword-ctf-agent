@@ -512,6 +512,7 @@ def ai_chat_json(
     max_tokens: int = 2000,
     model: Optional[str] = None,
     provider: Optional[str] = None,
+    recover_script: bool = False,
 ) -> Optional[dict]:
     """调用统一 LLM 端点并解析 JSON 对象回复（失败开放）。
 
@@ -534,7 +535,17 @@ def ai_chat_json(
         logger.warning("JSON 解析异常（fail-open 返回 None）: %s", exc)
         return None
     if obj is None:
-        logger.warning("LLM 返回内容无法解析为 JSON 对象")
+        # 2026-09-01 P1 诊断+恢复：记录原文前 200 字（此前盲点），plan 步尝试从代码围栏恢复 script
+        logger.warning("LLM 返回内容无法解析为 JSON 对象（原文前200字）: %s", str(content)[:200])
+        if recover_script:
+            import re as _re
+            _cb = _re.search(r"```(?:python|py)?\s*(.*?)\s*```", str(content), _re.DOTALL)
+            if _cb:
+                _code = _cb.group(1).strip()
+                if _code:
+                    _code = _code if _code.startswith("python:") else "python: " + _code
+                    return {"action": "script", "code": _code,
+                            "stage": "exploit", "done": False, "_recovered_from_code": True}
     return obj
 
 

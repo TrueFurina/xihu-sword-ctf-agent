@@ -431,6 +431,10 @@ class MainAgent:
                 # ── Plan：生成下一步行动（E2 每步超时 + 每题 LLM 调用计数）──
                 # step_timeout_s 单步硬上限：防单步 LLM 调用极慢拖死并发池（区别于每题墙钟）。
                 ctx.llm_calls += 1
+                logger.info("[%s] 步骤#%d attempt=%d 反幻觉=%s 卡壳=%d 候选=%s",
+                            getattr(ctx.question, "id", "?"), step_index, attempt,
+                            getattr(ctx, "_anti_hallucination", False),
+                            ctx.stuck_count, bool(ctx.candidate_flag))
                 try:
                     plan = await asyncio.wait_for(self._plan(ctx, attempt), timeout=self.step_timeout_s)
                 except asyncio.TimeoutError:
@@ -683,6 +687,33 @@ class MainAgent:
                             "标记超出能力边界，记录归因后换题（防卡题浪费后面快题时间）。"
                         )
                         logger.info("[%s] pwn/reverse 快速失败：无突破口止损", question.id)
+
+                # ── skill_require 强制路由（2026-09-01 修复）──
+                # 根因：infer_skill_require 对已加载的 solver 永远 return None → skill_require 是 no-op，
+                # LLM 自由发挥跑通用 crypto 链导致 dnui_keyboard（键盘坐标→字母）等题型失败。
+                # 修复：题面关键词命中专用 solver 且 LLM 尚未调用过 → 强制调用一次（确定性救已知可解题）。
+                _kb_kw = ("键盘", "keyboard", "坐标", "九宫格", "手机键盘", "telnet", "按键", "键盘布局")
+                _qtext = (str(getattr(question, "description", "") or "") + " " +
+                          " ".join(str(a) for a in getattr(question, "attachments", []) or [])).lower()
+                if (self.registry and self.registry.get("crypto_keyboard_path")
+                        and any(k in _qtext for k in _kb_kw)):
+                    _already = any(getattr(s, "tool_used", "") == "crypto_keyboard_path"
+                                   for s in ctx.steps)
+                    if not _already:
+                        try:
+                            import re as _re_kb
+                            _fo = await self.registry.run(
+                                "crypto_keyboard_path",
+                                {"attachments": list(getattr(question, "attachments", []) or [])})
+                            _txt = getattr(_fo, "text", "") or ""
+                            _m = _re_kb.search(r"flag\{[^}\s]{3,}\}", _txt, _re_kb.IGNORECASE)
+                            if _m:
+                                ctx.candidate_flag = _m.group(0)
+                                logger.info("[%s] skill_require 强制路由命中 flag: %s",
+                                            question.id, _m.group(0)[:40])
+                                break
+                        except Exception as _e_kb:
+                            logger.warning("[%s] skill_require 路由异常: %s", question.id, _e_kb)
 
                 # ── 校验 flag ──
                 flag = self._extract_flag(ctx, act_result)
@@ -1025,11 +1056,11 @@ class MainAgent:
                 logger.warning("[%s] Goal 日志写入异常: %s", getattr(ctx.question, "id", ""), exc)
         return result
 
-    async def _llm_json(self, system: str, user: str, attempt: int) -> Optional[dict]:
+    async def _llm_json(self, system: str, user: str, attempt: int, recover_script: bool = False) -> Optional[dict]:
         # 上帝模块拆分：LLM 封装归 core/llm_wrapper（2026-08-20 锐评整改）
         from core.llm_wrapper import llm_json
 
-        return await llm_json(system, user, attempt, self.llm_client)
+        return await llm_json(system, user, attempt, self.llm_client, recover_script=recover_script)
 
     async def _llm_text(self, system: str, user: str, attempt: int) -> str:
         # 上帝模块拆分：LLM 封装归 core/llm_wrapper
