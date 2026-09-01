@@ -1002,6 +1002,15 @@ class MainAgent:
         skill_req = self._infer_skill_require(ctx, reflection)
         if skill_req:
             self._last_skill_require = skill_req
+        # 诊断可观测性（2026-09-01 P1 Item4 修复）：回传最终非空步 observation，
+        # 供 scripts/_dryrun_race.run_llm_agent 的 raw.observation 根因 提取错/决策错
+        # —— 此前 solve 返回字典无 observation 字段，失败题 LLM 文本全丢，无法归因。
+        _last_obs = ""
+        for _s in reversed(ctx.steps):
+            _o = getattr(_s, "observation", "")
+            if _o and str(_o).strip():
+                _last_obs = str(_o)
+                break
         result = {
             "task_id": getattr(ctx.question, "id", ""),
             "question_type": getattr(ctx.question, "category", ""),
@@ -1039,6 +1048,8 @@ class MainAgent:
             "provider": provider_label,
             "retries": attempt,
             "steps": [s.__dict__ for s in ctx.steps],
+            # 最终步 observation 透传（2026-09-01 P1 Item4）：失败题根因用
+            "observation": _last_obs,
             # ── Goal 扩展字段 ──
             "self_reflection": reflection,
             "skill_require": skill_req,
