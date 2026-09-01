@@ -379,6 +379,7 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_complex_mult_group(question)),
         asyncio.ensure_future(_try_grid_resample(question)),
         asyncio.ensure_future(_try_zip_fake_encryption(question)),
+        asyncio.ensure_future(_try_plaintext_attachment(question)),
     ]
     try:
         for _fut in asyncio.as_completed(_tasks):
@@ -549,6 +550,46 @@ async def _try_keyboard_path(question) -> Optional[str]:
                 return str(flag)
         except Exception as exc:  # noqa: BLE001
             _warn_import_once("skills.crypto_keyboard_path", exc)
+    return None
+
+
+async def _try_plaintext_attachment(question) -> Optional[str]:
+    """明文小附件答案提取（2026-09-01 P1 Item4 修复 A）。
+
+    对文件名带答案信号（flag/answer/ans/solution/key/pass/pwd/secret）的明文小附件
+    (<256 字节），读内容（去首尾空白）作候选 flag。典型题：misc 流量/协议题把答案明文
+    直接放进 flag.txt，sha256 脱敏真值 = sha256(附件明文)；presolve 原只走 flag_scan/
+    crypto_auto 漏掉 → 落入 LLM 阶段空转失败（wrong_direction）。
+    安全性：下游 verify_against_truth 用 sha256 真值校验，错误候选自动 nullify 并回退 LLM，
+    无假阳性；flag_pattern 声明时仅接受匹配格式候选（复用诱饵守卫）。
+    """
+    attach = _attachments(question)
+    if not attach:
+        return None
+    _ans_kw = ("flag", "answer", "ans", "solution", "key", "pass", "pwd", "secret")
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        base = os.path.basename(p).lower()
+        if not any(k in base for k in _ans_kw):
+            continue
+        try:
+            sz = os.path.getsize(p)
+        except OSError:
+            continue
+        if sz == 0 or sz > 256:
+            continue
+        try:
+            with open(p, "r", encoding="utf-8", errors="ignore") as fh:
+                content = fh.read().strip()
+        except Exception:  # noqa: BLE001
+            continue
+        if not content:
+            continue
+        logger.info("[presolve:plaintext] %s 附件 %s 命中候选=%r",
+                    getattr(question, "id", "?"), os.path.basename(p), content[:40])
+        return content
     return None
 
 
