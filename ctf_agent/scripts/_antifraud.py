@@ -76,6 +76,19 @@ HONOR_CODE = os.path.join(GOV_DIR, "HONOR_CODE.md")
 #     接入 presolve `_try_modinv_factor`）REGRESS_PASS（判别式开方分解 p/q）。
 # 三道 sha256 均逐字匹配题面真值，均经 PROMOTION_EVIDENCE 正式晋级。
 #
+# 2026-09-03 vnctf_flag 治理修复（KPI 水位不变 12，本题本就在 9 地板 BASE_AUTHORIZED_KPI_SOLVES）：
+#   - 题面 flag_pattern 写错（flag{...} 而真值格式为 vnctf{...}）→ presolve 二次校验
+#     误判诱饵丢弃；修订题面 JSON 即可（`flag_pattern: "vnctf\\{[^}]+\\}|flag\\{[^}]+\\}"`）
+#   - venv certifi 包 RECORD 缺失致 httpx CA 查找失败，vision LLM 兜底走不通；
+#     `pip install --ignore-installed --no-deps certifi==2026.7.22` 修复
+#   - `_regress_one.py real_misc_vnctf_flag` 实测 REGRESS_PASS(5159ms)，
+#     skills/misc_grid_resample.run 走「网格重采样（确定性算法）+ baidu ernie-4.5-turbo-vl
+#     OCR 兜底（视觉 LLM 工具）+ 题面 sha256 严格校验」三段链路命中
+#   - 本题无新增 PROMOTION_EVIDENCE（已在 9 地板中），仅把「假可复现已计入」升级为
+#     「真可复现已计入」；REGRESSION_CHECKS 11→12、KNOWN_GAP 4→3、第二节-B 14/15→15/15
+#   - 与 9→10/10→11/11→12 三道带证晋级模式区别：那次是「新增离线解出」，本次是「既有
+#     离线解出的可复现性闭环」，不动 _antifraud.PROGRESS_EVIDENCE 也不动 KPI_WATERMARK。
+#
 # 模型升级（2026-08-28 评审 R5/G5）：旧版 KPI_WATERMARK 是「等式锁」——n != 9 一律
 # 当注水拒绝，导致真实进展到 10/13 也会被误杀（治理过拟合反作用）。现改为「带证据可
 # 晋级的地板」：

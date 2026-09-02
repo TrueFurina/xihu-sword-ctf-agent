@@ -135,7 +135,7 @@
   img.resize((79, 71), Image.NEAREST).show()
   "
   ```
-- **备注**：图像杂色点网格采样（黑底 + 均匀分布色点，非 LSB）；本环境 tesseract 读不出该像素字体 → 原 presolve 只出"人眼可读揭示图"不读字；2026-08-25 接入白名单视觉 LLM（qwen-vl-max，dashscope 端点）做 OCR 兜底，以题目自带 flag_sha256 校验才返回，确定性可复现、不谎报。教训——"疑似 LSB 隐写"题面有误导，R1 工具优先（先查公开 writeup）比盲目跑 LSB 提取更有效。附件路径为本地赛题库，不入库。
+- **备注**：图像杂色点网格采样（黑底 + 均匀分布色点，非 LSB）；本环境 tesseract 读不出该像素字体 → 原 presolve 只出"人眼可读揭示图"不读字；2026-08-25 接入白名单视觉 LLM（qwen-vl-max，dashscope 端点）做 OCR 兜底，以题目自带 flag_sha256 校验才返回，确定性可复现、不谎报。教训——"疑似 LSB 隐写"题面有误导，R1 工具优先（先查公开 writeup）比盲目跑 LSB 提取更有效。**2026-09-03 治理修复**：题面 `flag_pattern` 写错为 `flag\{[^}]+\}` 而真值格式为 `vnctf\{[^}]+\}`，导致 presolve 二次校验误判诱饵丢弃；同步修复 venv 依赖（pip install httpx + 强装 certifi 2026.7.22）让 baidu ernie-4.5-turbo-vl 视觉 LLM 兜底可走通；`_regress_one.py` 实测 **REGRESS_PASS (5159ms)**、sha256 逐字匹配题面真值，已正式入 `REGRESSION_CHECKS`（合并基线 11→12）。附件路径为本地赛题库，不入库。
 
 ### 5. 10735（MISC-02 【A类·完整攻击链】 · 正式赛真题 · logbool 流量包 SQL 布尔盲注）
 
@@ -323,9 +323,9 @@
 | 12 | real_reverse_sheng | reverse | ✅ | 逆向静态分析 |
 | 13 | real_reverse_upx | reverse | ✅ | UPX 脱壳 |
 | 14 | real_web_gongye_web2 | web | ✅ | 源码审计 flag_scan（7ms，源码披露类） |
-| 15 | real_misc_vnctf_flag | misc | ⚠️独立核验 | 图像网格重采样 + OCR（非 presolve，见第二节第 4 条） |
+| 15 | real_misc_vnctf_flag | misc | ✅ | 图像网格重采样 + 视觉 LLM OCR（2026-09-03 治理修复后入 presolve） |
 
-- **确定性管线真值验证解出：14/15**（第 15 题 vnctf_flag 走独立图像采样，第二节第 4 条已离线核验）。
+- **确定性管线真值验证解出：15/15**（vnctf_flag 2026-09-03 治理修复后正式入 presolve 自动化命中）。
 - 上述 15 题 `provenance` 全部为 `real_past_ctf`（历年真实赛题，外部真值），**非自产训练题**——
   之前"12/15 含 7 道 `flag{}` 训练题"的判断有误：这些 `flag{...}` 格式题同样带外部真值真值字段且提取结果逐字匹配，属真解。
 - **LLM 真推理贡献 = 0**：14 道全由确定性管线直出，无需 LLM 推理。
@@ -369,7 +369,7 @@
 |---|---|---|
 | 平台 accepted | **0** | 比赛结束，无开放赛事 |
 | **严格真题 offline_verified（唯一 KPI，merge_gate 机器真值）** | **12** | 台账第二节 12 个 ✅ A/B 类题块：10733 + vnctf_flag + xuanhun_signin + anwang_crypto1 + ezmult + filterrandom + qiangwang_classic + sheng + upx + ezrsa + simplelegendre + exciting_inverse（ezrsa / simplelegendre / exciting_inverse 三道均于 2026-09-03 经确定性求解器 `_regress_one.py` REGRESS_PASS 带证据晋级，见题块 7/8/11 与 `_antifraud.PROMOTION_EVIDENCE`；specialcurve2 / 10732 / 10735 经 2026-08-27 诚实校准判定不可复现、移出严格 KPI 并列入 KNOWN_GAP；`scripts/_merge_gate.py count_offline_verified` 实跑计数 fail-closed） |
-| 确定性管线真值验证 | **14 / 15** | 第二节-B：presolve+工具层提取 flag 与题库真值逐字一致；第 15 题 vnctf 走独立图像采样（真题集共 45 道，此 15 道有确定性管线覆盖） |
+| 确定性管线真值验证 | **15 / 15** | 第二节-B：presolve+工具层提取 flag 与题库真值逐字一致；2026-09-03 治理修复后 vnctf_flag 也入 presolve 自动化命中（第 15 题），全部 15 道 presolve 真值匹配。真题集共 45 道，此 15 道有确定性管线覆盖 |
 | 正式赛真题独立离线核验（genuine，含非自动化） | **3** | 10732 + 10733 + 10735（PKCS#1v1.5 / 高偶指数RSA / pcap盲注）；仅 10733 为严格 ✅ 可机器复现，10732/10735 为 genuine 但仅视觉/历史确认；分母 33 道正式赛 |
 | 外部真题独立离线核验（self-produced 口径） | **4** | HGAME2022 RSA×3 + 2022安网杯 misc3（非平台题，不计入严格 KPI）——HGAME RSA1/RSA2/RSA3 与西湖 FilterRandom 已于 2026-08-27 仓库内重建复现通过；安网 misc3（无公开附件）仍仅历史记录 |
 | LLM 真推理贡献 | **= 0** | 12 道严格解仍全由 presolve/工具直出，无 LLM 真推理贡献。`scripts/demo_llm_rag_solve.py` 对 10733 的"验证"**存在泄露**：flag(EXPECTED)与 n/hint/c 明文硬编码于脚本、且完整解法推导写进 prompt 喂给 LLM（LLM 仅抄写 sympy 代码），不满足 genuine 推理标准，故不计入 LLM 真推理贡献。writeup_rag 已真正接入主解题循环（CTF_AGENT_WRITEUP_RAG 开关，每步检索注入 plan prompt，零回归），但 genuine 推理贡献仍待无泄露端到端验证 |

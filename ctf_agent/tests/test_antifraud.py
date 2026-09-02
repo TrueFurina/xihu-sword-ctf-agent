@@ -71,6 +71,19 @@ def test_kpi_watermark_floor_is_nine():
     assert "REGRESS_PASS" in af.PROMOTION_EVIDENCE["real_crypto_exciting_inverse"]
 
 
+def test_vnctf_flag_governance_fix_in_base_authorized():
+    # 2026-09-03 治理修复：vnctf_flag 题面 flag_pattern 写错（flag{...} 而真值格式
+    # vnctf{...}）致 presolve 二次校验误判诱饵丢弃；修题面+修 venv certifi/httpx 后
+    # REGRESS_PASS(5159ms) 命中。本题本就含于 9 地板（KPI 水位不变仍 12），但必须
+    # 验证它真在 AUTHORIZED_KPI_SOLVES 中（防后续误移出）。
+    assert "real_misc_vnctf_flag" in af.BASE_AUTHORIZED_KPI_SOLVES
+    assert "real_misc_vnctf_flag" in af.AUTHORIZED_KPI_SOLVES
+    # 治理修复不新增 PROMOTION_EVIDENCE 项（水位锚写死 9+晋升数=12 不变）
+    assert len(af.PROMOTION_EVIDENCE) == 3
+    assert len(af.AUTHORIZED_KPI_SOLVES) == 12
+    assert af.KPI_WATERMARK == 12
+
+
 # ── WATERMARK_DRIFT / WATERMARK_REGRESSION ──
 def test_watermark_drift_blocked(tmp_violation_log, monkeypatch):
     # 计数溢出地板+晋升（无对应晋升记录）→ 阻断

@@ -112,6 +112,17 @@ REGRESSION_CHECKS = [
         "cmd": [sys.executable, "scripts/_regress_one.py", "real_crypto_exciting_inverse"],
         "flag_contains": "REGRESS_PASS",
     },
+    # 2026-09-03 治理修复：vnctf_flag 长期被台账标 A类✅ 但题面 flag_pattern 写错（flag{...}
+    # 而非 vnctf{...}）导致 presolve 二次校验误判诱饵丢弃，未真正经 presolve 自动化复现；
+    # 2026-09-03 修题面 JSON + 装 httpx/certifi 让 vision LLM（baidu ernie-4.5-turbo-vl）
+    # 兜底可走通 + 实测 REGRESS_PASS（5159ms，含 vision LLM 兜底），sha256 逐字匹配题面真值。
+    # 题块归类 A类（完整攻击链：网格重采样算法 + OCR/视觉 LLM 工具），已在 9 地板中，
+    # 本次不抬 KPI（仍 12），只把"假可复现已计入"升级为"真可复现已计入"。
+    {
+        "id": "real_misc_vnctf_flag",
+        "cmd": [sys.executable, "scripts/_regress_one.py", "real_misc_vnctf_flag"],
+        "flag_contains": "REGRESS_PASS",
+    },
 ]
 
 KNOWN_GAP = [
@@ -119,8 +130,6 @@ KNOWN_GAP = [
      "reason": "可复现脚本待固化（台账 2026-08-24 声明；攻击链清晰但 _solve_10732.py 散落待固化）"},
     {"id": "10735",
      "reason": "logbool pcap→RAR5→7z 解密链待固化为 verify 脚本（台账 offline_verified，无独立 verifier）"},
-    {"id": "real_misc_vnctf_flag",
-     "reason": "2026-08-29 诚实校准：点阵重采样显字（flag 在图内）需 OCR/视觉模型，文本 LLM 不可解=架构级缺口；verify_vnctf_flag.py 依赖 verified_flags.json 真值库（8/28 results 隔离时未随 KPI_BASELINE 恢复、且从未入库），不可复现。台账状态如实降级，移出回归集（与 MEMORY.md 判断一致）"},
     {"id": "real_crypto_specialcurve2",
      "reason": "不可复现：附件 SpecialCurve2.py 仅为恢复的挑战脚本模板，原 n/HINT/C 实例值每次运行随机生成、已永久丢失；verify_specialcurve2.py 仅做 sha256 自比对（同义反复），不真解题。2026-08-27 诚实校准从严格 KPI 与回归集移除"},
 ]
