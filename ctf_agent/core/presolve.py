@@ -385,6 +385,7 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_crypto_auto(question, registry)),
         asyncio.ensure_future(_try_hastad_broadcast(question)),
         asyncio.ensure_future(_try_legendre_phi(question)),
+        asyncio.ensure_future(_try_modinv_factor(question)),
         asyncio.ensure_future(_try_math_engine(question)),
         asyncio.ensure_future(_try_fast_solve(question)),
         asyncio.ensure_future(_try_jpeg_png_embedded(question)),
@@ -658,6 +659,48 @@ async def _try_legendre_phi(question) -> Optional[str]:
             return str(r)
         except Exception as exc:  # noqa: BLE001
             _warn_import_once("skills.crypto_legendre_phi", exc)
+    return None
+
+
+async def _try_modinv_factor(question) -> Optional[str]:
+    """phi + 双模逆二次分解 RSA（2026-09-03 新增 · B 类确定性密码学变换）。
+
+    对附件中含「e、phi、c、pinv、qinv 五个整数」的文本文件（如 output / out）
+    调用 skills.crypto_modinv_factor.run()：由 CRT（A·p+B·q=N+1，A=pinv<q、
+    B=qinv<p）构造 q 的一元二次方程 (B-1)q²+(A-B-phi)q+(phi·A-A+1)=0，
+    判别式开方一次分解出 p、q 后 RSA 解密（玄盾杯 ExcitingInverse 真题结构）。
+
+    触发面：任意 <512KB 的附件（解析先过滤：无四个大整数即快速返回 None；
+    实测 real_crypto_exciting_inverse <0.1s）。
+    仅当解出 flag_pattern 匹配明文才返回（防误报）。
+
+    诚实口径：本路是「phi + 双模逆二次分解 RSA」这一真实密码学攻击的确定性
+    实现（非 grep 明文、非读答案密钥），命中结果由题面 flag_sha256 逐字校验
+    把关。实测 real_crypto_exciting_inverse：sha256 匹配。
+    """
+    attach = _attachments(question)
+    if not attach:
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            if os.path.getsize(p) > 512 * 1024:
+                continue
+        except OSError:
+            continue
+        try:
+            from skills.crypto_modinv_factor import run as mf_run
+            r = mf_run({"path": p})
+            if not r:
+                continue
+            logger.info("[presolve:modinv_factor] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), str(r)[:40])
+            _save_candidates(question, [str(r)])
+            return str(r)
+        except Exception as exc:  # noqa: BLE001
+            _warn_import_once("skills.crypto_modinv_factor", exc)
     return None
 
 

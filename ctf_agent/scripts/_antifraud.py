@@ -65,12 +65,16 @@ HONOR_CODE = os.path.join(GOV_DIR, "HONOR_CODE.md")
 # 诚实校准（2026-08-28 实测）：原 KPI_WATERMARK=12 中含 ezrsa / simplelegendre /
 # exciting_inverse 三道，现行确定性管线 presolve 提取=None（不可复现），已移出严格
 # KPI 并列入 _merge_gate.KNOWN_GAP。当前可机复现真值 = 9。
-# 2026-09-03 带证据晋级：ezrsa 已由 Håstad 广播攻击确定性求解器
-# （skills/crypto_hastad_broadcast.py，接入 presolve `_try_hastad_broadcast`）
-# REGRESS_PASS（e=17，sha256 匹配题面真值），simplelegendre 已由勒让德符号逐位
-# 分解求解器（skills/crypto_legendre_phi.py，接入 presolve `_try_legendre_phi`）
-# REGRESS_PASS（phi 泄露分解 1024-bit p/q，sha256 匹配题面真值），均经
-# PROMOTION_EVIDENCE 正式晋级：地板 9 + 晋升 2 = 水位 11。exciting_inverse 仍在 KNOWN_GAP。
+# 2026-09-03 三道全部带证据重新晋级（地板 9 + 晋升 3 = 水位 12，恰好回到最初 12 的
+# 数值口径——但此 12 是「每题带 sha256 真值 + 可复现 verifier」的全证据态，非当年
+# 仅凭历史人工解出注水的 12）：
+#   - ezrsa：Håstad 广播攻击求解器（skills/crypto_hastad_broadcast.py，
+#     接入 presolve `_try_hastad_broadcast`）REGRESS_PASS（e=17）；
+#   - simplelegendre：勒让德符号逐位分解求解器（skills/crypto_legendre_phi.py，
+#     接入 presolve `_try_legendre_phi`）REGRESS_PASS（phi 泄露分解 p/q）；
+#   - exciting_inverse：phi+双模逆二次分解求解器（skills/crypto_modinv_factor.py，
+#     接入 presolve `_try_modinv_factor`）REGRESS_PASS（判别式开方分解 p/q）。
+# 三道 sha256 均逐字匹配题面真值，均经 PROMOTION_EVIDENCE 正式晋级。
 #
 # 模型升级（2026-08-28 评审 R5/G5）：旧版 KPI_WATERMARK 是「等式锁」——n != 9 一律
 # 当注水拒绝，导致真实进展到 10/13 也会被误杀（治理过拟合反作用）。现改为「带证据可
@@ -101,7 +105,7 @@ BASE_AUTHORIZED_KPI_SOLVES = frozenset({
 # （格式建议： "sha256:<真值摘要>|verify:scripts/_regress_one.py <id>|pr:<PR链接>"）。
 # 新增晋升 = 提 promotion PR，改动本字典 + 同增 AUTHORIZED + 同步 KPI_BASELINE.json。
 # 凡出现在本集合但证据字符串为空 / 缺失 → PROMOTION_WITHOUT_EVIDENCE 阻断（无证据注水）。
-# 已晋升 2 项（2026-09-03）：ezrsa —— Håstad 广播攻击确定性求解器
+# 已晋升 3 项（2026-09-03）：ezrsa —— Håstad 广播攻击确定性求解器
 # skills/crypto_hastad_broadcast.py 接入 presolve（_try_hastad_broadcast），
 # `scripts/_regress_one.py real_crypto_ezrsa` 实测 REGRESS_PASS（e=17，
 # CRT 合并三组 (n,c) + 整数开 e 次根，flag sha256 逐字匹配题面真值 93be5f3a…）。
@@ -109,6 +113,10 @@ BASE_AUTHORIZED_KPI_SOLVES = frozenset({
 # 接入 presolve（_try_legendre_phi），`scripts/_regress_one.py real_crypto_simplelegendre`
 # 实测 REGRESS_PASS（phi 泄露分解 1024-bit p/q + 逐位 (c|p)=(-1)^bi 判定，
 # flag sha256 逐字匹配题面真值 75e6aa4d…）。
+# exciting_inverse —— phi+双模逆二次分解确定性求解器 skills/crypto_modinv_factor.py
+# 接入 presolve（_try_modinv_factor），`scripts/_regress_one.py real_crypto_exciting_inverse`
+# 实测 REGRESS_PASS（CRT⟹A·p+B·q=N+1⟹q 二次方程判别式开方分解 1024-bit p/q，
+# flag sha256 逐字匹配题面真值 4b84616c…）。
 PROMOTION_EVIDENCE = {
     "real_crypto_ezrsa": (
         "sha256:93be5f3ad422c43e99e705f52df3ad974548dc558714e48162d3939787bdfdbf"
@@ -119,6 +127,11 @@ PROMOTION_EVIDENCE = {
         "sha256:75e6aa4de894faf2a760a91aa74d93e9f3b971377012f81bfb95806902ba0002"
         "|verify:scripts/_regress_one.py real_crypto_simplelegendre (REGRESS_PASS 2026-09-03)"
         "|skill:skills/crypto_legendre_phi.py (Legendre 逐位: phi 分解 p/q + (c|p)=(-1)^bi, 1.2s)"
+    ),
+    "real_crypto_exciting_inverse": (
+        "sha256:4b84616cccbe84a99256c23152a4fd226e87e9da64e92689063046251cc251c5"
+        "|verify:scripts/_regress_one.py real_crypto_exciting_inverse (REGRESS_PASS 2026-09-03)"
+        "|skill:skills/crypto_modinv_factor.py (phi+双模逆: CRT⟹q 二次方程判别式分解, 0.23s)"
     ),
 }
 
