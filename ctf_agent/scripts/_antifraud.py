@@ -67,8 +67,10 @@ HONOR_CODE = os.path.join(GOV_DIR, "HONOR_CODE.md")
 # KPI 并列入 _merge_gate.KNOWN_GAP。当前可机复现真值 = 9。
 # 2026-09-03 带证据晋级：ezrsa 已由 Håstad 广播攻击确定性求解器
 # （skills/crypto_hastad_broadcast.py，接入 presolve `_try_hastad_broadcast`）
-# REGRESS_PASS（e=17，sha256 匹配题面真值），经 PROMOTION_EVIDENCE 正式晋级，
-# 地板 9 + 晋升 1 = 水位 10。simplelegendre / exciting_inverse 仍在 KNOWN_GAP。
+# REGRESS_PASS（e=17，sha256 匹配题面真值），simplelegendre 已由勒让德符号逐位
+# 分解求解器（skills/crypto_legendre_phi.py，接入 presolve `_try_legendre_phi`）
+# REGRESS_PASS（phi 泄露分解 1024-bit p/q，sha256 匹配题面真值），均经
+# PROMOTION_EVIDENCE 正式晋级：地板 9 + 晋升 2 = 水位 11。exciting_inverse 仍在 KNOWN_GAP。
 #
 # 模型升级（2026-08-28 评审 R5/G5）：旧版 KPI_WATERMARK 是「等式锁」——n != 9 一律
 # 当注水拒绝，导致真实进展到 10/13 也会被误杀（治理过拟合反作用）。现改为「带证据可
@@ -99,15 +101,24 @@ BASE_AUTHORIZED_KPI_SOLVES = frozenset({
 # （格式建议： "sha256:<真值摘要>|verify:scripts/_regress_one.py <id>|pr:<PR链接>"）。
 # 新增晋升 = 提 promotion PR，改动本字典 + 同增 AUTHORIZED + 同步 KPI_BASELINE.json。
 # 凡出现在本集合但证据字符串为空 / 缺失 → PROMOTION_WITHOUT_EVIDENCE 阻断（无证据注水）。
-# 已晋升 1 项（2026-09-03）：ezrsa —— Håstad 广播攻击确定性求解器
+# 已晋升 2 项（2026-09-03）：ezrsa —— Håstad 广播攻击确定性求解器
 # skills/crypto_hastad_broadcast.py 接入 presolve（_try_hastad_broadcast），
 # `scripts/_regress_one.py real_crypto_ezrsa` 实测 REGRESS_PASS（e=17，
 # CRT 合并三组 (n,c) + 整数开 e 次根，flag sha256 逐字匹配题面真值 93be5f3a…）。
+# simplelegendre —— 勒让德符号逐位分解确定性求解器 skills/crypto_legendre_phi.py
+# 接入 presolve（_try_legendre_phi），`scripts/_regress_one.py real_crypto_simplelegendre`
+# 实测 REGRESS_PASS（phi 泄露分解 1024-bit p/q + 逐位 (c|p)=(-1)^bi 判定，
+# flag sha256 逐字匹配题面真值 75e6aa4d…）。
 PROMOTION_EVIDENCE = {
     "real_crypto_ezrsa": (
         "sha256:93be5f3ad422c43e99e705f52df3ad974548dc558714e48162d3939787bdfdbf"
         "|verify:scripts/_regress_one.py real_crypto_ezrsa (REGRESS_PASS 2026-09-03)"
         "|skill:skills/crypto_hastad_broadcast.py (Håstad e=17: CRT+iroot, 0.02s)"
+    ),
+    "real_crypto_simplelegendre": (
+        "sha256:75e6aa4de894faf2a760a91aa74d93e9f3b971377012f81bfb95806902ba0002"
+        "|verify:scripts/_regress_one.py real_crypto_simplelegendre (REGRESS_PASS 2026-09-03)"
+        "|skill:skills/crypto_legendre_phi.py (Legendre 逐位: phi 分解 p/q + (c|p)=(-1)^bi, 1.2s)"
     ),
 }
 

@@ -54,14 +54,18 @@ def test_clean_enforce_passes():
 
 def test_kpi_watermark_floor_is_nine():
     # 写死真值锚，不得依赖任何外部文件；水位 = 地板9 + 证据化晋升数
-    # 2026-09-03 正式提升：ezrsa 经 PROMOTION_EVIDENCE 带证据晋级（地板 9 + 晋升 1 = 水位 10）
+    # 2026-09-03 正式提升：ezrsa + simplelegendre 经 PROMOTION_EVIDENCE 带证据晋级
+    # （地板 9 + 晋升 2 = 水位 11）
     assert af.BASE_WATERMARK == 9
-    assert af.KPI_WATERMARK == 10
-    assert len(af.AUTHORIZED_KPI_SOLVES) == 10
+    assert af.KPI_WATERMARK == 11
+    assert len(af.AUTHORIZED_KPI_SOLVES) == 11
     assert "real_crypto_ezrsa" in af.AUTHORIZED_KPI_SOLVES
+    assert "real_crypto_simplelegendre" in af.AUTHORIZED_KPI_SOLVES
     # 晋升必须带可审计证据（PROMOTION_WITHOUT_EVIDENCE 反之阻断）
     assert af.PROMOTION_EVIDENCE["real_crypto_ezrsa"].startswith("sha256:93be5f3a")
     assert "REGRESS_PASS" in af.PROMOTION_EVIDENCE["real_crypto_ezrsa"]
+    assert af.PROMOTION_EVIDENCE["real_crypto_simplelegendre"].startswith("sha256:75e6aa4d")
+    assert "REGRESS_PASS" in af.PROMOTION_EVIDENCE["real_crypto_simplelegendre"]
 
 
 # ── WATERMARK_DRIFT / WATERMARK_REGRESSION ──
@@ -74,8 +78,8 @@ def test_watermark_drift_blocked(tmp_violation_log, monkeypatch):
 
 
 def test_watermark_above_floor_blocked(tmp_violation_log, monkeypatch):
-    # 11 > 地板9 但无晋升记录 → 仍判 WATERMARK_DRIFT（溢出无证据）
-    monkeypatch.setattr(af, "count_offline_verified", lambda: 11)
+    # 12 > 地板9+晋升2=水位11 但无对应晋升记录 → 仍判 WATERMARK_DRIFT（溢出无证据）
+    monkeypatch.setattr(af, "count_offline_verified", lambda: 12)
     v = af.check_kpi_watermark()
     assert any(r["rule"] == "WATERMARK_DRIFT" for r in v)
 
