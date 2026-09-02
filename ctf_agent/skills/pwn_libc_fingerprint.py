@@ -99,6 +99,16 @@ def pwn_libc_fingerprint(params: dict) -> dict:
     return result
 
 
+def run(params: dict) -> dict:
+    """skill 统一入口（SkillManager.load 强制要求 module.run 可调用）。
+
+    2026-09-01 修复：原入口函数名为 pwn_libc_fingerprint(params)，缺 run()
+    → load() 记「缺少 run() 函数」直接返回 None，该 skill 长期死加载。
+    此处委托给既有实现，行为不变。
+    """
+    return pwn_libc_fingerprint(params)
+
+
 def main() -> None:
     import argparse
 

@@ -22,14 +22,14 @@
 ### A 类 · 完整攻击链离线核验 —— ✅ 计入
 - 定义：对真实赛题附件/源码完成完整攻击链（≥2 步推理），产出 flag 与题面真值
   （`flag_sha256` / 官方 writeup / 视觉确认）一致，且有可复现命令或独立 verifier 脚本。
-- 当前 9 条严格真题中 A 类 5 条：10733 / vnctf_flag / xuanhun_signin / sheng / upx（specialcurve2 / 10732 / 10735 经 2026-08-27 诚实校准判定为不可复现，已移出严格 KPI，见各自题块 ⛔；ezrsa / simplelegendre / exciting_inverse 经 2026-08-28 实测 presolve 提取=None 移出严格 KPI，见 KNOWN_GAP）。
+- 当前 10 条严格真题中 A 类 5 条：10733 / vnctf_flag / xuanhun_signin / sheng / upx（specialcurve2 / 10732 / 10735 经 2026-08-27 诚实校准判定为不可复现，已移出严格 KPI，见各自题块 ⛔；simplelegendre / exciting_inverse 经 2026-08-28 实测 presolve 提取=None 移出严格 KPI，见 KNOWN_GAP）。
 
 ### B 类 · presolve 确定性密码学变换 —— ✅ 计入（2026-08-27 方案 A 裁定）
 - 定义：由确定性 skill 实现真实密码学/编码变换（非 grep 明文），输出与题面自带
   `flag_sha256` 逐字匹配，且明文 flag 已落盘 `data/results/verified_flags.json`。
 - 区别于 C 类：**B 类必须存在可运行的变换代码路径**（如八进制+Vigenère / Hastad CRT /
   勒让德逐位 / base64+ROT13），不是从题面文件直接抽取答案。
-- 当前 9 条严格真题中 B 类 4 条：anwang_crypto1 / ezmult / filterrandom / qiangwang_classic（ezrsa / simplelegendre / exciting_inverse 经 2026-08-28 实测 presolve 提取=None，移出严格 KPI 并列入 KNOWN_GAP）。
+- 当前 10 条严格真题中 B 类 5 条：anwang_crypto1 / ezmult / filterrandom / qiangwang_classic / ezrsa（ezrsa 经 2026-09-03 Håstad 求解器 `_regress_one.py` REGRESS_PASS 带证据重新晋级，见题块 7 与 `_antifraud.PROMOTION_EVIDENCE`；simplelegendre / exciting_inverse 仍因 2026-08-28 presolve 提取=None 移出严格 KPI 并列入 KNOWN_GAP）。
 
 ### C 类 · flag_scan / 源码 grep 明文披露 —— ❌ 不计入
 - 定义：从源码注释 / HTML / JS / manifest 直接 grep 出 flag 明文（如 reverse_js 2ms、
@@ -68,7 +68,7 @@
 
 ---
 
-## 二、离线核验解出（严格 KPI 9 题 = A 类 5 + B 类 4；外部真题 HGAME RSA1/RSA2/RSA3 与西湖论剑2021 FilterRandom 已于 2026-08-27 公开重建复现通过（RSA3 用公开真 flag 自洽重建；西湖用公开源码+自洽实例），但 E 类不计 KPI；specialcurve2 / 10732 / 10735 经 2026-08-27 诚实校准判定不可复现，已移出严格 KPI 并列入 KNOWN_GAP；ezrsa / simplelegendre / exciting_inverse 经 2026-08-28 实测 presolve 提取=None，移出严格 KPI 并列入 KNOWN_GAP）
+## 二、离线核验解出（严格 KPI 10 题 = A 类 5 + B 类 5；外部真题 HGAME RSA1/RSA2/RSA3 与西湖论剑2021 FilterRandom 已于 2026-08-27 公开重建复现通过（RSA3 用公开真 flag 自洽重建；西湖用公开源码+自洽实例），但 E 类不计 KPI；specialcurve2 / 10732 / 10735 经 2026-08-27 诚实校准判定不可复现，已移出严格 KPI 并列入 KNOWN_GAP；ezrsa 于 2026-09-03 经 Håstad 求解器带证据重新晋级（见题块 7）；simplelegendre / exciting_inverse 经 2026-08-28 实测 presolve 提取=None，仍移出严格 KPI 并列入 KNOWN_GAP）
 
 ### 1. real_crypto_specialcurve2 【A类·完整攻击链】（西湖论剑 2021）
 
@@ -168,10 +168,10 @@
 
 - **来源**：`data/questions_real/crypto/real_crypto_ezrsa.json`
 - **类型**：crypto / RSA 低指数 Hastad 广播攻击（e=17 爆破）
-- **状态**：⛔ unreproducible（确定性管线当前不解出，仅历史人工解出，严格 KPI 不计 —— 2026-08-28 实测 presolve 提取=None）
+- **状态**：✅ offline_verified（2026-09-03 带证据晋级：`skills/crypto_hastad_broadcast.py` Håstad 求解器接入 presolve `_try_hastad_broadcast`，`_regress_one.py` 实测 REGRESS_PASS、e=17，sha256 匹配题面官方值 —— 见 `_antifraud.PROMOTION_EVIDENCE` 提升记录）
 - **flag**：`<REDACTED> sha256=93be5f3ad422c43e99e705f52df3ad974548dc558714e48162d3939787bdfdbf`（明文见 verified_flags.json）
-- **核验方式**：output 6 行 = n1/c1/n2/c2/n3/c3；爆破 e<100 素数，CRT 组合三组 (n,c) + 17 次根得明文；flag sha256 匹配题面官方值
-- **可复现命令**：`.venv/Scripts/python.exe scripts/_verify_presolve_truth.py`
+- **核验方式**：output 6 行 = n1/c1/n2/c2/n3/c3；CRT 合并三组 (n,c) + 整数开 e 次根（e 爆破 2..99 命中 17）得明文；flag sha256 匹配题面官方值
+- **可复现命令**：`.venv/Scripts/python.exe scripts/_regress_one.py real_crypto_ezrsa`（应输出 REGRESS_PASS）
 
 ### 8. real_crypto_simplelegendre 【B类·presolve密码学变换】（历年真题 · 勒让德符号逐位解密）
 
@@ -368,7 +368,7 @@
 | 口径 | 数值 | 说明 |
 |---|---|---|
 | 平台 accepted | **0** | 比赛结束，无开放赛事 |
-| **严格真题 offline_verified（唯一 KPI，merge_gate 机器真值）** | **9** | 台账第二节 9 个 ✅ A/B 类题块：10733 + vnctf_flag + xuanhun_signin + anwang_crypto1 + ezmult + filterrandom + qiangwang_classic + sheng + upx（specialcurve2 / 10732 / 10735 经 2026-08-27 诚实校准判定不可复现、移出严格 KPI 并列入 KNOWN_GAP；ezrsa / simplelegendre / exciting_inverse 经 2026-08-28 实测 `scripts/_verify_presolve_truth.py` 与 `scripts/_regress_one.py` 均 presolve 提取=None，移出严格 KPI 并列入 KNOWN_GAP；`scripts/_merge_gate.py count_offline_verified` 实跑计数 fail-closed） |
+| **严格真题 offline_verified（唯一 KPI，merge_gate 机器真值）** | **10** | 台账第二节 10 个 ✅ A/B 类题块：10733 + vnctf_flag + xuanhun_signin + anwang_crypto1 + ezmult + filterrandom + qiangwang_classic + sheng + upx + ezrsa（ezrsa 2026-09-03 经 Håstad 求解器 `_regress_one.py` REGRESS_PASS 带证据晋级；specialcurve2 / 10732 / 10735 经 2026-08-27 诚实校准判定不可复现、移出严格 KPI 并列入 KNOWN_GAP；simplelegendre / exciting_inverse 经 2026-08-28 实测 `scripts/_verify_presolve_truth.py` 与 `scripts/_regress_one.py` 均 presolve 提取=None，移出严格 KPI 并列入 KNOWN_GAP；`scripts/_merge_gate.py count_offline_verified` 实跑计数 fail-closed） |
 | 确定性管线真值验证 | **14 / 15** | 第二节-B：presolve+工具层提取 flag 与题库真值逐字一致；第 15 题 vnctf 走独立图像采样（真题集共 45 道，此 15 道有确定性管线覆盖） |
 | 正式赛真题独立离线核验（genuine，含非自动化） | **3** | 10732 + 10733 + 10735（PKCS#1v1.5 / 高偶指数RSA / pcap盲注）；仅 10733 为严格 ✅ 可机器复现，10732/10735 为 genuine 但仅视觉/历史确认；分母 33 道正式赛 |
 | 外部真题独立离线核验（self-produced 口径） | **4** | HGAME2022 RSA×3 + 2022安网杯 misc3（非平台题，不计入严格 KPI）——HGAME RSA1/RSA2/RSA3 与西湖 FilterRandom 已于 2026-08-27 仓库内重建复现通过；安网 misc3（无公开附件）仍仅历史记录 |

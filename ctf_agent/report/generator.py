@@ -164,3 +164,154 @@ def save_report(md: str, out_dir: str = "data/reports") -> str:
     with open(path, "w", encoding="utf-8") as f:
         f.write(md)
     return path
+
+
+def generate_review_report(
+    goal_log_path: str = "data/results/goal_log.jsonl",
+    ledger_path: str = "REAL_SOLVES_LEDGER.md",
+    out_dir: str = "data/reports",
+) -> str:
+    """复盘报告生成器（2026-09-02，借鉴 SecAutoMind 复盘报告能力）。
+
+    数据源（全部真实执行痕迹，非编造）：
+    - goal_log.jsonl：失败桶归因（error.category）+ 攻击链时间线（task 时间序列）
+    - REAL_SOLVES_LEDGER.md：严格真题 offline_verified 状态
+    - 事实黑板（data/results/blackboard.json）：跨会话已知失败记录
+
+    输出：Markdown 复盘报告——总览 / 失败桶分布 / 攻击链时间线 / IOC 提取 /
+    台账引用。用于赛后复盘与题型弱点发现（挂钩解题能力：失败桶定位下一步补强方向）。
+    """
+    import ast
+    import json
+    import os
+    import re
+    from collections import Counter
+    from pathlib import Path
+
+    # ── 1. goal_log 读取：失败桶 + 时间线 ────────────────────────
+    buckets = Counter()
+    timeline: dict[str, list] = {}
+    total = solved = 0
+    if os.path.exists(goal_log_path):
+        with open(goal_log_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    d = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if str(d.get("task_id")) == "supervise_test":
+                    continue
+                total += 1
+                tid = str(d.get("task_id", "?"))
+                ts = str(d.get("timestamp", ""))[:19]
+                if d.get("flag") and d.get("validated"):
+                    solved += 1
+                e = d.get("error")
+                if isinstance(e, str):
+                    try:
+                        e = ast.literal_eval(e)
+                    except Exception:
+                        e = None
+                cat = e.get("category", "no_error") if isinstance(e, dict) else "no_error"
+                buckets[cat] += 1
+                timeline.setdefault(tid, []).append({
+                    "ts": ts,
+                    "solved": bool(d.get("flag") and d.get("validated")),
+                    "category": cat,
+                })
+
+    # ── 2. 台账读取：offline_verified 状态 ────────────────────────
+    ledger_stats = {"offline_verified": 0, "claimed_pending": 0, "known_gap": 0}
+    ledger_path_full = ledger_path
+    if not os.path.exists(ledger_path_full) and os.path.exists(os.path.join("..", ledger_path)):
+        ledger_path_full = os.path.join("..", ledger_path)
+    if os.path.exists(ledger_path_full):
+        text = open(ledger_path_full, encoding="utf-8").read()
+        ledger_stats["offline_verified"] = len(re.findall(r"offline_verified", text)) if False else 0
+        # 严格口径：台账题块状态行 ✅ 数（与 merge_gate count_offline_verified 一致）
+        ledger_stats["offline_verified"] = len(re.findall(r"\| ✅ \|", text))
+        ledger_stats["claimed_pending"] = len(re.findall(r"claimed_pending|待核验", text))
+        ledger_stats["known_gap"] = len(re.findall(r"KNOWN_GAP|缺运行时参数", text))
+
+    # ── 3. 事实黑板：已知失败记录（IOC/跨会话）────────────────────
+    blackboard_failures = []
+    bb_path = "data/results/blackboard.json"
+    if os.path.exists(bb_path):
+        try:
+            bb = json.load(open(bb_path, encoding="utf-8"))
+            for tid, recs in bb.get("known_failures", {}).items():
+                for r in recs:
+                    blackboard_failures.append({"task_id": tid, **r})
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    # ── 渲染 MD ──────────────────────────────────────────────────
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    lines = [
+        "# 复盘报告（自动生成）",
+        "",
+        f"> 生成时间：{now} ｜ 数据源：goal_log + 台账 + 事实黑板（全部真实执行痕迹）",
+        "",
+        "## 一、总览",
+        "",
+        f"- 目标执行记录：**{total}** 条（剔 supervise_test）",
+        f"- 解出（flag + validated）：**{solved}** 条",
+        f"- 严格真题 offline_verified：**{ledger_stats['offline_verified']}**（台账口径）",
+        f"- 台账待核验/KNOWN_GAP：{ledger_stats['claimed_pending']} / {ledger_stats['known_gap']}",
+        f"- 黑板已知失败记录：**{len(blackboard_failures)}** 条",
+        "",
+        "## 二、失败桶分布（goal_log 归因）",
+        "",
+        "| 失败类别 | 数量 | 占比 |",
+        "|---|---|---|",
+    ]
+    for cat, cnt in buckets.most_common():
+        pct = f"{100 * cnt / max(total, 1):.1f}%"
+        lines.append(f"| {cat} | {cnt} | {pct} |")
+    lines.append("")
+
+    # 攻击链时间线（取最长 3 题展示）
+    lines.append("## 三、攻击链时间线（样例）")
+    lines.append("")
+    for tid, steps in sorted(timeline.items(), key=lambda kv: -len(kv[1]))[:3]:
+        lines.append(f"### {tid}（{len(steps)} 步）")
+        lines.append("")
+        lines.append("| 时间 | 结果 | 归因 |")
+        lines.append("|---|---|---|")
+        for s in steps[:8]:
+            res = "✅" if s["solved"] else "❌"
+            lines.append(f"| {s['ts']} | {res} | {s['category']} |")
+        lines.append("")
+
+    # IOC 提取（黑板失败 + 时间线失败归因）
+    lines.append("## 四、IOC / 失败线索（复盘指引）")
+    lines.append("")
+    if blackboard_failures:
+        lines.append("| 题目 | 类别 | 原因 | 时间 |")
+        lines.append("|---|---|---|---|")
+        for rec in blackboard_failures[:10]:
+            lines.append(
+                f"| {rec['task_id']} | {rec.get('category')} | {str(rec.get('reason'))[:60]} | {rec.get('ts')} |"
+            )
+    else:
+        lines.append("（黑板暂无已知失败记录——本轮无跨会话失败沉淀）")
+    lines.append("")
+
+    # 台账引用
+    lines.append("## 五、台账引用")
+    lines.append("")
+    lines.append(f"- 台账：`{ledger_path}`（严格真题 offline_verified={ledger_stats['offline_verified']}）")
+    lines.append(f"- goal_log：`{goal_log_path}`（失败桶归因源）")
+    lines.append("- 复盘要点：失败桶 Top1 即下一轮补强方向（挂钩解题能力最终目标）")
+    lines.append("")
+
+    md = "\n".join(lines)
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path = os.path.join(out_dir, f"复盘报告_{ts}.md")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(md)
+    return path

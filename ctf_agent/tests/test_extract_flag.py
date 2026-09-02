@@ -11,7 +11,11 @@ from core.phases import extract_flag  # noqa: E402
 
 def _ctx(flag_pattern=None, category="crypto"):
     q = SimpleNamespace(id="q1", flag_pattern=flag_pattern, category=category)
-    return SimpleNamespace(question=q, _extract_failed=False)
+    # 2026-09-01：extract_flag 新增「工具证据门」（全程无工具调用即拒绝疑似猜 flag，
+    # spookifier 实证：步骤#0 猜 flag 即 break）。夹具补一个工具步骤，反映真实求解
+    # 「先工具实算、再提取 flag」的路径（证据门只查 has_tool_call，不查 flag 归属）。
+    steps = [SimpleNamespace(action="tool:crypto_auto", observation="crypto_auto done")]
+    return SimpleNamespace(question=q, _extract_failed=False, steps=steps)
 
 
 def _agent():

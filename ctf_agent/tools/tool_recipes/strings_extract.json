@@ -1,0 +1,10 @@
+{
+  "name": "strings_extract",
+  "description": "提取二进制/文件中可读字符串（纯 Python 内建实现，无外部依赖）——reverse 题型 strings 扫描",
+  "command": "python -c \"import re,sys;d=open(sys.argv[1],'rb').read();print('\\n'.join(m.decode('utf-8','replace') for m in re.findall(rb'[\\x20-\\x7e]{5,}',d)))\" {path}",
+  "inputs": [
+    {"name": "path", "required": true, "description": "目标文件路径"}
+  ],
+  "categories": ["reverse", "misc"],
+  "timeout": 30
+}

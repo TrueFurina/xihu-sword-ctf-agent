@@ -229,10 +229,34 @@ def run(payload: dict) -> dict:
     """对齐 jpeg_png_embedded.run 的入口。
 
     payload: {'text': 'UYTGBNM EDCV ...'} 或 {'path': '<附件文件>'}
+             或 {'attachments': [...]}（统一契约，与 flag_scan/crypto_auto 一致，
+             2026-09-01 补：修复 772d5c1 强制路由传 attachments 键不生效的问题）
     返回: {'decoded': 'CLCKOUTHK', 'flag': 'flag{CLCKOUTHK}', 'ascii': str, 'source': ...}
     """
     text = payload.get("text")
     path = payload.get("path")
+    if not text and not path:
+        # ── attachments 统一契约（flag_scan/crypto_auto 同款键）──
+        # 附件路径可能相对 ctf_agent/（如 data/questions_real/_attachments/...），
+        # 也可能已是绝对路径；仅消费 .txt/.text 文本附件。
+        for _a in payload.get("attachments") or []:
+            _p = str(_a)
+            if not _p.lower().endswith((".txt", ".text")):
+                continue
+            _cands = [_p]
+            if not os.path.isfile(_p):
+                _cands.append(os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), _p))
+            for _c in _cands:
+                try:
+                    if os.path.isfile(_c):
+                        with open(_c, encoding="utf-8", errors="replace") as _fh:
+                            text = _fh.read()
+                            break
+                except Exception:
+                    continue
+            if text:
+                break
     if not text and path:
         with open(path, encoding="utf-8", errors="replace") as fh:
             text = fh.read()

@@ -1,0 +1,8 @@
+{
+  "name": "task_analyzer",
+  "purpose": "识别 task.py 的 RSA 算法特征（e/n/hint）并给出解法路由（crypto_pkcs1_improved / crypto_high_exponent / rsa_fermat_factor），属元分析 skill，自身不解 flag",
+  "input_spec": "params: path（task.py 路径）或 script（脚本内容）",
+  "output_spec": "dict: algorithm / route / params(e,n,hint) / reason / ok",
+  "categories": ["crypto"],
+  "version": "1.0"
+}

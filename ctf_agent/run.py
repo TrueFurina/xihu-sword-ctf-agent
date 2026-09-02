@@ -128,6 +128,10 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     registry.register(DeterministicDecodeAdapter())  # 确定性解码 fallback（P1-6：postmortem #3）
     registry.register(CryptoAutoAdapter(sandbox=sandbox))  # 确定性 crypto 嗅探/攻击一键直出（2026-08-21 攻坚）
     registry.register(FlagScanAdapter())                    # 确定性 flag 明文扫描（源码注释/HTML alert 类）
+    # ── 工具声明式配方（2026-09-02）：JSON 配方自动注册，降低加工具成本（新增工具只写配方）──
+    from tools.recipe_loader import load_recipe_adapters
+    for _ra in load_recipe_adapters():
+        registry.register(_ra)
     # ── Skill 管理器：本地仓库发现 / 加载（/goal 动态能力拓展）──
     _skills_dir = os.path.join(_ROOT, "skills")
     skill_manager = SkillManager(skills_dir=_skills_dir, registry=registry)
@@ -238,6 +242,20 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
         _usage_tok = _usage_cv.set(_usage_box)
         try:
             out = await agent.solve(question, attempt=attempt, hint=hint, correction=correction)
+        except BudgetExceeded as _be:
+            # 边界兜底（2026-08-29 精进）：任何子路径（监督/工具/目标指令等）抛出的
+            # 预算超限都不允许逃逸出 solve_once——转成与 budget.check BUDGET_STOP
+            # 一致口径的 budget_exceeded 输出（而非退化 solver_exception），
+            # 防整场评测被单题预算异常击穿（B1 首跑 exit=1 事后防护）。
+            return {
+                "task_id": question.id,
+                "question_type": question.category,
+                "flag": None,
+                "error": {"category": "budget_exceeded",
+                          "detail": f"步级硬停：单题预算超限（{_be.question_id}: {_be.used} >= {_be.cap}）"},
+                "duration_ms": 0,
+                "retries": attempt,
+            }
         finally:
             _usage_cv.reset(_usage_tok)
         # token 记账（P1-2 修复 2026-08-21）：优先用真实 usage 累计值，
@@ -276,6 +294,9 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
         expected = answers.get(str(question.id)) if answers else None
         _expected_q = _answers_q.get(str(question.id)) if _answers_q else None
         if expected and out.get("flag"):
+            logger.warning("[%s] solver 收到 flag=%s validated=%s expected=%s",
+                           getattr(question, "id", "?"), str(out["flag"])[:60],
+                           out.get("validated"), str(expected)[:20])
             _ok = _expected_q.flag_matches(out["flag"]) if _expected_q else (out["flag"] == expected)
             if not _ok:
                 out["validated"] = False

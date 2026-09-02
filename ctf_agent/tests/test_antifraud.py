@@ -53,10 +53,15 @@ def test_clean_enforce_passes():
 
 
 def test_kpi_watermark_floor_is_nine():
-    # 写死真值锚，不得依赖任何外部文件；水位 = 基线9 + 证据化晋升数(0)
+    # 写死真值锚，不得依赖任何外部文件；水位 = 地板9 + 证据化晋升数
+    # 2026-09-03 正式提升：ezrsa 经 PROMOTION_EVIDENCE 带证据晋级（地板 9 + 晋升 1 = 水位 10）
     assert af.BASE_WATERMARK == 9
-    assert af.KPI_WATERMARK == 9
-    assert len(af.AUTHORIZED_KPI_SOLVES) == 9
+    assert af.KPI_WATERMARK == 10
+    assert len(af.AUTHORIZED_KPI_SOLVES) == 10
+    assert "real_crypto_ezrsa" in af.AUTHORIZED_KPI_SOLVES
+    # 晋升必须带可审计证据（PROMOTION_WITHOUT_EVIDENCE 反之阻断）
+    assert af.PROMOTION_EVIDENCE["real_crypto_ezrsa"].startswith("sha256:93be5f3a")
+    assert "REGRESS_PASS" in af.PROMOTION_EVIDENCE["real_crypto_ezrsa"]
 
 
 # ── WATERMARK_DRIFT / WATERMARK_REGRESSION ──
@@ -143,7 +148,7 @@ def test_baseline_tamper_blocked(tmp_violation_log, monkeypatch, tmp_path):
 
 def test_baseline_consistent_ok(tmp_violation_log, monkeypatch, tmp_path):
     bp = tmp_path / "KPI_BASELINE.json"
-    bp.write_text(json.dumps({"offline_verified": 9}), encoding="utf-8")
+    bp.write_text(json.dumps({"offline_verified": af.KPI_WATERMARK}), encoding="utf-8")
     monkeypatch.setattr(af, "BASELINE", str(bp))
     assert af.check_baseline_consistency() == []
 

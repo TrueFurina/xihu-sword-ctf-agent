@@ -91,6 +91,13 @@ REGRESSION_CHECKS = [
         "cmd": [sys.executable, "scripts/_regress_one.py", "real_misc_xuanhun_signin"],
         "flag_contains": "REGRESS_PASS",
     },
+    # 2026-09-03 带证据晋级：Håstad 广播攻击确定性求解器 skills/crypto_hastad_broadcast.py
+    # 接入 presolve（_try_hastad_broadcast），实测 REGRESS_PASS（e=17，sha256 匹配题面真值）。
+    {
+        "id": "real_crypto_ezrsa",
+        "cmd": [sys.executable, "scripts/_regress_one.py", "real_crypto_ezrsa"],
+        "flag_contains": "REGRESS_PASS",
+    },
 ]
 
 KNOWN_GAP = [
@@ -102,8 +109,6 @@ KNOWN_GAP = [
      "reason": "2026-08-29 诚实校准：点阵重采样显字（flag 在图内）需 OCR/视觉模型，文本 LLM 不可解=架构级缺口；verify_vnctf_flag.py 依赖 verified_flags.json 真值库（8/28 results 隔离时未随 KPI_BASELINE 恢复、且从未入库），不可复现。台账状态如实降级，移出回归集（与 MEMORY.md 判断一致）"},
     {"id": "real_crypto_specialcurve2",
      "reason": "不可复现：附件 SpecialCurve2.py 仅为恢复的挑战脚本模板，原 n/HINT/C 实例值每次运行随机生成、已永久丢失；verify_specialcurve2.py 仅做 sha256 自比对（同义反复），不真解题。2026-08-27 诚实校准从严格 KPI 与回归集移除"},
-    {"id": "real_crypto_ezrsa",
-     "reason": "2026-08-28 实测：现行确定性管线 presolve 提取=None（❌未命中），仅历史人工解出；KPI 12→9 诚实回退，移出严格 KPI。待修复 crypto_auto/Hastad 求解器后带证据重新晋级"},
     {"id": "real_crypto_simplelegendre",
      "reason": "2026-08-28 实测：现行确定性管线 presolve 提取=None（❌未命中），仅历史人工解出；KPI 12→9 诚实回退，移出严格 KPI。待修复勒让德符号求解器后带证据重新晋级"},
     {"id": "real_crypto_exciting_inverse",

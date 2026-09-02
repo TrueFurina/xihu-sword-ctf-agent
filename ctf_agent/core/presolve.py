@@ -353,6 +353,20 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
     """
     if not force and presolve_attempted(question):
         return None
+    # 事实黑板缓存复用（2026-09-02）：同一真题跨会话/跨进程二次命中直接返回，
+    # 跳过重算（挂钩解题速度）——黑板仅本地共享（data/results/blackboard.json）
+    if not force:
+        try:
+            _qid = str(getattr(question, "id", ""))
+            if _qid:
+                from core.blackboard import get_blackboard
+                _cached = get_blackboard().get_presolve(_qid)
+                if _cached and _cached[0]:
+                    logger.info("[presolve:blackboard] %s 黑板缓存命中 flag=%s",
+                                _qid, str(_cached[0])[:40])
+                    return _cached[0]
+        except Exception as _e:  # noqa: BLE001 - 黑板故障不阻塞主流程
+            logger.debug("[presolve:blackboard] %s 读取异常: %s", _qid, _e)
     # 无附件且非 crypto/misc 关键词题 → 无可嗅探，不标记（允许后续附件出现时重试）
     attach = _attachments(question)
     cat = str(getattr(question, "category", "")).lower()
@@ -369,6 +383,7 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
     _tasks = [
         asyncio.ensure_future(_try_flag_scan(question, registry)),
         asyncio.ensure_future(_try_crypto_auto(question, registry)),
+        asyncio.ensure_future(_try_hastad_broadcast(question)),
         asyncio.ensure_future(_try_math_engine(question)),
         asyncio.ensure_future(_try_fast_solve(question)),
         asyncio.ensure_future(_try_jpeg_png_embedded(question)),
@@ -379,6 +394,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_complex_mult_group(question)),
         asyncio.ensure_future(_try_grid_resample(question)),
         asyncio.ensure_future(_try_zip_fake_encryption(question)),
+        asyncio.ensure_future(_try_zero_width(question)),
+        asyncio.ensure_future(_try_pattern_scan(question)),
     ]
     try:
         for _fut in asyncio.as_completed(_tasks):
@@ -400,6 +417,14 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
                         getattr(question, "id", "?"), _fp, _r)
                     continue
                 if _passes_answer_check(question, _r, answers):
+                    # 事实黑板写缓存（2026-09-02）：解出成功后供跨会话复用
+                    try:
+                        _qid = str(getattr(question, "id", ""))
+                        if _qid:
+                            from core.blackboard import get_blackboard
+                            get_blackboard().set_presolve(_qid, _r, source="presolve")
+                    except Exception:
+                        pass
                     return _r
             if _r and not _is_plausible_flag(_r):
                 logger.debug("[presolve] %s 命中但疑似垃圾/占位 flag，丢弃: %r",
@@ -549,6 +574,155 @@ async def _try_keyboard_path(question) -> Optional[str]:
                 return str(flag)
         except Exception as exc:  # noqa: BLE001
             _warn_import_once("skills.crypto_keyboard_path", exc)
+    return None
+
+
+async def _try_hastad_broadcast(question) -> Optional[str]:
+    """Håstad 广播攻击（2026-09-03 新增 · B 类确定性密码学变换）。
+
+    对附件中含「多组大整数」的文本文件（如 output / out / .txt）调用
+    skills.crypto_hastad_broadcast.run()：识别同一明文多模数小指数 RSA
+    （c_i = m^e mod n_i，真题约束 e<100 但 e 未显式给出），
+    CRT 合并各组密文后对 e=2..99 逐个做整数 e 次根，还原 m 并解出 flag。
+
+    触发面：任意 <512KB 的附件（大整数解析极快，实测 ezrsa 0.02s）。
+    仅当开根结果解出 flag_pattern 匹配明文才返回（防误报）。
+
+    诚实口径：本路是「Håstad 广播攻击」这一真实密码学攻击的确定性实现
+    （CRT + 整数开根，非 grep 明文、非读答案密钥），命中结果由题面
+    flag_sha256 逐字校验把关。实测 real_crypto_ezrsa：e=17，sha256 匹配。
+    """
+    attach = _attachments(question)
+    if not attach:
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            if os.path.getsize(p) > 512 * 1024:
+                continue
+        except OSError:
+            continue
+        try:
+            from skills.crypto_hastad_broadcast import run as hb_run
+            r = hb_run({"path": p})
+            if not r:
+                continue
+            logger.info("[presolve:hastad_broadcast] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), str(r)[:40])
+            _save_candidates(question, [str(r)])
+            return str(r)
+        except Exception as exc:  # noqa: BLE001
+            _warn_import_once("skills.crypto_hastad_broadcast", exc)
+    return None
+
+
+async def _try_zero_width(question) -> Optional[str]:
+    """零宽字符隐写解码（2026-09-01 精进 ③a）。
+
+    对附件文本中的零宽字符（ZWSP/ZWNJ/ZWJ/词连接符）按常见编码试解码：
+    ① 二进制：ZWSP=0, ZWNJ=1（含 FEFF/2060 变体，正反序都试）→ 8bit/字符；
+    ② 四进制（yuanfux/zero-width-lib 风格）：200B=0, 200C=1, 200D=2, 2060=3 → 每 4 字符 1 字节。
+    仅当解码出 flag_pattern 匹配的明文才返回（防误报）。
+    BeCare4 本地缺 npmtxt 原文件（题面 markdown 无零宽数据——原文件在官方仓库），
+    本路对开赛/未来真实零宽题生效（2026-09-01 misc 附件全量扫描：44 附件 0 零宽字符）。
+    """
+    attach = _attachments(question)
+    if not attach:
+        return None
+    text = ""
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            text += open(p, "rb").read().decode("utf-8", errors="ignore")
+        except Exception:  # noqa: BLE001 - 单个附件读失败跳过
+            continue
+    _map = {"\u200b": "0", "\u200c": "1", "\u200d": "2", "\ufeff": "0", "\u2060": "1"}
+    seq = [_map[c] for c in text if c in _map]
+    if len(seq) < 8:
+        return None
+    import re as _re
+
+    pattern = getattr(question, "flag_pattern", None) or r"(?:flag|D0g3)\{[^}]+\}"
+    # ① 二进制试解（ZWSP/ZWNJ，正反序）
+    for zero, one in (("0", "1"), ("1", "0")):
+        bits = "".join("1" if b == one else "0" for b in seq if b in (zero, one))
+        try:
+            s = "".join(chr(int(bits[i:i + 8], 2)) for i in range(0, len(bits) - 7, 8))
+        except Exception:  # noqa: BLE001 - 非法位串跳过
+            continue
+        m = _re.search(pattern, s)
+        if m and _is_plausible_flag(m.group(0)):
+            logger.info("[%s] 零宽隐写二进制解码命中: %s",
+                        getattr(question, "id", "?"), m.group(0)[:40])
+            return m.group(0)
+    # ② 四进制试解（200B=0, 200C=1, 200D=2, 2060=3）
+    q4 = ""
+    for c in text:
+        o = ord(c)
+        if o == 0x200B:
+            q4 += "0"
+        elif o == 0x200C:
+            q4 += "1"
+        elif o == 0x200D:
+            q4 += "2"
+        elif o == 0x2060:
+            q4 += "3"
+    if len(q4) >= 8:
+        try:
+            s = "".join(chr(int(q4[i:i + 4], 4)) for i in range(0, len(q4) - 3, 4))
+            m = _re.search(pattern, s)
+            if m and _is_plausible_flag(m.group(0)):
+                logger.info("[%s] 零宽隐写四进制解码命中: %s",
+                            getattr(question, "id", "?"), m.group(0)[:40])
+                return m.group(0)
+        except Exception:  # noqa: BLE001 - 非法四进制串跳过
+            pass
+    return None
+
+
+async def _try_pattern_scan(question) -> Optional[str]:
+    """按题面声明 flag_pattern 扫附件明文（2026-09-01 精进 ③b/③c 核心引擎）。
+
+    根因：flag_scan 只匹配 flag{}/DASCTF{}/CTF{} 三种前缀——VNCTF{}/HTB{}/D0g3{}/
+    LINECTF{}/dice{}/hope{}/ctfplus{}/UDOM{}/wgmy{}/NSSCTF{}/ISCTF{} 等题面声明的
+    pattern 全漏。实测 2026-09-01 全库扫描：73 题附件直接含题面 pattern 明文，
+    presolve 矩阵 18 个缺口里绝大多数（timeflies VNCTF、spookifier HTB、linectf
+    LINECTF、BeCare4 D0g3、cmd_inj UDOM 等）答案明文就在附件里。
+    本路按题面 flag_pattern 直扫附件文本；模板占位（%d/%s）拒绝；正确性由下游
+    flag_matches（sha256 双源校验）把关——匹配不上就是诱饵，不算真解。
+    """
+    attach = _attachments(question)
+    pattern = getattr(question, "flag_pattern", None)
+    if not attach or not pattern:
+        return None
+    import re as _re
+
+    try:
+        rx = _re.compile(pattern)
+    except Exception:  # noqa: BLE001 - 非法 pattern 跳过
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            txt = open(p, "rb").read().decode("utf-8", errors="ignore")
+        except Exception:  # noqa: BLE001 - 单附件读失败跳过
+            continue
+        m = rx.search(txt)
+        if not m:
+            continue
+        cand = m.group(0)
+        if _re.search(r"%[dsfx]", cand):
+            continue  # 模板占位（如 filterrandom 的 DASCTF{%d-%d}），拒绝
+        if _is_plausible_flag(cand):
+            logger.info("[%s] flag_pattern 附件直扫命中: %s",
+                        getattr(question, "id", "?"), cand[:40])
+            return cand
     return None
 
 

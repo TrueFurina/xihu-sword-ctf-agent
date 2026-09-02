@@ -52,6 +52,11 @@ ctf_agent/docs/archive/root_docs/独立赛前评估-代码核验版-20260821.md
 ctf_agent/docs/archive/root_docs/赛前手雷手册-20260821.md
 ctf_agent/deliverables/archive_禁用引用/
 ctf_agent/deliverables/赛时手册/
+# 本地解题产物/报告（不进 git，本地保留）——对齐根 /deliverables/ 约定
+# 2026-09-03 归位：honest_bench/llm_breaking_ice/能力缺口诊断等本地产物统一落本地，
+# 杜绝 `git add -A` 误提交污染（含并行进程自动提交）。
+# 注：已跟踪的 benchmark_runs/llm_breaking_ice_20260828-* 不受影响（gitignore 不取消跟踪）。
+ctf_agent/deliverables/**
 协同任务总账-TOP0.md
 solutions/
 wt-web-target/

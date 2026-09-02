@@ -446,10 +446,28 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
                 return None
             return flag
     pattern = getattr(ctx.question, "flag_pattern", None) or r"flag\{[^}]+\}"
+    # 2026-09-01 修复（LLM 幻觉根因，spookifier 实证）：正则/E1 兜底路径同样要过
+    # 「工具证据」门——此前只有 checker 路径校验 in_cur/in_hist/has_tool，兜底路径对
+    # LLM 自写文本里的 flag 型字符串直接放行 → 步骤#0 猜 flag 即 break（3 重试全同）。
+    # 门禁（与 checker 路径第二道一致）：全程无任何工具/脚本调用 → 拒绝（疑似瞎猜）。
+    _steps = getattr(ctx, "steps", None) or []
+    _has_tool_call = any(
+        str(getattr(s, "action", "")).startswith("tool:")
+        or str(getattr(s, "action", "")) in ("script", "http_request", "file_analyze",
+                                             "search", "submit_script", "bruteforce")
+        for s in _steps
+    ) or str(act.get("kind") or "") in ("tool", "script")
     if not primary_blocked:
         m = re.search(pattern, str(output))
         if m:
-            return m.group(0)
+            _f = m.group(0)
+            if not _has_tool_call:
+                logger.info("[%s] 正则兜底 flag 无工具证据（疑似猜 flag，拒绝）: %s",
+                            getattr(ctx, "question", None) and ctx.question.id or "?", _f[:40])
+                ctx._extract_failed = True
+                _mark_hallucination(ctx)
+                return None
+            return _f
     # ── E1 结构化候选兜底：主输出无匹配时，扫 JSON 候选列表 ──
     # 仅做模板级正则校验（格式符占位/flag_pattern）；候选来自 LLM 结构化输出，
     # 但附件明文 flag 经正则提取即应接受（X8ccET：d0g3{...} 来自 read 工具落盘 output）。
@@ -458,6 +476,10 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
             continue  # 模板占位，跳过（疑似抄题面）
         mc = re.search(pattern, cand)
         if mc:
+            if not _has_tool_call:
+                ctx._extract_failed = True
+                _mark_hallucination(ctx)
+                return None
             ctx._extract_failed = False  # 找到有效候选，撤销主输出误触发的提取失败埋点
             return mc.group(0)
     return None

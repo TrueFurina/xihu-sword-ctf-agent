@@ -72,6 +72,7 @@ def run_benchmark(
     per_question_wallclock_s: float = 300.0,
     race_controller: "Optional[RaceController]" = None,
     concurrency: int = 1,
+    progress_path: Optional[str] = None,
 ) -> list[BenchmarkResult]:
     """对题目列表逐个求解并统计。
 
@@ -161,6 +162,15 @@ def run_benchmark(
             results.append(_loop.run_until_complete(_solve_question(q)))
         finally:
             _loop.close()
+        # 崩溃安全网（2026-09-01）：逐题落盘——即使中途异常终止（B1 exit=1 教训），
+        # 已完成题的原始数据不丢（progress.jsonl）。
+        if progress_path:
+            try:
+                import json as _json
+                with open(progress_path, "a", encoding="utf-8") as _pf:
+                    _pf.write(_json.dumps(results[-1].to_dict(), ensure_ascii=False) + "\n")
+            except Exception:  # noqa: BLE001 - 进度落盘失败不影响评测
+                pass
     return results
 
 
@@ -225,6 +235,35 @@ def summarize(results: list[BenchmarkResult]) -> dict:
         "by_provenance": by_provenance,
         "by_solved_by": by_solved_by,
     }
+
+
+def _run_benchmark_safely(args, questions, solver, use_mock: bool, race_controller) -> list:
+    """崩溃安全网（2026-09-01）：run_benchmark + 逐题进度落盘 + BaseException 兜底报告。
+
+    B1 首跑 exit=1（无 traceback、无报告）教训——任何逃逸（SystemExit/KeyboardInterrupt 等
+    BaseException 类，`except Exception` 抓不住）都要留下诊断信息与已完成数据，
+    不允许静默丢报告。
+    """
+    import dataclasses
+    from pathlib import Path
+
+    _progress = str(Path(args.results_dir) / "progress.jsonl")
+    try:
+        return run_benchmark(questions, solver, max_retries=args.max_retries, use_mock=use_mock,
+                             per_question_wallclock_s=args.wallclock,
+                             race_controller=race_controller, concurrency=args.concurrency,
+                             progress_path=_progress)
+    except BaseException as _bex:  # noqa: BLE001 - 安全网兜底（一切逃逸）
+        logger.error("评测异常终止（安全网捕获）: %r", _bex)
+        try:
+            _od = Path(args.results_dir)
+            _od.mkdir(parents=True, exist_ok=True)
+            (_od / "benchmark_report.json").write_text(
+                json.dumps({"aborted": True, "abort_reason": repr(_bex)},
+                           ensure_ascii=False, indent=1), encoding="utf-8")
+        except Exception:  # noqa: BLE001 - 兜底报告失败不影响 raise
+            pass
+        raise
 
 
 def main() -> None:
@@ -308,9 +347,8 @@ def main() -> None:
 
         logger.info("真实基线钉死配置 provider=%s base_url_host=%s wallclock=%.0fs",
                     providers[0], _bu_host, args.wallclock)
-        results = run_benchmark(questions, solver, max_retries=args.max_retries, use_mock=False,
-                                per_question_wallclock_s=args.wallclock,
-                                race_controller=race_controller, concurrency=args.concurrency)
+        results = _run_benchmark_safely(args, questions, solver, use_mock=False,
+                                        race_controller=race_controller)
         summary = summarize(results)
         # Claim 1 实验（2026-08-28）：真实 token 用量（solver.budget 记账）——
         # 供"熔断降 Token"对比实验报实测基线（评估要求 ≥3 种子 + CI，先报基线再谈 delta）。
@@ -351,9 +389,8 @@ def main() -> None:
 
         logger.info("真实基线(多provider之一) provider=%s base_url_host=%s wallclock=%.0fs",
                     prov, _bu_host, args.wallclock)
-        res = run_benchmark(_questions, solver, max_retries=args.max_retries, use_mock=False,
-                            per_question_wallclock_s=args.wallclock,
-                            race_controller=race_controller, concurrency=args.concurrency)
+        res = _run_benchmark_safely(args, _questions, solver, use_mock=False,
+                                    race_controller=race_controller)
         summ = summarize(res)
         per_provider[prov] = summ
         ids = {r.question_id for r in res if r.solved}

@@ -279,6 +279,21 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "坐标": "crypto_keyboard_path", "九宫格": "crypto_keyboard_path",
         "手机键盘": "crypto_keyboard_path", "telnet": "crypto_keyboard_path",
         "按键": "crypto_keyboard_path", "键盘布局": "crypto_keyboard_path",
+        # ── M4 接线补强（2026-09-01）：原孤儿 skill，已验证 run() 可加载，补触发词 ──
+        # pwn_libc_fingerprint：libc 指纹/基址计算（pwn 泄露 libc 地址场景）
+        "libc": "pwn_libc_fingerprint", "libc指纹": "pwn_libc_fingerprint",
+        "libc基址": "pwn_libc_fingerprint", "libc基地址": "pwn_libc_fingerprint",
+        "got表": "pwn_libc_fingerprint", "plt": "pwn_libc_fingerprint",
+        "ret2libc": "pwn_libc_fingerprint", "one_gadget": "pwn_libc_fingerprint",
+        # crypto_pkcs1_improved：hint=(e*p+e²)^q mod n / AES-ECB 改进填充 RSA
+        "pkcs1": "crypto_pkcs1_improved", "pkcs#1": "crypto_pkcs1_improved",
+        "改进填充": "crypto_pkcs1_improved",
+        # misc_bigfile_traffic：16MB+ pcapng / 超大 zip 直读（避免超时）
+        "大文件": "misc_bigfile_traffic", "超大": "misc_bigfile_traffic",
+        "pcapng": "misc_bigfile_traffic", "流量包": "misc_bigfile_traffic",
+        "大流量": "misc_bigfile_traffic", "mmap扫描": "misc_bigfile_traffic",
+        # task_analyzer：task.py RSA 算法识别+路由（元分析 skill，crypto 附 .py 脚本时）
+        "task.py": "task_analyzer", "rsa脚本": "task_analyzer", "rsa加密脚本": "task_analyzer",
     }
     for keyword, skill_name in skill_map.items():
         if keyword in desc or keyword in " ".join(gaps).lower():

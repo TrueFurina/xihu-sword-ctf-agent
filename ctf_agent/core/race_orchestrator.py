@@ -47,6 +47,8 @@ class RaceController:
         self.time_budget_min = time_budget_min
         self.budget_total = budget_total
         self.confidence_floor = confidence_floor
+        self._last_mv: dict = {}        # qid -> 边际收益（plan() 填充，reflect 守卫用）
+        self._last_mv_max: float = 0.0  # 本轮最大 MV（相对阈值基准）
 
     def plan(self, questions: List[Any]) -> Allocation:
         """基于题目清单构造 RaceState，经 DecisionEngine 输出资源分配方案。"""
@@ -57,14 +59,33 @@ class RaceController:
             total_count=len(questions),
             solved_count=0,
         )
+        self._last_mv = {}
+        _mv_max = 0.0
         for q in questions:
             qs = QuestionState(
                 qid=getattr(q, "id", ""),
                 category=getattr(q, "category", "misc"),
             )
+            # 边际收益（2026-08-29 赛智收尾）：解出概率 × 分值 / 预计成本。
+            # 此前 QuestionState.marginal_value 从未被计算（全 0），DecisionEngine
+            # 的 MV 排序实际惰性——这里真正落地 MV 维度。
+            _mv = self._compute_marginal_value(qs, q)
+            qs.marginal_value = _mv
+            self._last_mv[qs.qid] = _mv
+            _mv_max = max(_mv_max, _mv)
             state.question_states[qs.qid] = qs
             state.pending_questions.append(qs)
+        self._last_mv_max = _mv_max
         return self._engine.decide(state)
+
+    @staticmethod
+    def _compute_marginal_value(qs: QuestionState, q: Any) -> float:
+        """启发式边际收益 = 解出概率 × 分值 / 预计成本（不调用 LLM）。"""
+        diff = str(getattr(q, "difficulty", "") or "").upper()
+        _prob = {"EASY": 0.7, "MEDIUM": 0.5, "HARD": 0.3}.get(diff, 0.5)
+        _score = float(getattr(q, "score", 100) or 100)
+        _cost = 1.0 if str(qs.category).lower() in ("crypto", "pwn", "reverse") else 0.6
+        return round(_prob * _score / _cost, 4)
 
     @staticmethod
     def _confidence_from_output(output: Optional[dict]) -> float:
@@ -107,5 +128,11 @@ class RaceController:
         # ABANDON（预算反思）优先；SWITCH 对 benchmark 的 run_benchmark 是无操作
         # （仅处理 ABANDON），对 FeedbackLoop/live 链路是提前换题。
         if result.decision != "ABANDON" and conf < self.confidence_floor and attempt_index >= 1:
+            # MV 守卫（2026-08-29 赛智收尾）：高边际收益题多给机会——即使信心低，
+            # 只要这题价值高（MV ≥ 本轮峰值的一半）就不换题；低价值题才 SWITCH。
+            # 未在 plan() 中出现（如 benchmark 路径）→ 维持原 A 实现行为（SWITCH）。
+            _mv = self._last_mv.get(qid)
+            if _mv is not None and self._last_mv_max > 0 and _mv >= self._last_mv_max * 0.5:
+                return "CONTINUE"
             return "SWITCH"
         return result.decision
