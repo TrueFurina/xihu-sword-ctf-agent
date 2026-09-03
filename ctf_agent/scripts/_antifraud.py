@@ -89,6 +89,31 @@ HONOR_CODE = os.path.join(GOV_DIR, "HONOR_CODE.md")
 #   - 与 9→10/10→11/11→12 三道带证晋级模式区别：那次是「新增离线解出」，本次是「既有
 #     离线解出的可复现性闭环」，不动 _antifraud.PROGRESS_EVIDENCE 也不动 KPI_WATERMARK。
 #
+# 2026-09-03 10732 治理修复（KPI 水位不变 12，本题**不在** 9 地板 BASE_AUTHORIZED_KPI_SOLVES）：
+#   - 长期台账标 ⛔ "脚本散落待固化"，治理 = 从题面 race_details/10732.json 自带的 DASCTF
+#     附件 OSS URL（9.11MB / 腾讯 COS 缓存命中）重下原始赛题 zip → 解出 26MB 完整包
+#     （Crypto 模块 + task.py + PKCS#1.v1.5.enc）→ 落 `data/race_attachments/10732_Yusa的
+#     密码学课堂——PKCS#1的附件/`（本地保留，.gitignore data/race_attachments/ 排除不入 HEAD）
+#   - 写 `scripts/verify_10732.py`：读附件 task.py 注释里的 padded_long → 剥 PKCS#1 v1.5
+#     篡改填充（题方改写 Crypto/Cipher/PKCS1_v1_5.encrypt 为全 0 PS 后门）→ 末尾 16 字节 =
+#     AES_KEY=44bfc33d0bfb3cd688a074a7adad1504（强校验）→ AES-ECB 解密 PKCS#1.v1.5.enc →
+#     38624 字节 %PDF-1.4 PDF → 视觉裁切 flag 行 → 实测 REGRESS_PASS
+#   - REGRESSION_CHECKS 12→13、KNOWN_GAP 3→2（剩 10735 + specialcurve2）
+#   - **不进 PROMOTION_EVIDENCE 原因（诚信底线）**：10732 题面 `data/race_details/10732.json`
+#     **无 flag_sha256 字段**，无可自动化校验的外部真值库。视觉读 + baidu vision LLM 兜底
+#     flag = `DASCTF{6b3ed7dc3c1c6615fb97a7020922f7a5}`，其 sha256 =
+#     `2e9af0b34fa6476a638674bc6342f5aa28ec3187898b98fb3abc2b3be17b75db`，与台账 2026-08-24
+#     记录的 sha256 前缀 `337eadc1a305b60f` 不一致（公开 writeup 同名系列 MT 随机数预测题非
+#     本 PKCS#1 题），无外部真值闭环。若写 PROMOTION_EVIDENCE 把这条 sha256 写进去则属「自
+#     我授权」（verifier 跑 vision → 自己算 sha256 → 自己写白名单 = 闭环自洽但无外部校
+#     验），**违反诚信红线**。故 KPI_WATERMARK 12 不动、COUNT_OFFLINE_VERIFIED 12 不动、
+#     台账 ✅ 不增、KNOWN_GAP 移除归治理成果。
+#   - 与 vnctf_flag 治理修复区别：vnctf 在 9 地板白名单里、台账改 ✅ 不触发 WATERMARK_DRIFT；
+#     10732 不在白名单 → 台账不能标 ✅（否则 n=13 ≠ KPI_WATERMARK=12 触发 WATERMARK_DRIFT
+#     fail-closed）。台账状态表达「✅ 可机器复现 + ⛔ 不进严格 KPI」双标。
+#   - 治理净收益：KNOWN_GAP 4→2（10735/specialcurve2 仍未复现）、REGRESSION_CHECKS 12→13、
+#     附件可机器复现（PKCS#1 v1.5 全 0 PS 后门攻击链落地），KPI 12 水位诚实不动。
+#
 # 模型升级（2026-08-28 评审 R5/G5）：旧版 KPI_WATERMARK 是「等式锁」——n != 9 一律
 # 当注水拒绝，导致真实进展到 10/13 也会被误杀（治理过拟合反作用）。现改为「带证据可
 # 晋级的地板」：

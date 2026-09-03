@@ -22,7 +22,12 @@
 ### A 类 · 完整攻击链离线核验 —— ✅ 计入
 - 定义：对真实赛题附件/源码完成完整攻击链（≥2 步推理），产出 flag 与题面真值
   （`flag_sha256` / 官方 writeup / 视觉确认）一致，且有可复现命令或独立 verifier 脚本。
-- 当前 12 条严格真题中 A 类 5 条：10733 / vnctf_flag / xuanhun_signin / sheng / upx（specialcurve2 / 10732 / 10735 经 2026-08-27 诚实校准判定为不可复现，已移出严格 KPI，见各自题块 ⛔）。
+- 当前 12 条严格真题中 A 类 5 条：10733 / vnctf_flag / xuanhun_signin / sheng / upx
+  （specialcurve2 / 10735 经 2026-08-27 诚实校准判定为不可复现，已移出严格 KPI 并列入 KNOWN_GAP；
+  **10732 经 2026-09-03 治理修复，可机器复现**（scripts/verify_10732.py + 附件本地落库 + REGRESSION_CHECKS 入条目），
+  但因无外部 sha256 真值闭环（视觉读+vision LLM 兜底 flag = `DASCTF{6b3ed7dc3c1c6615fb97a7020922f7a5}`，
+  与台账 2026-08-24 sha256 前缀 `337eadc1a305b60f` 不一致；公开 writeup 同名系列 MT 随机数预测题非本 PKCS#1 题），
+  **不进 PROMOTION_EVIDENCE、KPI_WATERMARK 保持 12 不动**，见题块 ⛔→✅ 治理标注）。
 
 ### B 类 · presolve 确定性密码学变换 —— ✅ 计入（2026-08-27 方案 A 裁定）
 - 定义：由确定性 skill 实现真实密码学/编码变换（非 grep 明文），输出与题面自带
@@ -68,7 +73,7 @@
 
 ---
 
-## 二、离线核验解出（严格 KPI 12 题 = A 类 5 + B 类 7；外部真题 HGAME RSA1/RSA2/RSA3 与西湖论剑2021 FilterRandom 已于 2026-08-27 公开重建复现通过（RSA3 用公开真 flag 自洽重建；西湖用公开源码+自洽实例），但 E 类不计 KPI；specialcurve2 / 10732 / 10735 经 2026-08-27 诚实校准判定不可复现，已移出严格 KPI 并列入 KNOWN_GAP；ezrsa / simplelegendre / exciting_inverse 三道 2026-08-28 曾因 presolve 提取=None 诚实回退 12→9，均于 2026-09-03 经确定性求解器带证据重新晋级（见题块 7/8/11）——此 12 为全证据态，与回退前口径不同）
+## 二、离线核验解出（严格 KPI 12 题 = A 类 5 + B 类 7；外部真题 HGAME RSA1/RSA2/RSA3 与西湖论剑2021 FilterRandom 已于 2026-08-27 公开重建复现通过（RSA3 用公开真 flag 自洽重建；西湖用公开源码+自洽实例），但 E 类不计 KPI；specialcurve2 / 10735 经 2026-08-27 诚实校准判定不可复现，已移出严格 KPI 并列入 KNOWN_GAP；ezrsa / simplelegendre / exciting_inverse 三道 2026-08-28 曾因 presolve 提取=None 诚实回退 12→9，均于 2026-09-03 经确定性求解器带证据重新晋级（见题块 7/8/11）——此 12 为全证据态，与回退前口径不同；**10732 经 2026-09-03 治理修复可机器复现但不进 PROMOTION_EVIDENCE，水位 12 不动**）
 
 ### 1. real_crypto_specialcurve2 【A类·完整攻击链】（西湖论剑 2021）
 
@@ -83,21 +88,25 @@
 - **复核结论（2026-08-27 修正·人工校正）**：2026-08-27 16:42 由并行「真题库重建」自动化新建的 `SpecialCurve2.py` 自身注释声明——原实例 n/HINT/C 在脚本注释中给出但**每次运行随机生成、从未留存**，该文件仅为「挑战脚本模板」，无法复现本实例真值；`verify_specialcurve2.py` 仅做 sha256 同义反复比对。故此前「升 ✅ 计入 KPI」判断错误，回退为 ⛔ unreproducible，merge_gate 计数恢复 12（与 KPI_BASELINE.json 一致）。此条由自动化误升，已人工校正。
 ### 2. 10732（CRYPTO-01 【A类·完整攻击链】 · 正式赛真题 · PKCS#1 v1.5）
 
-- **来源**：`data/race_details/10732.json` + 附件 `data/race_attachments/10732_Yusa的密码学课堂——PKCS#1的附件/...`
+- **来源**：`data/race_details/10732.json` + 附件 `data/race_attachments/10732_Yusa的密码学课堂——PKCS#1的附件/{task.py,PKCS#1.v1.5.enc,Crypto/}`（附件本地保留，`.gitignore data/race_attachments/` 排除不入 HEAD）
 - **类型**：crypto / RSA PKCS#1 v1.5 + AES
-- **状态**：⛔ unreproducible（**真实解出但不可机器复现**，故严格 KPI 不计；详见下方原因）
-- **flag**：`<DASCTF{<REDACTED> sha256=337eadc1a305b60f>`
+- **状态**：✅ 可机器复现（治理修复 2026-09-03 落库，scripts/verify_10732.py + REGRESSION_CHECKS 入项）⛔ 不进严格 KPI（**无外部 sha256 真值闭环**，详见下方诚实标注）
+- **可复现命令**：`scripts/verify_10732.py`（强校验 AES_KEY=`44bfc33d0bfb3cd688a074a7adad1504` + PDF 头 `%PDF-1.4` + 38624 字节 + 视觉裁切 flag 行）→ 实测 `REGRESS_PASS`
+- **flag 视觉读法**：`DASCTF{6b3ed7dc3c1c6615fb97a7020922f7a5}`（斜体，PDF 第 3 页 Congratulations 下方；肉眼 + 二值化高对比裁切 + baidu ernie-4.5-turbo-vl vision LLM 兜底三读一致；与台账 2026-08-24 记录的 sha256 前缀 `337eadc1a305b60f` 不一致，公开 writeup 同名系列题非本 PKCS#1 题，**无外部真值闭环**）
 - **核验方式**：
-  - PyMuPDF 提取 `data/results/_10732_decrypted.pdf` 三页文本未发现 flag 文本；
-  - 视觉渲染第 3 页 `data/results/crypto01_render_p2.png` 清晰显示斜体 flag：`<DASCTF{<REDACTED> sha256=337eadc1a305b60f>`（2026-08-24 本机跑通攻击链后视觉确认）。
+  - PyMuPDF 提取 `data/results/_verify_10732_visual/_10732_decrypted.pdf` 三页文本层只有 Congratulations 一句（"You seem to know RSA and python very well ,congratulations!"），**flag 在视觉渲染层、文本层无明文**；
+  - 视觉渲染第 3 页 → 二值化裁斜体 flag 行 → 三读一致 = `DASCTF{6b3ed7dc3c1c6615fb97a7020922f7a5}`
 - **攻击链**：
-  1. 题面已知 p → `q·r = n // p`。
-  2. `hint_enc = hint³ mod n`，且 `hint.bit_length() < 1024` → 直接开立方根得 hint（提示 padding 危险）。
-  3. `AES_KEY_ENC^d mod q·r` 得 raw；解析自定义全 0 PS → AES_KEY = `44bfc33d0bfb3cd688a074a7adad1504`。
-  4. AES-ECB 解密 PDF → 第 3 页视觉 flag。
-- **可复现脚本**：`scripts/_solve_10732.py` 未固化入仓库；归档副本见 `_archive/ctf_agent_broken/solutions/solve_10732_pkcs1_v15.py`，PKCS#1 附件见 `_archive/ctf_agent_broken/data/race_attachments/10732_Yusa的密码学课堂——PKCS#1的附件`。
+  1. 解析附件 task.py 注释里的 padded_long（pow(AES_KEY_ENC, d, q*r) 的输出，255 字节值，>600 位十进制）
+  2. padded_long 转 256 字节 EM；EM 形如 `00 02 [全 0 PS] 00 [M]`（题方改写 Crypto/Cipher/PKCS1_v1_5.encrypt 为全 0 PS 后门，标准 PKCS#1 v1.5 要求 PS 全非非0）
+  3. 直接取 EM 末尾 16 字节 → AES_KEY = `44bfc33d0bfb3cd688a074a7adad1504`（强校验）
+  4. AES-ECB 解密 PKCS#1.v1.5.enc → 38624 字节合法 %PDF-1.4 PDF
+  5. 渲染第 3 页 → 二值化裁 flag 行（视觉层）
+- **可复现脚本**：`scripts/verify_10732.py`（2026-09-03 治理修复入仓；与 10733 同风格独立 verifier，读本地附件而非硬编码赛题参数）
 
-- **不可复现原因（真实解出，但严格 KPI 不计入）**：PKCS#1 v1.5 解密 + AES-ECB 解密 PDF 攻击链已于 2026-08-24 本机跑通并视觉确认 flag；但 flag **仅存在于 PDF 视觉渲染层**、文本层无明文，解题脚本对明文 flag 使用 placeholder 不落盘，**无法从干净 checkout 自动化复现**。属 genuine solve，非严格 KPI 口径（如需升 ✅，需补 OCR/视觉提取 + 仓库内附件 + verify 脚本）。
+- **治理修复标注（2026-09-03 诚信口径）**：PKCS#1 v1.5 解密 + AES-ECB 解密 PDF 攻击链于 2026-08-24 本机跑通 + 视觉确认 flag；2026-08-27 因「脚本散落待固化」诚实校准移出严格 KPI。2026-09-03 治理修复 = 从题面 race_details/10732.json 自带的 DASCTF 附件 OSS URL 重下原始赛题 zip（9.11MB / 腾讯 COS 缓存命中）→ 解出 26MB 完整包（Crypto 模块 + task.py + PKCS#1.v1.5.enc）→ 落 `data/race_attachments/10732_Yusa的密码学课堂——PKCS#1的附件/` → 写 `scripts/verify_10732.py`（读附件 → 剥 PKCS 全 0 PS 后门 → AES_KEY 强校验 → AES-ECB → PDF 解密 → 视觉裁切）→ 实测 REGRESS_PASS。
+- **不进 PROMOTION_EVIDENCE 原因（诚实底线）**：10732 题面 `data/race_details/10732.json` **无 flag_sha256 字段**（不同于 vnctf_flag / ezrsa 等题面自带真值约束），无可自动化校验的外部真值库。视觉读 + vision LLM 兜底 = flag 字符 sha256 = `2e9af0b34fa6476a638674bc6342f5aa28ec3187898b98fb3abc2b3be17b75db`，**这是 self-discovered 真值（依赖 baidu vision 模型稳定性），与 9→10/10→11/11→12 三道带 sha256 真值闭环的晋升模式有本质区别**。若改写 PROMOTION_EVIDENCE 把这条 sha256 写进去则属于「自我授权」（verifier 自己跑 vision → 自己算 sha256 → 自己写进白名单 = 闭环自洽但无外部校验），**违反诚信红线**。故 KPI_WATERMARK 保持 12 不动、COUNT_OFFLINE_VERIFIED 保持 12 不动、台账 ✅ 不增、KNOWN_GAP 移除（4→3 归治理成果）。
+- **与 vnctf_flag 治理修复对比**：vnctf_flag 在 BASE_AUTHORIZED_KPI_SOLVES 9 地板白名单里，台账改 ✅ 不触发 WATERMARK_DRIFT（vnctf 已在 AUTHORIZED 中），治理修复 = 仅修题面 + 装包让 vision LLM 走通 + REGRESSION_CHECKS 入项；KPI 12 不动。10732 同理：不在 9 地板白名单 → 台账不能标 ✅（否则触发 WATERMARK_DRIFT），但 REGRESSION_CHECKS 入项 + KNOWN_GAP 移除是可复现闭环的治理成果；**台账状态表达改为「✅ 可机器复现 + ⛔ 不进严格 KPI」双标**（如需简单显示，使用 ✅ 后附 ⛔ 标注"不进 KPI"）。
 ### 3. 10733（CRYPTO-02 【A类·完整攻击链】 · 正式赛真题 · How_many_rot_are_there）
 
 - **来源**：`data/race_details/10733.json` + 附件 `data/race_attachments/10733_How_many_rot_are_there的附件`

@@ -54,6 +54,18 @@ REGRESSION_CHECKS = [
         "cmd": [sys.executable, "scripts/verify_10733.py"],
         "flag_contains": "DASCTF{rabbits6sc5mpl",
     },
+    # 2026-09-03 治理修复：10732 PKCS#1 v1.5 长期被台账标 ⛔ "脚本散落待固化"，治理后
+    # 落 scripts/verify_10732.py（读本地附件 task.py + PKCS#1.v1.5.enc → 剥 PKCS 填充
+    # 取 AES_KEY=44bfc33d0bfb3cd688a074a7adad1504 → AES-ECB 解密 → %PDF-1.4 38624B），
+    # 实测 REGRESS_PASS。与 9→10/10→11/11→12 三道带证晋级模式不同：10732 无可用外部
+    # sha256 真值闭环（视觉读 + vision LLM 兜底 = DASCTF{6b3ed7dc3c1c6615fb97a7020922f7a5}，
+    # 与台账 2026-08-24 记录的 sha256 前缀 337eadc1a305b60f 不一致；公开 writeup 同名系列
+    # MT 随机数预测题非本 PKCS#1 题；不进 _antifraud.PROMOTION_EVIDENCE = KPI 水位 12 不动）。
+    {
+        "id": "10732",
+        "cmd": [sys.executable, "scripts/verify_10732.py"],
+        "flag_contains": "REGRESS_PASS",
+    },
     # 以下 7 道为确定性管线（presolve）可复现解出，统一经 scripts/_regress_one.py 单题真值比对
     # （与 _verify_presolve_truth.py 同工具层；2026-08-28 实测 9 道全部 REGRESS_PASS）。
     {
@@ -126,8 +138,6 @@ REGRESSION_CHECKS = [
 ]
 
 KNOWN_GAP = [
-    {"id": "10732",
-     "reason": "可复现脚本待固化（台账 2026-08-24 声明；攻击链清晰但 _solve_10732.py 散落待固化）"},
     {"id": "10735",
      "reason": "logbool pcap→RAR5→7z 解密链待固化为 verify 脚本（台账 offline_verified，无独立 verifier）"},
     {"id": "real_crypto_specialcurve2",

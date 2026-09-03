@@ -71,6 +71,36 @@ def test_kpi_watermark_floor_is_nine():
     assert "REGRESS_PASS" in af.PROMOTION_EVIDENCE["real_crypto_exciting_inverse"]
 
 
+# ── 治理修复防御性测试（防止 KPI 注水回归） ──
+def test_10732_governance_fix_not_in_kpi_watermark():
+    """2026-09-03 10732 治理修复：可机器复现（REGRESSION_CHECKS 含 10732）+ 不进严格 KPI
+    （KPI_WATERMARK 仍 12 / AUTHORIZED 不含 10732）双状态成立。
+    防御：禁止任何人擅自把 10732 加入 BASE_AUTHORIZED_KPI_SOLVES 或 PROMOTION_EVIDENCE
+    （会触发自我授权注水，违反诚信红线）。"""
+    # KPI_WATERMARK 应保持 12（vnctf/10732 治理都不动水位）
+    assert af.KPI_WATERMARK == 12, (
+        f"KPI_WATERMARK 应保持 12，{af.KPI_WATERMARK} 表示被擅自篡改"
+    )
+    assert len(af.AUTHORIZED_KPI_SOLVES) == 12
+    # 10732 不应在 AUTHORIZED_KPI_SOLVES（会触发 WATERMARK_DRIFT 因台账已可机器复现）
+    assert "10732" not in af.AUTHORIZED_KPI_SOLVES, (
+        "10732 不应在 AUTHORIZED_KPI_SOLVES，否则与台账题块"
+        "「✅ 可机器复现 + ⛔ 不进严格 KPI」双标状态冲突——会触发 WATERMARK_DRIFT"
+    )
+    # 10732 不应在 PROMOTION_EVIDENCE（无外部 sha256 真值闭环，自我授权红线）
+    assert "10732" not in af.PROMOTION_EVIDENCE, (
+        "10732 不应在 PROMOTION_EVIDENCE——其 sha256 来源是 verifier+vision LLM "
+        "自我闭环（无外部真值校验），写入 PROMOTION_EVIDENCE 等于自我授权"
+    )
+    # REGRESSION_CHECKS 应含 10732（可机器复现闭环）
+    from scripts._merge_gate import REGRESSION_CHECKS, KNOWN_GAP
+    ids = [r["id"] for r in REGRESSION_CHECKS]
+    assert "10732" in ids, f"REGRESSION_CHECKS 应含 10732，当前：{ids}"
+    # KNOWN_GAP 应不含 10732（已治理移除）
+    gap_ids = [g["id"] for g in KNOWN_GAP]
+    assert "10732" not in gap_ids, f"KNOWN_GAP 应不含 10732（已治理移除），当前：{gap_ids}"
+
+
 def test_vnctf_flag_governance_fix_in_base_authorized():
     # 2026-09-03 治理修复：vnctf_flag 题面 flag_pattern 写错（flag{...} 而真值格式
     # vnctf{...}）致 presolve 二次校验误判诱饵丢弃；修题面+修 venv certifi/httpx 后
