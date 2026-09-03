@@ -23,11 +23,15 @@
 - 定义：对真实赛题附件/源码完成完整攻击链（≥2 步推理），产出 flag 与题面真值
   （`flag_sha256` / 官方 writeup / 视觉确认）一致，且有可复现命令或独立 verifier 脚本。
 - 当前 12 条严格真题中 A 类 5 条：10733 / vnctf_flag / xuanhun_signin / sheng / upx
-  （specialcurve2 / 10735 经 2026-08-27 诚实校准判定为不可复现，已移出严格 KPI 并列入 KNOWN_GAP；
-  **10732 经 2026-09-03 治理修复，可机器复现**（scripts/verify_10732.py + 附件本地落库 + REGRESSION_CHECKS 入条目），
-  但因无外部 sha256 真值闭环（视觉读+vision LLM 兜底 flag = `DASCTF{6b3ed7dc3c1c6615fb97a7020922f7a5}`，
-  与台账 2026-08-24 sha256 前缀 `337eadc1a305b60f` 不一致；公开 writeup 同名系列 MT 随机数预测题非本 PKCS#1 题），
-  **不进 PROMOTION_EVIDENCE、KPI_WATERMARK 保持 12 不动**，见题块 ⛔→✅ 治理标注）。
+  （specialcurve2 经 2026-08-27 诚实校准判定为不可复现，移出严格 KPI 并列入 KNOWN_GAP；
+  **10732 / 10735 经 2026-09-03 治理修复，均可机器复现**（scripts/verify_10732.py + verify_10735.py
+  + 附件本地落库 + REGRESSION_CHECKS 入条目），但两者题面均**无官方 flag_sha256 外部真值闭环**，
+  **不进 PROMOTION_EVIDENCE、KPI_WATERMARK 保持 12 不动**——见各题块 ⛔→✅ 治理标注与
+  `scripts/_antifraud.py` 治理注释：
+  - 10732（PKCS#1 v1.5）：视觉读+vision LLM 兜底 flag = `DASCTF{6b3ed7dc3c1c6615fb97a7020922f7a5}`，
+    与台账 2026-08-24 sha256 前缀 `337eadc1a305b60f` 不一致（内部不自洽）；
+  - 10735（logbool pcap 盲注）：pcap 重放 flag.txt sha256=`67f3e126d51a6169…` 与台账 2026-08-24
+    记录前缀 + 归档中间产物**逐字节一致**（双独立运行互证，证据强于 10732），但同属无题面官方锚点）。
 
 ### B 类 · presolve 确定性密码学变换 —— ✅ 计入（2026-08-27 方案 A 裁定）
 - 定义：由确定性 skill 实现真实密码学/编码变换（非 grep 明文），输出与题面自带
@@ -148,22 +152,18 @@
 
 ### 5. 10735（MISC-02 【A类·完整攻击链】 · 正式赛真题 · logbool 流量包 SQL 布尔盲注）
 
-- **来源**：`data/race_details/10735.json` + 附件 `data/race_attachments/10735_logbool的附件/tempdir/MISC附件/logbool.pcapng`（16MB，110701 包）
+- **来源**：`data/race_details/10735.json` + 附件 `data/race_attachments/10735_logbool的附件/tempdir/MISC附件/logbool.pcapng`（16MB，110701 包；附件本地保留，`.gitignore data/race_attachments/` 排除不入 HEAD）
 - **类型**：misc / 流量分析 + SQL 布尔盲注数据恢复 + RAR5 密码解压
-- **状态**：⛔ unreproducible（**真实解出但不可机器复现**，故严格 KPI 不计；详见下方原因）
+- **状态**：✅ 可机器复现（治理修复 2026-09-03 落库，scripts/verify_10735.py + REGRESSION_CHECKS 入项）⛔ 不进严格 KPI（**题面无官方 flag_sha256 外部真值闭环**，详见下方诚实标注）
 - **flag**：`<DASCTF{<REDACTED> sha256=67f3e126d51a6169>`
 - **攻击链**：
-  1. 2679 个 HTTP 请求全部为 SQL 布尔盲注（`ORD(MID((SELECT IFNULL(CAST(<field> AS NCHAR),0x20) FROM ctftest.ctfblob ...),idx,1))>ascii`，响应含 `success` = 成立）。
-  2. 解析三字段（username/password/content），按成立的最大 ascii+1 还原字符：username=`boolblob`、password=`timeemitloggol`、content=hex。
-  3. content 以 `Rar!` 魔数开头 → hex 转 RAR5 包；用 password=`timeemitloggol` 解压（本机 7-Zip 23.01）得 `flag.txt` → flag。
-- **可复现命令**：
-  ```bash
-  # 在 ctf_agent/ 目录下执行（附件缺失，当前不可复现——待补附件后固化 verify 脚本）
-  # 1) 解析 pcap（scapy）还原三字段；2) content hex→rar；3) 7z x -p<password> 解压
-  ```
-- **备注**：题面 flag 字段为空（待解）；解压工具链：本机无 unrar/7z → 下载官方 7-Zip 23.01（`tools/_7z/full/7z.exe`，bsdtar 解 SFX）。R1 工具优先（公开 writeup 同题 `202509_NBWS_logbool` 路线）节省了大量盲试。
-
-- **不可复现原因（真实解出，但严格 KPI 不计入）**：logbool.pcapng（16MB / 110701 包）附件当前全仓缺失（含 `data/race_details/10735.json` 亦不存在），无法从干净 checkout 复现；2026-08-24 曾本机跑通完整攻击链（SQL 布尔盲注 → RAR5 解压 → flag）。属 genuine solve，非严格 KPI 口径。
+  1. 2678 个 HTTP 请求全部为 SQL 布尔盲注（`ORD(MID((SELECT IFNULL(CAST(<field> AS NCHAR),0x20) FROM ctftest.ctfblob ORDER BY id LIMIT <row>,1),<pos>,1))><ascii>`，响应体以 `</br></br>success` 结尾 = 成立；实测 1122/2674 true）。
+  2. 逐 (列,行,位) 收集 (thr, is_true) → 0..255 argmin 冲突数鲁棒解码：username=`boolblob`、password=`timeemitloggol`、id=`1`、COUNT=`1`、content=338-hex。
+  3. content 以 RAR5 魔数 `526172211a070100` 开头 → hex 转 169B RAR5 包；7z 带密码=`timeemitloggol` 解压得 `flag.txt`（40B）。
+- **可复现命令**：`scripts/verify_10735.py`（scapy 读 pcap → HTTP 重组 → 盲注谓词解析 → 鲁棒解码 → 7z.exe 带密码解压 → 三重 sha256 锚校验）→ 实测 `REGRESS_PASS`（19s，worst_conflict=0）
+- **三重 sha256 锚**：content-hex=`380c0718aa5772849557787c8c7cbe7b7d7415dac12c8d1e2cb5341349c5c0de`；rar 字节=`a7699a1dbd4dd1826a783b8447b3c97085aed67c0e28b6252fbbb05e730b0d3c`（与归档 `_archive/ctf_agent_broken/data/race_tmp/logbool.rar` 逐字节一致）；flag.txt=`67f3e126d51a61698b45a40d0cd82e75d544b208c2bdfc8301927f55fc19924f`（与归档 `data/results/_10735_unrar/flag.txt` 逐字节一致）
+- **备注**：题面 `data/race_details/10735.json` flag 字段为空（待解）、**无 flag_sha256 官方锚点**；解压用完整版 7-Zip `data/race_attachments/_bin/7z.exe`（支持 RAR5；精简版 7za.exe 与 unrar.exe 均不支持/管道挂起，弃用）。
+- **诚实标注（治理修复 2026-09-03，与 10732 同款第三类口径）**：2026-08-27 诚实校准判 ⛔ 不可复现（附件全仓缺失 + 脚本散落）；2026-09-03 治理 = 从报废仓库 `_archive/ctf_agent_broken/` 找回 16MB 原始 pcap 落本地 + 固化 `scripts/verify_10735.py`。三重 sha256 锚全部命中且与台账 2026-08-24 记录前缀 `67f3e126d51a6169`、归档 `logbool.rar` / `_10735_unrar/flag.txt` 逐字节一致——2026-08-24 与 2026-09-03 两次独立运行交叉互证，证据强于 10732（其视觉读 flag 与 2026-08-24 记录不一致）。但题面无官方 flag_sha256、无可自动化校验的外部真值库，sha 锚点源自 2026-08-24 自记录/归档中间产物，属「自证双运行一致」；**写 PROMOTION_EVIDENCE 即自我授权，违反诚信红线** → 只入 REGRESSION_CHECKS（可机器复现闭环）、**不进严格 KPI、KPI_WATERMARK 12 不动、状态行不标 ✅ offline_verified**（防 n=13 ≠ 12 触发 WATERMARK_DRIFT）。
 ### 6. real_crypto_anwang_crypto1 【B类·presolve密码学变换】（历年真题 · 八进制 ASCII + Vigenère）
 
 - **来源**：`data/questions_real/crypto/real_crypto_anwang_crypto1.json`
@@ -377,9 +377,9 @@
 | 口径 | 数值 | 说明 |
 |---|---|---|
 | 平台 accepted | **0** | 比赛结束，无开放赛事 |
-| **严格真题 offline_verified（唯一 KPI，merge_gate 机器真值）** | **12** | 台账第二节 12 个 ✅ A/B 类题块：10733 + vnctf_flag + xuanhun_signin + anwang_crypto1 + ezmult + filterrandom + qiangwang_classic + sheng + upx + ezrsa + simplelegendre + exciting_inverse（ezrsa / simplelegendre / exciting_inverse 三道均于 2026-09-03 经确定性求解器 `_regress_one.py` REGRESS_PASS 带证据晋级，见题块 7/8/11 与 `_antifraud.PROMOTION_EVIDENCE`；specialcurve2 / 10732 / 10735 经 2026-08-27 诚实校准判定不可复现、移出严格 KPI 并列入 KNOWN_GAP；`scripts/_merge_gate.py count_offline_verified` 实跑计数 fail-closed） |
+| **严格真题 offline_verified（唯一 KPI，merge_gate 机器真值）** | **12** | 台账第二节 12 个 ✅ A/B 类题块：10733 + vnctf_flag + xuanhun_signin + anwang_crypto1 + ezmult + filterrandom + qiangwang_classic + sheng + upx + ezrsa + simplelegendre + exciting_inverse（ezrsa / simplelegendre / exciting_inverse 三道均于 2026-09-03 经确定性求解器 `_regress_one.py` REGRESS_PASS 带证据晋级，见题块 7/8/11 与 `_antifraud.PROMOTION_EVIDENCE`；specialcurve2 经 2026-08-27 诚实校准判定不可复现、移出严格 KPI 并列入 KNOWN_GAP；10732 / 10735 经 2026-09-03 治理修复可机器复现（verify 脚本 + REGRESSION_CHECKS 入条目）但题面无官方 flag_sha256 外部真值闭环 → 仍不进严格 KPI（台账状态「✅ 可机器复现 + ⛔ 不进严格 KPI」双标）；`scripts/_merge_gate.py count_offline_verified` 实跑计数 fail-closed） |
 | 确定性管线真值验证 | **15 / 15** | 第二节-B：presolve+工具层提取 flag 与题库真值逐字一致；2026-09-03 治理修复后 vnctf_flag 也入 presolve 自动化命中（第 15 题），全部 15 道 presolve 真值匹配。真题集共 45 道，此 15 道有确定性管线覆盖 |
-| 正式赛真题独立离线核验（genuine，含非自动化） | **3** | 10732 + 10733 + 10735（PKCS#1v1.5 / 高偶指数RSA / pcap盲注）；仅 10733 为严格 ✅ 可机器复现，10732/10735 为 genuine 但仅视觉/历史确认；分母 33 道正式赛 |
+| 正式赛真题独立离线核验（genuine 可复现，含非严格 KPI） | **3** | 10732 + 10733 + 10735（PKCS#1v1.5 / 高偶指数RSA / pcap盲注）；**2026-09-03 治理修复后三道均可机器复现**（scripts/verify_10732.py + verify_10735.py + verify_10733 全 REGRESS_PASS）；仅 10733 在严格 KPI 12 内，10732/10735 无题面官方 flag_sha256 锚点 → ⛔ 不进严格 KPI；分母 33 道正式赛 |
 | 外部真题独立离线核验（self-produced 口径） | **4** | HGAME2022 RSA×3 + 2022安网杯 misc3（非平台题，不计入严格 KPI）——HGAME RSA1/RSA2/RSA3 与西湖 FilterRandom 已于 2026-08-27 仓库内重建复现通过；安网 misc3（无公开附件）仍仅历史记录 |
 | LLM 真推理贡献 | **= 0** | 12 道严格解仍全由 presolve/工具直出，无 LLM 真推理贡献。`scripts/demo_llm_rag_solve.py` 对 10733 的"验证"**存在泄露**：flag(EXPECTED)与 n/hint/c 明文硬编码于脚本、且完整解法推导写进 prompt 喂给 LLM（LLM 仅抄写 sympy 代码），不满足 genuine 推理标准，故不计入 LLM 真推理贡献。writeup_rag 已真正接入主解题循环（CTF_AGENT_WRITEUP_RAG 开关，每步检索注入 plan prompt，零回归），但 genuine 推理贡献仍待无泄露端到端验证 |
 | 训练题库解出（不计入） | 15/60（本地自出题） | 仅反映模板覆盖度，非正式战绩 |
@@ -388,9 +388,9 @@
 
 ## 六、下一步（按 ROI）
 
-1. **固化 10732 可复现脚本**——当前仅靠视觉 artifact（`crypto01_render_p2.png` 显示 flag）；补一个能从附件重跑出 flag 的 verify 脚本，使该解出完全可复现。
-2. **扩大正式赛真题解出**——剩余 31 道正式赛真题（10716-10748 中未解者）逐个离线攻；优先有附件、可离线做的题。
-3. **从 questions_real 中再挑未解题**——补通用 skill / presolve 路径，提升 1/15 这一项。
+1. **specialcurve2 实例值恢复**——原 n/HINT/C 已永久丢失，暂列 KNOWN_GAP（唯一剩余缺口）；仅当公开渠道出现同题实例/附件时再补 verify。
+2. **扩大正式赛真题解出**——剩余正式赛真题（10716-10748 中未解者）逐个离线攻；优先有附件、可离线做的题。
+3. **从 questions_real 中再挑未解题**——补通用 skill / presolve 路径，提升确定性管线真值验证覆盖（15/45）。
 4. **答辩/治理文档全部归档**——不再新增不产生解题数的文档（见任务清单）。
 
 ---

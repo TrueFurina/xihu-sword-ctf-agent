@@ -114,6 +114,35 @@ HONOR_CODE = os.path.join(GOV_DIR, "HONOR_CODE.md")
 #   - 治理净收益：KNOWN_GAP 4→2（10735/specialcurve2 仍未复现）、REGRESSION_CHECKS 12→13、
 #     附件可机器复现（PKCS#1 v1.5 全 0 PS 后门攻击链落地），KPI 12 水位诚实不动。
 #
+# 2026-09-03 10735 治理修复（KPI 水位不变 12，本题**不在** 9 地板 BASE_AUTHORIZED_KPI_SOLVES）：
+#   - 台账 2026-08-27 诚实校准长期标 ⛔ "真实解出但不可机器复现"（附件全仓缺失 + 脚本散落），
+#     治理 = 从 _archive/ctf_agent_broken/（2026-08-24 报废仓库）找回 16MB 原始赛题 pcap
+#     logbool.pcapng（110701 包）→ 落 `data/race_attachments/10735_logbool的附件/`（本地
+#     保留，.gitignore data/race_attachments/ 排除不入 HEAD）
+#   - 写 `scripts/verify_10735.py`：scapy 重装 HTTP 流 → sqlmap 布尔盲注谓词
+#     `ORD(MID((SELECT IFNULL(CAST(<col> AS NCHAR),0x20) FROM ctftest.ctfblob
+#     ORDER BY id LIMIT <row>,1),<pos>,1))><thr>` 解析（响应体 </br></br>success 结尾=真）
+#     → 0..255 argmin 冲突数鲁棒解码还原 ctfblob 各列 → content=338-hex(RAR5)、
+#     password → 完整版 7z.exe（tools/_7z/full/7z.exe 同款 557KB，支持 RAR5）带密码解压
+#     → flag.txt → 实测 REGRESS_PASS(19s)，worst_conflict=0
+#   - REGRESSION_CHECKS 13→14、KNOWN_GAP 2→1（剩 specialcurve2）
+#   - **不进 PROMOTION_EVIDENCE 原因（诚信底线，与 10732 同款）**：10735 题面
+#     `data/race_details/10735.json` **无 flag_sha256 字段**（DASCTF 平台题，flag 字段为空
+#     待解），无可自动化校验的外部真值库。三重 sha256 锚
+#     （content-hex=380c0718… / rar 字节=a7699a1d… / flag.txt=67f3e126…）全部源自
+#     2026-08-24 台账自记录 + 归档中间产物（logbool.rar / _10735_unrar/flag.txt）交叉——
+#     2026-08-24 与 2026-09-03 两次独立运行逐字节互证，但属「自证双运行一致」而非外部
+#     官方真值。若写 PROMOTION_EVIDENCE 把 sha256 写进白名单则属「自我授权」（pcap 重放 →
+#     自己算 sha256 → 自己写白名单 = 闭环自洽但无外部校验），**违反诚信红线**。
+#     故 KPI_WATERMARK 12 不动、台账 ✅ 不增（防 n=13 ≠ KPI_WATERMARK=12 触发
+#     WATERMARK_DRIFT fail-closed）。台账状态表达「✅ 可机器复现 + ⛔ 不进严格 KPI」双标。
+#   - 与 10732 治理修复区别：10732 的视觉读 flag 与台账 2026-08-24 记录 sha256 前缀
+#     **不一致**（无内部自洽）；10735 的 pcap 重放 flag 与台账记录前缀 **一致** + 归档
+#     rar/flag 逐字节一致（双运行互证，证据强于 10732），但两者同属无题面官方锚点 →
+#     同口径：只入 REGRESSION_CHECKS、不进严格 KPI。
+#   - 治理净收益：KNOWN_GAP 2→1（仅 specialcurve2 不可复现）、REGRESSION_CHECKS 13→14、
+#     MISC-02 完整攻击链（流量盲注重放）可机器复现，KPI 12 水位诚实不动。
+#
 # 模型升级（2026-08-28 评审 R5/G5）：旧版 KPI_WATERMARK 是「等式锁」——n != 9 一律
 # 当注水拒绝，导致真实进展到 10/13 也会被误杀（治理过拟合反作用）。现改为「带证据可
 # 晋级的地板」：

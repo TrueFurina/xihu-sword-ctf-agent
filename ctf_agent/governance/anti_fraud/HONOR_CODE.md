@@ -16,7 +16,10 @@
 1. **虚增 / 虚报 KPI**：`offline_verified` 解出数偏离写死真值锚 `KPI_WATERMARK`（当前 = 基线 `BASE_WATERMARK = 9` + 证据化晋升数）；跌破地板或溢出无证据晋升均属注水；
 2. **泄露式假验证**：在仓库 / 脚本 / commit 中硬编码真实 flag 字面量，或预植
    `EXPECTED = "flag{...}"` 答案后以「自比通过」冒充「真解出 / 真推理」；
-3. **口径走私**：把不可复现项（如 specialcurve2 / 10732 / 10735）、外部真题、
+3. **口径走私**：把不可复现项 / 无题面官方真值闭环项（如 `real_crypto_specialcurve2`
+   不可复现；`10732` / `10735` 已于 2026-09-03 治理为**可机器复现**（verify 脚本 +
+   REGRESSION_CHECKS 入条目）但题面**无官方 flag_sha256 外部锚点**，台账状态仅可表达
+   「✅ 可机器复现 + ⛔ 不进严格 KPI」，仍不得计入严格 KPI）、外部真题、
    self-authored 训练项计入严格 KPI；
 4. **篡改基线**：改动 `KPI_BASELINE.json` 的 `offline_verified` 以重置棘轮 / 粉饰水位；
 5. **话术包装**：在 commit message 中以「LLM 推理贡献 / 破冰 / 从 0 突破」等声称
@@ -39,8 +42,10 @@
 - `PROMOTION_EVIDENCE` —— 证据化晋升字典（>9 的部分），每道必须带可审计证据字符串
   （`sha256:<真值摘要>|verify:scripts/_regress_one.py <id>|pr:<PR链接>`）。白名单含超额
   题块却无本条记录 → `PROMOTION_WITHOUT_EVIDENCE` 阻断（无证据注水）。
-- 不可复现项（`real_crypto_specialcurve2` / `10732` / `10735`）永久标 ⛔，
-  不计入严格 KPI，机器强制排除。
+- 无题面官方真值闭环项永久标 ⛔ 不计入严格 KPI，机器强制排除：`real_crypto_specialcurve2`
+  （不可复现：实例值永久丢失）；`10732` / `10735`（2026-09-03 治理为可机器复现，但题面
+  `data/race_details/*.json` 均无 flag_sha256 字段——可复现 ≠ 可入严格 KPI，晋级必须经
+  `PROMOTION_EVIDENCE` 且 sha256 锚须源自题面/官方外部真值库，自记录/归档交叉不算）。
 
 > **带证据可晋级（修复「等式锁」治理过拟合）**：真实进展到 10/13 题不再被当注水误杀。
 > 合法晋升路径 = 提 **promotion PR**：① 在 `_merge_gate.REGRESSION_CHECKS` 新增**真跑通过**

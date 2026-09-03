@@ -43,9 +43,11 @@ ERR_WRONG_DIRECTION = "wrong_direction"
 ERR_HALLUCINATION = "hallucination"
 ERR_TOOL_FAILURE = "tool_failure"
 ERR_ENV_FAILURE = "env_failure"
-# KNOWN_GAP 题集（从台账 REAL_SOLVES_LEDGER.md「可复现脚本待固化/缺运行时参数」条目自动派生）：
-# 10732（PKCS#1 v1.5，缺 hint_enc/AES_KEY_ENC 运行时参数）、10735（logbool 流量包，pcap 攻击链+7z 未固化）
-# —— 题面缺参解不出是题缺参（extract_fail），非方向错（wrong_direction），避免污染失败桶统计。
+# KNOWN_GAP 题集（主 Agent **实时解出**缺口，区别于台账可复现性治理——2026-09-03 澄清）：
+# 10732（PKCS#1 v1.5：缺 hint_enc/AES_KEY_ENC 运行时参数；离线已固化 verify_10732.py，但 presolve
+#   无 PKCS#1 篡改填充攻击路由）、10735（logbool 流量包：离线已固化 verify_10735.py 盲注重放，
+#   但 presolve 无 pcap→盲注解码确定性路由，实时解出仍不可达）
+# —— 实时解不出是缺确定性路由/题缺参（extract_fail），非方向错（wrong_direction），避免污染失败桶统计。
 # 注意：anwang_crypto1（安网杯八进制+Vigenère）是 presolve 可解题（台账 offline_verified），
 # 不属于 KNOWN_GAP——它曾经的 wrong_direction 是 presolve 路由未覆盖所致，正确修法是路由覆盖（83f2fa1），
 # 而非归类为 KNOWN_GAP。

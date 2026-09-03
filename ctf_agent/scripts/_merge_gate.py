@@ -66,6 +66,21 @@ REGRESSION_CHECKS = [
         "cmd": [sys.executable, "scripts/verify_10732.py"],
         "flag_contains": "REGRESS_PASS",
     },
+    # 2026-09-03 治理修复：10735 MISC-02 logbool 长期被台账标 ⛔ "真实解出但不可复现"
+    # （附件全仓缺失 + 脚本散落），治理 = 从 _archive/ctf_agent_broken/ 找回 16MB 原始
+    # pcap 落本地 + 固化 scripts/verify_10735.py（scapy 重装 HTTP 流 → sqlmap 布尔盲注
+    # 谓词解析 → 鲁棒解码还原 content(RAR5 hex)/password → 完整版 7z.exe 带密码解压），
+    # 实测 REGRESS_PASS(19s)。三重 sha256 锚全命中：content-hex=380c0718… / rar 字节
+    # =a7699a1d…（与归档 logbool.rar 逐字节一致）/ flag.txt=67f3e126…（与台账 2026-08-24
+    # 记录前缀 67f3e126d51a6169 及归档 _10735_unrar/flag.txt 一致，双独立运行交叉互证）。
+    # 与 10732 同款第三类口径：题面 data/race_details/10735.json 无 flag_sha256 字段
+    # （flag 为空待解），sha 锚点源自 2026-08-24 自记录/归档中间产物而非外部官方真值；
+    # 不进 _antifraud.PROMOTION_EVIDENCE = KPI 水位 12 不动（台账不可标 ✅ offline_verified）。
+    {
+        "id": "10735",
+        "cmd": [sys.executable, "scripts/verify_10735.py"],
+        "flag_contains": "REGRESS_PASS",
+    },
     # 以下 7 道为确定性管线（presolve）可复现解出，统一经 scripts/_regress_one.py 单题真值比对
     # （与 _verify_presolve_truth.py 同工具层；2026-08-28 实测 9 道全部 REGRESS_PASS）。
     {
@@ -138,8 +153,6 @@ REGRESSION_CHECKS = [
 ]
 
 KNOWN_GAP = [
-    {"id": "10735",
-     "reason": "logbool pcap→RAR5→7z 解密链待固化为 verify 脚本（台账 offline_verified，无独立 verifier）"},
     {"id": "real_crypto_specialcurve2",
      "reason": "不可复现：附件 SpecialCurve2.py 仅为恢复的挑战脚本模板，原 n/HINT/C 实例值每次运行随机生成、已永久丢失；verify_specialcurve2.py 仅做 sha256 自比对（同义反复），不真解题。2026-08-27 诚实校准从严格 KPI 与回归集移除"},
 ]
