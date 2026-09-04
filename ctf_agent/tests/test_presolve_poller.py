@@ -33,11 +33,12 @@ class FakeRegistry:
         return out
 
 
-def _question(attachments=("x.txt",), category="crypto", description=""):
+def _question(attachments=("x.txt",), category="crypto", description="", qid="q1"):
     class Q:
         id = "q1"
         title = "t"
     q = Q()
+    q.id = qid
     q.category = category
     q.description = description
     q.attachments = list(attachments)
@@ -52,7 +53,7 @@ def test_presolve_dedup_same_attachment_sniffed_once():
     from core.presolve import presolve
 
     registry = FakeRegistry()
-    q = _question(attachments=["a.txt"], category="crypto")
+    q = _question(attachments=["a.txt"], category="crypto", qid="q_presolve_dedup")
 
     async def main():
         # 第一次：flag_scan 命中 → 返回 flag
@@ -80,8 +81,8 @@ def test_presolve_answer_mismatch_discarded():
     from core.presolve import presolve
 
     registry = FakeRegistry()
-    q = _question(attachments=["a.txt"], category="crypto")
-    answers = {"q1": "flag{expected_real}"}  # 与假注册表返回的 flag 不同
+    q = _question(attachments=["a.txt"], category="crypto", qid="q_presolve_mismatch")
+    answers = {"q_presolve_mismatch": "flag{expected_real}"}  # 与假注册表返回的 flag 不同
 
     async def main():
         return await presolve(q, registry=registry, answers=answers)
@@ -95,7 +96,7 @@ def test_presolve_no_attachments_does_not_mark():
     from core.presolve import presolve
 
     registry = FakeRegistry()
-    q = _question(attachments=[], category="crypto", description="")
+    q = _question(attachments=[], category="crypto", description="", qid="q_presolve_noatt")
 
     async def main():
         flag1 = await presolve(q, registry=registry, answers=None)

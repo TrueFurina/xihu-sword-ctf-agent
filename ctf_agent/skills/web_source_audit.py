@@ -18,6 +18,7 @@ import json
 import os
 import re
 import tarfile
+import time as _time  # 2026-09-01 修复：原在 _Budget.__init__ 内局部导入，bump() 引用超出作用域 → 整个 skill 扫描即崩（被 presolve try/except 静默吞掉，贡献零命中）
 import zipfile
 
 # ── flag 特征（含赛题验证过的变体：rot13 的 DASCTF{ = QNFPGS{）──
@@ -48,6 +49,13 @@ BACKDOOR_PATTERNS = [
     (r"file_put_contents\s*\(\s*\$_?(?:GET|POST|REQUEST)", "写文件后门"),
     (r"move_uploaded_file\s*\([^)]*\$_(?:GET|POST|REQUEST)", "上传后门"),
     (r"\$_(?:GET|POST|REQUEST)\[[^]]*\]\s*\(\s*\$_(?:GET|POST|REQUEST)", "动态调用后门"),
+    # ── 原型链污染（2026-09-01 精进 ③：anxun_welcome express-validator→lodash 链）──
+    # CVE 参考：lodash<4.17.17 prototype pollution；express-validator 6.6.0 依赖脆弱 lodash。
+    # __proto__ 赋值/合并/字符串提及都是注入点候选（node_modules 已排除，噪音可控）；
+    # constructor.prototype 是动态链构造；脆弱依赖版本是版本线索。
+    (r"__proto__", "原型链污染：__proto__ 注入点/提及"),
+    (r"constructor\.prototype[^.\n]{0,20}", "原型链污染：constructor.prototype 链"),
+    (r"[\"'](?:lodash|express-validator)[\"']\s*:\s*[\"'][0-9.]+[\"']", "脆弱依赖版本（lodash<4.17.17 / express-validator 原型链 CVE 候选）"),
 ]
 
 # ── 敏感文件/目录（排除第三方库噪声）──
@@ -74,8 +82,6 @@ class _Budget:
     """
 
     def __init__(self, time_limit: float = 25.0, max_files: int = 4000):
-        import time as _time
-
         self.time_limit = time_limit
         self.max_files = max_files
         self.t0 = _time.monotonic()
