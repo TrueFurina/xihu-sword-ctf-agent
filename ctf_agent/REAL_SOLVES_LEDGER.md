@@ -22,11 +22,15 @@
 ### A 类 · 完整攻击链离线核验 —— ✅ 计入
 - 定义：对真实赛题附件/源码完成完整攻击链（≥2 步推理），产出 flag 与题面真值
   （`flag_sha256` / 官方 writeup / 视觉确认）一致，且有可复现命令或独立 verifier 脚本。
-- 当前 12 条严格真题中 A 类 5 条：10733 / vnctf_flag / xuanhun_signin / sheng / upx
-  （specialcurve2 经 2026-08-27 诚实校准判定为不可复现，移出严格 KPI 并列入 KNOWN_GAP；
+- 当前 13 条严格真题中 A 类 6 条：10733 / vnctf_flag / xuanhun_signin / sheng / upx / specialcurve2
+  （**specialcurve2 经 2026-09-11 治理修复重新晋级**：原"实例值永久丢失"判定基于旧信息——
+  原实例 n/HINT/C 完整留存于公开 writeup（ljahum 博客 2021-12-14），与 skill 已存真值 e
+  数学自洽（pow(2,e,n)==norm(HINT) 实测断言）；verify_specialcurve2.py 重写为完整攻击链
+  （自洽验证→factordb/ECM 分解 266-bit n→复数群解密→sha256 逐字匹配题面官方
+  flag_sha256=cd7e815f…），经 PROMOTION_EVIDENCE 带证据晋级 12→13；
   **10732 / 10735 经 2026-09-03 治理修复，均可机器复现**（scripts/verify_10732.py + verify_10735.py
   + 附件本地落库 + REGRESSION_CHECKS 入条目），但两者题面均**无官方 flag_sha256 外部真值闭环**，
-  **不进 PROMOTION_EVIDENCE、KPI_WATERMARK 保持 12 不动**——见各题块 ⛔→✅ 治理标注与
+  **不进 PROMOTION_EVIDENCE、水位=基线+晋升数保持诚实口径**——见各题块 ⛔→✅ 治理标注与
   `scripts/_antifraud.py` 治理注释：
   - 10732（PKCS#1 v1.5）：视觉读+vision LLM 兜底 flag = `DASCTF{6b3ed7dc3c1c6615fb97a7020922f7a5}`，
     与台账 2026-08-24 sha256 前缀 `337eadc1a305b60f` 不一致（内部不自洽）；
@@ -38,7 +42,7 @@
   `flag_sha256` 逐字匹配，且明文 flag 已落盘 `data/results/verified_flags.json`。
 - 区别于 C 类：**B 类必须存在可运行的变换代码路径**（如八进制+Vigenère / Hastad CRT /
   勒让德逐位 / base64+ROT13），不是从题面文件直接抽取答案。
-- 当前 12 条严格真题中 B 类 7 条：anwang_crypto1 / ezmult / filterrandom / qiangwang_classic / ezrsa / simplelegendre / exciting_inverse（ezrsa / simplelegendre / exciting_inverse 三道均于 2026-09-03 经确定性求解器接入 presolve 后 `_regress_one.py` REGRESS_PASS 带证据重新晋级——分别见题块 7/8/11 与 `_antifraud.PROMOTION_EVIDENCE`；2026-08-28 的 12→9 诚实回退已全部闭环修复）。
+- 当前 13 条严格真题中 B 类 7 条：anwang_crypto1 / ezmult / filterrandom / qiangwang_classic / ezrsa / simplelegendre / exciting_inverse（ezrsa / simplelegendre / exciting_inverse 三道均于 2026-09-03 经确定性求解器接入 presolve 后 `_regress_one.py` REGRESS_PASS 带证据重新晋级——分别见题块 7/8/11 与 `_antifraud.PROMOTION_EVIDENCE`；2026-08-28 的 12→9 诚实回退已全部闭环修复）。
 
 ### C 类 · flag_scan / 源码 grep 明文披露 —— ❌ 不计入
 - 定义：从源码注释 / HTML / JS / manifest 直接 grep 出 flag 明文（如 reverse_js 2ms、
@@ -77,19 +81,19 @@
 
 ---
 
-## 二、离线核验解出（严格 KPI 12 题 = A 类 5 + B 类 7；外部真题 HGAME RSA1/RSA2/RSA3 与西湖论剑2021 FilterRandom 已于 2026-08-27 公开重建复现通过（RSA3 用公开真 flag 自洽重建；西湖用公开源码+自洽实例），但 E 类不计 KPI；specialcurve2 / 10735 经 2026-08-27 诚实校准判定不可复现，已移出严格 KPI 并列入 KNOWN_GAP；ezrsa / simplelegendre / exciting_inverse 三道 2026-08-28 曾因 presolve 提取=None 诚实回退 12→9，均于 2026-09-03 经确定性求解器带证据重新晋级（见题块 7/8/11）——此 12 为全证据态，与回退前口径不同；**10732 经 2026-09-03 治理修复可机器复现但不进 PROMOTION_EVIDENCE，水位 12 不动**）
+## 二、离线核验解出（严格 KPI 13 题 = A 类 6 + B 类 7；外部真题 HGAME RSA1/RSA2/RSA3 与西湖论剑2021 FilterRandom 已于 2026-08-27 公开重建复现通过（RSA3 用公开真 flag 自洽重建；西湖用公开源码+自洽实例），但 E 类不计 KPI；**specialcurve2 经 2026-09-11 治理修复重新晋级（原"实例值丢失"判定过时——writeup 博客留存原实例 n/HINT/C 且与真值 e 数学自洽，完整攻击链 verifier sha256 逐字匹配题面官方 flag_sha256，带证据晋级 12→13，KNOWN_GAP 清零）**；10735 经 2026-09-03 治理修复可机器复现但不进严格 KPI；ezrsa / simplelegendre / exciting_inverse 三道 2026-08-28 曾因 presolve 提取=None 诚实回退 12→9，均于 2026-09-03 经确定性求解器带证据重新晋级（见题块 7/8/11）——此 13 为全证据态；**10732 经 2026-09-03 治理修复可机器复现但不进 PROMOTION_EVIDENCE，水位口径=基线+晋升数诚实不动**）
 
 ### 1. real_crypto_specialcurve2 【A类·完整攻击链】（西湖论剑 2021）
 
 - **来源**：`data/questions_real/crypto/real_crypto_specialcurve2.json`
 - **类型**：crypto / 复数乘法群类 RSA
-- **状态**：⛔ unreproducible（**不可机器复现**，严格 KPI 不计）——详见复核结论。
-- **flag**：`<DASCTF{<REDACTED> sha256=cd7e815f4a5a378b>`（明文仅存于本地 gitignored `data/results/verified_flags.json`，属历史人工解出真值，**非程序复现**）
-- **核验方式**：`scripts/verify_specialcurve2.py` **仅做 sha256 自比**（读题面 `flag_sha256` 与真值库 sha256 比较），**不含任何密码学求解**，不构成可复现解出证据。
-- **可复现命令**：无（附件为模板，实例值不可复现）。
-- **备注**：88 位 DLP 用 PARI/GP `znlog` 解出指数 e 的**方法**本仓库 skill 已覆盖，但本实例的 n/HINT/C 已丢失，无法端到端复现。
+- **状态**：✅ offline_verified（2026-09-11 治理修复重新晋级，A 类·完整攻击链）——原 ⛔ unreproducible 判定基于"实例值丢失"旧信息，已过时。
+- **flag**：`<DASCTF{<REDACTED> sha256=cd7e815f4a5a378b>`（明文不打印不入库，sha256 与题面官方 flag_sha256 逐字一致）。
+- **核验方式**：`scripts/verify_specialcurve2.py`（2026-09-11 重写为完整攻击链）：① 自洽验证 pow(2,e,n)==norm(HINT)（原实例来自公开 writeup ljahum 博客 2021-12-14，与 skill 已存真值 e 数学自洽，非盲信）② factordb → sympy ECM(B1=25万, gmpy2 实测 190s) 分解 266-bit n=三 89-bit 安全素数 ③ ord=∏(p²−1)（p≡3 mod 4 → F_{p²} 非零元群阶）④ d=e⁻¹ mod ord，M=C^d（复数乘法群 (Z/nZ)[i] 快速幂）⑤ sha256 逐字匹配题面官方 flag_sha256=cd7e815f4a5a378b…（外部真值闭环）。
+- **可复现命令**：`.venv/Scripts/python.exe scripts/verify_specialcurve2.py` → 实测 REGRESS_PASS（EXIT=0；factordb 网络不通时走 ECM fallback，全程离线可复现）。
+- **晋级**：PROMOTION_EVIDENCE 入条目（_antifraud.py），REGRESSION_CHECKS 14→15，KNOWN_GAP 1→0 清零，水位 12→13（地板 9 + 晋升 4，全证据态）。
 
-- **复核结论（2026-08-27 修正·人工校正）**：2026-08-27 16:42 由并行「真题库重建」自动化新建的 `SpecialCurve2.py` 自身注释声明——原实例 n/HINT/C 在脚本注释中给出但**每次运行随机生成、从未留存**，该文件仅为「挑战脚本模板」，无法复现本实例真值；`verify_specialcurve2.py` 仅做 sha256 同义反复比对。故此前「升 ✅ 计入 KPI」判断错误，回退为 ⛔ unreproducible，merge_gate 计数恢复 12（与 KPI_BASELINE.json 一致）。此条由自动化误升，已人工校正。
+- **历史复核存档（2026-08-27·已被 2026-09-11 治理修复推翻）**：当日基于 `SpecialCurve2.py` 模板注释（"原实例每次运行随机生成、从未留存"）判定不可复现并回退 ⛔。2026-09-11 核实该判定基于旧信息——公开 writeup（ljahum 博客 2021-12-14）完整留存原实例 n/HINT/C 且与 skill 已存真值 e 数学自洽，完整攻击链 verifier 实测 sha256 逐字匹配题面官方真值，重新晋级 ✅（详见上方核验方式与晋级条目）。
 ### 2. 10732（CRYPTO-01 【A类·完整攻击链】 · 正式赛真题 · PKCS#1 v1.5）
 
 - **来源**：`data/race_details/10732.json` + 附件 `data/race_attachments/10732_Yusa的密码学课堂——PKCS#1的附件/{task.py,PKCS#1.v1.5.enc,Crypto/}`（附件本地保留，`.gitignore data/race_attachments/` 排除不入 HEAD）

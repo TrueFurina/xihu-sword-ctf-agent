@@ -150,12 +150,24 @@ REGRESSION_CHECKS = [
         "cmd": [sys.executable, "scripts/_regress_one.py", "real_misc_vnctf_flag"],
         "flag_contains": "REGRESS_PASS",
     },
+    # 2026-09-11 带证据晋级（最后一个 KNOWN_GAP 清零）：specialcurve2 原实例 n/HINT/C
+    # 完整留存于公开 writeup（ljahum 博客 2021-12-14），与 skill 已存真值 e 数学自洽
+    # （pow(2,e,n)==norm(HINT) 实测断言）。verify_specialcurve2.py 重写为完整攻击链：
+    # 自洽验证 → factordb/ECM(B1=25万,gmpy2 加速实测 190s) 分解 266-bit n
+    # → ord=∏(p²-1) → d=e⁻¹ → M=C^d（复数乘法群快速幂）→ sha256 逐字匹配题面
+    # 官方 flag_sha256=cd7e815f4a5a378b（外部真值闭环，A 类要件齐备）。
+    # 实测 REGRESS_PASS（EXIT=0）。
+    {
+        "id": "real_crypto_specialcurve2",
+        "cmd": [sys.executable, "scripts/verify_specialcurve2.py"],
+        "flag_contains": "REGRESS_PASS",
+    },
 ]
 
-KNOWN_GAP = [
-    {"id": "real_crypto_specialcurve2",
-     "reason": "不可复现：附件 SpecialCurve2.py 仅为恢复的挑战脚本模板，原 n/HINT/C 实例值每次运行随机生成、已永久丢失；verify_specialcurve2.py 仅做 sha256 自比对（同义反复），不真解题。2026-08-27 诚实校准从严格 KPI 与回归集移除"},
-]
+# 2026-09-11：KNOWN_GAP 清零——specialcurve2 经完整攻击链重写后可机器复现（带官方
+# flag_sha256 外部真值闭环），原"实例值永久丢失"判定基于旧信息（writeup 博客有原实例），
+# 已过时。KNOWN_GAP 列表保留（空）以维持结构。
+KNOWN_GAP: list = []
 
 
 def dirty_check() -> bool:
@@ -226,10 +238,10 @@ def count_offline_verified() -> int:
     if not os.path.isfile(LEDGER):
         print(f"❌ 台账缺失：{LEDGER}")
         return -1
-    # 2026-08-27 诚实护栏：以下题的「核验」仅为 sha256 同义反复（读题面 flag_sha256
-    # 与真值库自比），不含任何真实求解，绝不可计入 KPI——即便台账被误标 ✅ 也排除。
-    # 防止并行「真题库重建」自动化把注水项重新计入严格 KPI。
-    _CIRCULAR_VERIFY_EXCLUDE = {"real_crypto_specialcurve2"}
+    # 2026-08-27 诚实护栏（历史）：曾把 specialcurve2 列为「sha256 自比」循环验证排除项。
+    # 2026-09-11 治理修复：verify_specialcurve2.py 已重写为完整攻击链（自洽验证→分解 n
+    # →复数群解密→sha256 匹配题面官方真值），不再同义反复 → 从排除集移除。
+    _CIRCULAR_VERIFY_EXCLUDE: set = set()
     try:
         count = 0
         cur_title = ""

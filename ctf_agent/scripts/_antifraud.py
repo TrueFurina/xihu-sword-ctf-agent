@@ -50,7 +50,9 @@ from _merge_gate import (  # noqa: E402
 
 # 循环验证排除项（与 _merge_gate.count_offline_verified 同口径，写死在此处，
 # 防止把「sha256 自比」式同义反复误计为严格 KPI 解出）。
-_CIRCULAR_VERIFY_EXCLUDE = {"real_crypto_specialcurve2"}
+# 2026-09-11 治理修复：specialcurve2 的 verify 脚本已重写为完整攻击链（自洽验证→
+# factordb/ECM 分解→复数群解密→sha256 匹配题面官方真值），不再同义反复 → 移出排除集。
+_CIRCULAR_VERIFY_EXCLUDE: set = set()
 
 ROOT = os.path.dirname(SCRIPTS_DIR)
 LEDGER = os.path.join(ROOT, "REAL_SOLVES_LEDGER.md")
@@ -184,6 +186,12 @@ BASE_AUTHORIZED_KPI_SOLVES = frozenset({
 # 接入 presolve（_try_modinv_factor），`scripts/_regress_one.py real_crypto_exciting_inverse`
 # 实测 REGRESS_PASS（CRT⟹A·p+B·q=N+1⟹q 二次方程判别式开方分解 1024-bit p/q，
 # flag sha256 逐字匹配题面真值 4b84616c…）。
+# specialcurve2 —— 2026-09-11 带证据晋级（最后一个 KNOWN_GAP 清零）：原实例 n/HINT/C
+# 完整留存于公开 writeup（ljahum 博客 2021-12-14），与 skill 已存真值 e 数学自洽
+# （pow(2,e,n)==norm(HINT) 实测断言，非盲信）。`scripts/verify_specialcurve2.py` 重写为
+# 完整攻击链：自洽验证 → factordb/ECM(B1=25万, gmpy2 加速实测 190s) 分解 266-bit n
+# → ord=∏(p²-1) → d=e⁻¹ → M=C^d（复数乘法群 (Z/nZ)[i] 快速幂）→ sha256 逐字匹配
+# 题面官方 flag_sha256=cd7e815f…（外部真值闭环，A 类要件齐备）。实测 REGRESS_PASS。
 PROMOTION_EVIDENCE = {
     "real_crypto_ezrsa": (
         "sha256:93be5f3ad422c43e99e705f52df3ad974548dc558714e48162d3939787bdfdbf"
@@ -199,6 +207,12 @@ PROMOTION_EVIDENCE = {
         "sha256:4b84616cccbe84a99256c23152a4fd226e87e9da64e92689063046251cc251c5"
         "|verify:scripts/_regress_one.py real_crypto_exciting_inverse (REGRESS_PASS 2026-09-03)"
         "|skill:skills/crypto_modinv_factor.py (phi+双模逆: CRT⟹q 二次方程判别式分解, 0.23s)"
+    ),
+    "real_crypto_specialcurve2": (
+        "sha256:cd7e815f4a5a378b8a856ee518a1d7277f306221ce6d68d56dd6f27da2571c4f"
+        "|verify:scripts/verify_specialcurve2.py (REGRESS_PASS 2026-09-11, EXIT=0)"
+        "|skill:skills/crypto_complex_mult_group.py (复数乘法群: 自洽验证+ECM分解+M=C^d, ~190s)"
+        "|source:writeup(ljahum 2021-12-14) 原实例 n/HINT/C + pow(2,e,n)==norm(HINT) 自洽断言"
     ),
 }
 
