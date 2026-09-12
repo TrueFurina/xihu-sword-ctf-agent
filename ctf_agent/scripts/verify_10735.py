@@ -32,8 +32,9 @@ honest 边界（与 10732 同款治理口径，2026-09-03）：
     属「自证双运行一致」而非外部官方真值——若写 PROMOTION_EVIDENCE 属自我授权
     （pcap 重放 → 自己算 sha256 → 自己写白名单，闭环自洽但无外部校验）。
   - 因此 10735 治理归位 = 可机器复现 verifier 落库 + REGRESSION_CHECKS 入条目 +
-    KNOWN_GAP 移除；**不进 PROMOTION_EVIDENCE = 不升 KPI 水位**（KPI_WATERMARK 12
-    不动、台账 ✅ offline_verified 不增，防 WATERMARK_DRIFT）——与 10732 治理
+    KNOWN_GAP 移除；**不进 PROMOTION_EVIDENCE = 本题不使 KPI 水位变动**（KPI_WATERMARK
+    现为 13 = 地板 9 + 晋升 4，其由 12 升 13 是 specialcurve2 于 2026-09-11 带证据
+    晋级产生，与本题无关；台账 ✅ offline_verified 不因本题增，防 WATERMARK_DRIFT）——与 10732 治理
     修复、与 9→10/10→11/11→12 三道带证晋级模式不同的第三类：既不是带外部真值
     晋级，也不是留在 KNOWN_GAP，而是「可复现闭环 + 诚信不入严格 KPI」。
 
@@ -50,6 +51,16 @@ import sys
 import urllib.parse
 import zlib
 from collections import defaultdict
+
+# ── 环境健壮性（2026-09-12）──
+# scapy 的 Windows 分支在 **import 期** 就执行 os.environ["ProgramFiles"]（去探测 Wireshark
+# 安装路径），变量缺失即抛 KeyError、整个验证器 import 阶段直接崩。精简 shell / 子进程化
+# 调用（如从非登录环境跑 scripts/_merge_gate.py）不会继承该变量，曾使合并闸门对本题误报
+# 「台账称已解出但无法复现」的假红——实为环境缺变量，并非题目不可复现（补变量后实测
+# REGRESS_PASS，三重 sha256 锚全命中）。此处显式补默认值，验证器不再依赖调用方 shell。
+os.environ.setdefault(
+    "ProgramFiles", os.environ.get("PROGRAMW6432") or r"C:\Program Files"
+)
 
 from scapy.all import Raw, TCP, rdpcap  # .venv 已装 scapy 2.7.0
 
@@ -273,7 +284,7 @@ def main() -> int:
             "flag 字符串不落 verifier 输出/不入 git。flag.txt sha256=67f3e126… 与台账 "
             "2026-08-24 记录前缀 67f3e126d51a6169 + 归档 _10735_unrar/flag.txt 逐字节 "
             "一致（双独立运行交叉互证）；但题面无 flag_sha256 官方字段、无外部真值闭环，"
-            "故不进 PROMOTION_EVIDENCE，KPI 水位 12 不动"
+            "故不进 PROMOTION_EVIDENCE，KPI 水位不因本题变动（现为 13 = 地板 9 + 晋升 4）"
         ),
     }, ensure_ascii=False, indent=2))
     print("REGRESS_PASS")
