@@ -1,0 +1,10 @@
+{
+  "name": "entropy_scan",
+  "description": "文件字节熵扫描（纯 Python 内建实现，无外部依赖）——熵 >7.2 bits/byte 提示加壳/加密/压缩（reverse 题分诊：判断是否需要先脱壳），低熵提示明文/简单编码",
+  "command": "python -c \"import math,sys,collections;d=open(sys.argv[1],'rb').read();c=collections.Counter(d);n=len(d) or 1;e=-sum(v/n*math.log2(v/n) for v in c.values());print(f'entropy={e:.3f} bits/byte, size={n} bytes');print('VERDICT: high-entropy (packed/encrypted/compressed likely - consider unpacking first)') if e>7.2 else print('VERDICT: normal (plaintext or simple encoding likely)')\" {path}",
+  "inputs": [
+    {"name": "path", "required": true, "description": "目标文件路径"}
+  ],
+  "categories": ["reverse", "misc"],
+  "timeout": 30
+}
