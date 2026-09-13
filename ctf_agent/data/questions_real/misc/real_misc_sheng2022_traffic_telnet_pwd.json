@@ -4,7 +4,7 @@
   "category": "misc",
   "title": "某省赛 路由器流量分析 题1 telnet密码",
   "description": "Wireshark 分析 capture.pcapng, 找出 telnet(路由器) 账号 admin / 密码; writeup 明确给出密码 Cisc0。flag{密码}。",
-  "flag": "cc0f6b523bef8856abef3a459bb80f34c12e4bd58467e1d1bf751ec896021009",
+  "flag": "<redacted>",
   "flag_pattern": "^[A-Za-z0-9]+$",
   "attachments": [
     "data/questions_real/_attachments/misc/real_misc_sheng2022_traffic_telnet_pwd/flag.txt"

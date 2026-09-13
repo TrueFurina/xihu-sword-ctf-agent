@@ -4,7 +4,7 @@
   "category": "misc",
   "title": "玄盾杯 Misc-SignIN（JPEG 尾部嵌 PNG）",
   "description": "xz1.jpg 是 JPEG 文件，尾部嵌入 PNG（FFD9 后接 89504E47 PNG 头）。提取 PNG 即可看到 flag 文字。",
-  "flag": "d5e1894ae1bb4e4d191702604bfea3ceb7a006074721d6fc3a05b8c601f42b83",
+  "flag": "<redacted>",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
     "data/questions_real/_attachments/misc/real_misc_xuanhun_signin/xz1.jpg"

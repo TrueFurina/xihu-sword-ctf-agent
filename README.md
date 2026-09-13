@@ -1,99 +1,127 @@
-# xihu-sword-ctf-agent
+# 西湖论剑 CTF-Agent · xihu-sword-ctf-agent
 
-> 🌏 **中文文档 / Chinese documentation**: [README.zh.md](./README.zh.md)
+> 一个 **deterministic-first（确定性优先）** 的多智能体 CTF 解题框架。
+> A deterministic-first multi-agent framework for solving CTF challenges.
 
-> ⚠️ **Honesty disclaimer (read first)**: This project's real-world competition result on the live platform was **0 accepted flags**. All "solved / pass-rate" figures in this repo refer to **offline deterministic analysis** of historical CTF problems (the `data/questions_real/` corpus), not any live contest score. We do not claim LLM autonomous reasoning capability — the real capability here is a **deterministic static analyzer (presolve)** covering common CTF categories. See [Honest KPI](#honest-kpi) below.
-
-An open-source **AI agent framework for CTF (Capture The Flag)** competitions. The agent polls a DASCTF-style platform, triages challenges, runs deterministic solvers first, and only escalates to an LLM when static analysis misses. Built and battle-tested against the *West Lake Sword Tournament (西湖论剑)* AI CTF track.
+[English](#english) · [中文](#chinese)
 
 ---
 
-## Why this exists
+<a id="chinese"></a>
+## 中文
 
-Most "CTF agents" are just an LLM with a shell. This one is the opposite: **deterministic-first**. A pre-solve layer (`core/presolve.py`) fans out dozens of ready-to-run skills (RSA attacks, stego extractors, source-code auditors, base64 multilayer decoders, …) in parallel. The LLM is a last-resort escalator, behind a whitelist, a token budget, and a wall-clock stop-loss. The result is a system that is **reproducible, debuggable, and honest about what it can and cannot do**.
+### 它解决什么问题
 
-## Architecture
+多数「CTF 解题智能体」只是「LLM 套一层 shell」：结果不可复现、不可调试、还容易夸大能力。
+我的核心判断是——CTF 里大量题型（RSA 攻击、隐写提取、源码审计、多层编码）本质是可穷举的**确定性套路**，不该交给会幻觉的 LLM。
 
-```
-ctf_agent/
-├── core/          main loop, presolve static analyzer, supervisor agent, wall-clock stop-loss
-├── agents/        per-category solvers (crypto_toolkit / misc / web / reverse / pwn …)
-├── skills/        52 deterministic skills (run(params) -> dict interface)
-├── llm/           LLM client (provider whitelist, fail-closed circuit breaking)
-├── ctfplatform/   contest-platform client (DASCTF-style), retry / fail-open submit path
-├── sandbox/       code-execution sandbox (subprocess isolation)
-├── eval/          historical-problem benchmark (honest KPI measurement)
-├── data/questions_real/   historical problem corpus (most flags SHA-256; a few long-public events e.g. Anxun Cup 2020 retain plaintext; 2026 contest excluded)
-├── config.py      config (defaults + environment-variable fallback)
-├── run.py         entry point (--mode cli/web/mock)
-└── setup.sh       environment bootstrap
-```
+所以本项目只回答一个问题：**如何让解题系统「可复现、可审计、且对能力水位诚实」**。
 
-### Solve pipeline
+### 设计取舍（本项目最大的判断）
+
+采用 **deterministic-first**：先跑 `presolve` 静态分析层，并行扇出一群确定性技能；只有静态分析 miss 的题，才升级给 LLM，且 LLM 处在「白名单 provider + token 预算 + 墙钟止损」三重约束之后。
+这与「LLM-first」路线相反，是本项目最核心的取舍。
+
+### 系统结构（多智能体分工）
 
 ```
-platform poll → triage/classify → attachment download + target probe
-             → deterministic skills (52) ⇄ LLM reasoning (whitelisted providers)
-             → flag validation → platform submit (fail-closed on request errors)
+                         ┌──────────────┐
+      题面/附件 ───────▶ │  supervisor  │  步骤预算 + 工具优先纪律 + 提交闸门(fail-closed)
+                         └──────┬───────┘
+                                │ 静态分析优先
+                 ┌──────────────┼───────────────────────┐
+                 ▼              ▼                        ▼
+         ┌────────────┐  ┌──────────────┐        ┌──────────────┐
+         │  presolve  │  │  解题 agents  │        │  math_engine │
+         │ 静态分析器  │  │ crypto/misc/ │        │  数学推理补充  │
+         │ 49 确定性技能│  │ web/rev/pwn  │        └──────────────┘
+         └─────┬──────┘  └──────────────┘
+               │ miss 才升级
+               ▼
+         ┌────────────┐
+         │    LLM     │  白名单 + token 预算 + 墙钟止损
+         └────────────┘
 ```
 
-- **Supervisor architecture**: `core/main_agent.py` plans per challenge, `core/supervisor_agent.py` enforces step budgets, tool-first discipline, and the request-failure-vs-wrong-flag separation (the post-incident fix for a submit-circuit-breaker bug).
-- **Deterministic-first**: `skills/` holds 52 runnable skills. `core/presolve.py` runs them before any LLM token is spent.
-- **Whitelisted LLM only** (contest rule §3); multi-source fallback with 401/402 circuit breaking, per-question token budgets, heavy-model upgrade policy.
-- **Race harness**: `scripts/_race_start.py --compete` = first-blood scan → stable polling → final report, with a mandatory e2e data-link preflight (fail-closed).
+监督者（supervisor）负责步骤预算与「工具优先」纪律；五类解题 agent 各管一类题型；
+底层 `math_engine` 补数学推理。提交走 **fail-closed 闸门**——请求出错即硬失败，绝不带病提交。
 
-## Hard gates (lessons, codified)
+### ⚠️ 诚实水位声明（请务必读）
 
-| Gate | What | Enforced by |
-|------|------|-------------|
-| Test gate | real `pytest` run, no per-file fake loops | `setup.sh` (exit 1 on failure) |
-| E2E gate | platform actually serves challenge data | `scripts/_e2e_verify.py`, wired into `--compete` |
-| Network gate | proxy alive / LLM endpoints reachable | `scripts/_net_check.py` (`trust_env=False`) |
-| Secret gate | no plaintext keys in staged files | pre-commit hook (`scripts/_scan_secrets.py`) |
-| Write-lease gate | one writer per scope; out-of-scope commits rejected | `scripts/_lease.py` + pre-commit |
+本项目坚持「工件可信、裁判分离、启动即门禁」三铁律，对能力水位也保持克制：
 
-## Quick start
+| 口径 | 数值 | 说明 |
+|---|---|---|
+| 真题集（历年 CTF）真链路实测 | 15/15 由 **presolve 静态分析直出** | 这是**工具链覆盖率**，不是 LLM 能力 |
+| 主 Agent（LLM）真题集真实推理解出 | **0** | 未证明「LLM 推理不行」，只证明「尚未验证」 |
+| 真实赛场线上 accepted | **0** | 诚实记录，不虚报 |
+| 确定性技能数量 | **49** | 可复跑、可审计的 `run(params)->dict` 接口 |
+
+**结论很克制**：本系统的能力 = 静态分析器覆盖率；要扩题型，就写更多确定性技能。我们**没有**用 mock 正确率、自建靶机得分等「虚高数字」充当战绩。
+
+### 快速开始
 
 ```bash
-cd ctf_agent
-bash setup.sh                      # venv + deps + whitelist + net check + test gate
-export CTF_AGENT_LLM_PROVIDER=deepseek
-export CTF_AGENT_LIGHT_MODEL=deepseek-chat
-export DEEPSEEK_API_KEY=sk-xxx     # your key — never commit it
-.venv/Scripts/python.exe run.py --mode mock --category crypto   # offline smoke test
-.venv/Scripts/python.exe run.py --mode cli                      # local practice
+bash setup.sh                 # 建 .venv + 装依赖 + 白名单预检 + 全测试
+python run.py --mode mock     # 离线冒烟演示（不烧 token）
+python -m pytest tests/ -q -m "not slow"   # 离线测试门禁
 ```
 
-Configuration is environment-variable driven (see `config.py`): `DASCTF_TOKEN`, `DASCTF_BASE_URL`, provider API keys. **Never commit keys** — the hook refuses.
+题库位于 `data/questions_real/`（flag 字段已自动脱敏为 `<redacted>`）。
 
-## Honest KPI
+### 治理与边界
 
-The single machine-enforced KPI is **`offline_verified`** — the number of *historical real problems* for which a complete, reproducible attack chain produced a flag matching the problem's ground-truth `flag_sha256` (see `REAL_SOLVES_LEDGER.md`, guarded by the merge-gate ratchet in `scripts/_merge_gate.py` so it can only go up, never down).
+- **工件可信**：只信可复现命令 + 落盘工件；不把 LLM 自述当事实。
+- **裁判分离**：实现者不能当自己的裁判（诚实扫描器 `_honesty_scan` 拦截虚假水位表述）。
+- **隐私边界**：真 flag 全部脱敏；密钥只走环境变量与白名单 provider；pre-commit 钩子扫描明文密钥。
+- 内部赛题资源、作战复盘、未脱敏报告**不在本仓库**（由发布脚本自动剔除）。
 
-| Metric | Result |
-|--------|--------|
-| **offline_verified** (strict real-problem KPI) | **13** |
-| Deterministic pipeline coverage (presolve direct-solve, early 15-problem subset) | **15 / 15** (presolve direct-solve coverage — NOT a "solved" claim; full 92-problem corpus coverage tracked in REAL_SOLVES_LEDGER.md; `real_misc_vnctf_flag` 2026-09-03 governance fix —题面 `flag_pattern` 修订 + vision LLM 兜底链路修复后正式入 presolve) |
-| LLM autonomous-reasoning contribution | **0** (all 13 verified solves are deterministic presolve/tooling; zero LLM reasoning) |
-| Regression-set reproducible count | **15 / 15** (13 题严格 KPI 集 + 10732/10735 治理修复：`scripts/verify_10732.py` + `verify_10735.py` + `verify_specialcurve2.py` 可机器复现攻击链；REGRESSION_CHECKS 15 道全过；10732/10735 **不进** PROMOTION_EVIDENCE 因题面无官方 sha256 真值闭环；specialcurve2 **有**题面官方 flag_sha256 闭环，经 PROMOTION_EVIDENCE 带证据晋级 12→13，详见台账题块 1/2 + `scripts/_antifraud.py`) |
+### 路线图
 
-> ⚠️ **What `offline_verified=13` does and does NOT mean.** It is the count of *real past-CTF problems* (provenance=`real_past_ctf`, sha256-verified, machine-counted by `scripts/_merge_gate.py count_offline_verified`) solved by a **reproducible deterministic pipeline** — a real engineering milestone, but **NOT a capability measurement**. These problems' writeups are public and almost certainly in LLM pre-training corpora (contamination risk — see `data/results/CTF-Agent深度评审报告_20260828.md` G1). LLM autonomous-reasoning contribution is **0/13**. Treat 13 as "template coverage of memorizable public problems," never as "reasoning ability." (Note: on 2026-08-28 the KPI was honestly cut back from a nominal 12 to 9 because three solves — `real_crypto_ezrsa`, `real_crypto_simplelegendre`, `real_crypto_exciting_inverse` — were not reproducible by the deterministic pipeline. All three were promoted **back into the strict KPI on 2026-09-03 with evidence**, each via a deterministic solver wired into presolve and returning `REGRESS_PASS` with sha256 matching ground truth: `real_crypto_ezrsa` — Håstad broadcast solver `skills/crypto_hastad_broadcast.py` (`_try_hastad_broadcast`, e=17, CRT+iroot); `real_crypto_simplelegendre` — Legendre-symbol solver `skills/crypto_legendre_phi.py` (`_try_legendre_phi`, phi-leak factorization + per-bit `(c|p)=(-1)^bi`); `real_crypto_exciting_inverse` — phi+dual-modular-inverse solver `skills/crypto_modinv_factor.py` (`_try_modinv_factor`, CRT⟹`A·p+B·q=N+1`⟹quadratic-root factorization). This count is therefore fully evidence-backed, unlike the pre-rollback nominal 12 — and unlike the 2026-08-28 nominal 12 that the rollback exposed as unverified. See `PROMOTION_EVIDENCE` in `scripts/_antifraud.py` and blocks 7/8/11 of `REAL_SOLVES_LEDGER.md`.) **2026-09-03 governance fix (no KPI change)**: `real_misc_vnctf_flag` was historically ledgered as A-class ✅ but the problem JSON had `flag_pattern` written as `flag\{[^}]+\}` while the true flag is `vnctf\{...\}` — presolve's secondary regex check misclassified the skill's sha256-verified output as "bait" and dropped it. Fixed the pattern, repaired the venv's broken `certifi` (force-reinstalled `certifi==2026.7.22` because RECORD file was missing, blocking `httpx` from finding the CA bundle), and confirmed `scripts/_regress_one.py real_misc_vnctf_flag` → `REGRESS_PASS (5159ms)` via the existing `skills/misc_grid_resample.py` (grid-resample deterministic algorithm + baidu `ernie-4.5-turbo-vl` vision-LLM OCR fallback, sha256-gated return). The solve was already counted in the 9-baseline `BASE_AUTHORIZED_KPI_SOLVES`; this fix moves it from "fake-reproducible-but-counted" to "genuinely-reproducible-and-counted", closes the `KNOWN_GAP` entry, and grows the machine-rerun regression set from 11 → 12.
+见 [Issues](https://github.com/truefurina/xihu-sword-ctf-agent/issues) —— 已开 8 条真实工程路线图（path_traversal 自动解、E1 结构化输出、E8 多候选提交、reverse 工具链重接、诚实水位 CI、SSRF fallback、扩大确定性技能、离线 demo 文档）。
 
-> **LLM reasoning break-ice experiment (not counted in KPI, read the caveat)**: With `scripts/_llm_breaking_ice.py --no-internal-presolve` (presolve shortcuts disabled, LLM forced to reason), **`11/15`** historical problems were solved by `main_agent_llm` autonomous reasoning on baidu Qianfan ERNIE (crypto×7 / reverse×3 / web×1; all 11 have `sha256_ok=true` and `validated=true` against the problem ground truth — disk truth `deliverables/benchmark_runs/llm_breaking_ice_20260901-050201.json`). Earlier runs: `8/15` (2026-08-28, `llm_breaking_ice_20260828-022534.json`) is **superseded** by the 2026-09-01 run; an even earlier `10/15` count included two reverse solves whose sha256 did not match and was corrected.
->
-> ⚠️ **Honesty caveat on the 4 unsolved (updated 2026-09-13):** the original report labeled them "3×TIMEOUT + 1×wrong_direction." This conflates **infrastructure failure with reasoning failure** and is itself a metric-integrity bug — the benchmark never serialized reasoning `steps`, so a TIMEOUT at exactly 240 s with 0 steps most likely means *the first LLM call never returned* (no credential / API hang / network death), **not** "the model can't reason." Per the user's strict-honesty requirement, `scripts/_llm_breaking_ice.py` now (a) pre-checks credentials and labels runs with no key as `INFRA_NO_CREDENTIAL` — never counted as reasoning failure; (b) persists `steps`; (c) tags TIMEOUT with `timeout_cause="api_hang_or_no_first_response_suspected"`. **Therefore the 11/15 figure must NOT be cited as "LLM can solve 11/15"** — it is "11 solved in one run where credentials were present; 4 inconclusive (timeout cause unverified)." The only strictly-honest LLM-reasoning statement remains: **LLM autonomous-reasoning contribution to the KPI is 0/13** (no LLM-only solve is in the strict sha256-verified KPI set). Details in `MEMORY.md`.
+---
 
-Interpretation: **capability = static-analyzer coverage**, not LLM reasoning. To solve more problem types, write more deterministic skills. We say this plainly because over-claiming is the easiest way to embarrass an open-source security tool.
+<a id="english"></a>
+## English
 
-## Security & compliance
+### What problem it solves
 
-This repo publishes the **engineering skeleton and methodology only**. Red lines:
+Most "CTF-solving agents" are just an LLM wrapped in a shell — non-reproducible,
+undebuggable, and prone to overclaiming. Our core thesis: a large share of CTF
+challenges (RSA attacks, stego extraction, source audit, layered encoding) are
+**deterministic patterns** that should not be handed to a hallucinating LLM.
 
-1. **Flags are handled per-event, honestly.** The large majority of historical-contest flags are stored as SHA-256. A small number of entries from long-public events (e.g. Anxun Cup 2020, whose write-ups are already public) retain plaintext flags. **Flags and attachments for the 2026 West Lake Sword contest itself are NOT included in this repo** (excluded via `.gitignore`). Truth files for the strict KPI live in `.gitignore`.
-2. **No secrets in the repo.** LLM keys and platform tokens are injected via env vars / registry only.
-3. **Internal contest resources are excluded** (`data/race_details/`, attachments, signatures) via `.gitignore`.
-4. **Honest water-level.** We do not exaggerate capability. See above.
+This project answers one question only: **how to make a solving system
+reproducible, auditable, and honest about its real capability level.**
 
-## License
+### Key design choice: deterministic-first
 
-[MIT](LICENSE) — open for learning and research. Respect each CTF's rules and platform terms.
+A `presolve` static-analysis layer fans out 49 deterministic skills first. Only
+challenges it misses are escalated to the LLM, which is then boxed by whitelisted
+providers + a token budget + a wall-clock stop-loss. This is the opposite of an
+"LLM-first" approach and is the project's central trade-off.
+
+### Honesty disclaimer (read this)
+
+| Metric | Value | Note |
+|---|---|---|
+| Real past-CTF set, true-chain | 15/15 solved by **presolve static analysis** | tooling coverage, **not** LLM capability |
+| Main Agent (LLM) true solves on real set | **0** | "not validated", not "proven incapable" |
+| Live competition accepted | **0** | reported honestly |
+| Deterministic skills | **49** | auditable `run(params)->dict` |
+
+We deliberately avoid presenting mock accuracy or self-hosted target scores as
+real capability.
+
+### Quick start
+
+```bash
+bash setup.sh
+python run.py --mode mock
+python -m pytest tests/ -q -m "not slow"
+```
+
+### License
+
+[MIT](LICENSE) — Copyright (c) 2026 truefurina (张敏杰 / Zhang Minjie).

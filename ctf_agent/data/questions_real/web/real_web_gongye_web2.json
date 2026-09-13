@@ -4,7 +4,7 @@
   "category": "web",
   "title": "2021中国工业互联网安全大赛 web2",
   "description": "2021中国工业互联网安全大赛河南选拔赛（复赛）web2。分析附件源码/前端文件，找到 flag。",
-  "flag": "6061e023561587c02d9f63e4e24df3626370623691871ed330506042e15de376",
+  "flag": "<redacted>",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
     "data/questions_real/_attachments/web/real_web_gongye_web2/index.php",

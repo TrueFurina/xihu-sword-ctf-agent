@@ -4,7 +4,7 @@
   "category": "reverse",
   "title": "helloupx11",
   "description": "附件是一个 UPX 加壳的 ELF 可执行文件。分析二进制，找出 flag。",
-  "flag": "7130218010da8eea66d88b56a779817c0fca75707897285f104370bf1ed99842",
+  "flag": "<redacted>",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
     "data/questions_real/_attachments/reverse/real_reverse_upx/helloupx11"

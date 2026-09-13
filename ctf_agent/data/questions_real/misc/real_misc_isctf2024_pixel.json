@@ -4,7 +4,7 @@
   "category": "misc",
   "title": "ISCTF2024 数字迷雾",
   "description": "像素中寻找线索(隐写)。",
-  "flag": "8c18b1122278c9846cd9aa11671a264d592033e719514adb4ac4a41d2f425192",
+  "flag": "<redacted>",
   "flag_pattern": "ISCTF\\{[^}]+\\}",
   "attachments": [
     "data/questions_real/_attachments/misc/real_misc_isctf2024_pixel/flag.txt"

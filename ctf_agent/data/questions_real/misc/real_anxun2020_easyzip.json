@@ -5,7 +5,7 @@
   "category": "misc",
   "title": "安洵杯2020 MISC easyzip（ZIP明文攻击+CRC+Base64套娃+栅栏）",
   "description": "easyzip.zip 内 redeme.txt 明文可解，对加密 zip 做明文攻击得密码 %3#c$v!@，解 flag.txt 后多层 Base64 套娃，最内层栅栏密码。二进制原题见官方仓库。",
-  "flag": "flag{zip&crc_we_can_do_it}",
+  "flag": "<redacted>",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": ["data/questions_real/_attachments/anxun2020/misc/easyzip.md"],
   "difficulty": "MEDIUM"
