@@ -51,21 +51,42 @@ class Blackboard:
                 pass  # 黑板写失败不阻塞主流程（只读复用优先）
 
     # ── presolve 缓存（跨会话复用核心）──────────────────────────
+    # 缓存版本化（2026-09-11）：条目绑定 presolve 源码指纹——presolve.py
+    # 变更后旧缓存自动失效，防止"旧逻辑解出的 flag"被新逻辑直接复用（脏命中）。
+    _PRESOLVE_SRC = os.path.join(os.path.dirname(__file__), "presolve.py")
+
+    @classmethod
+    def _presolve_fingerprint(cls) -> str:
+        """presolve.py 源码 sha256 前 16 位（源码变更即换指纹）。"""
+        import hashlib
+        try:
+            with open(cls._PRESOLVE_SRC, "rb") as f:
+                return hashlib.sha256(f.read()).hexdigest()[:16]
+        except OSError:
+            return "unknown"
+
     def get_presolve(self, task_id: str):
-        """查 presolve 缓存：返回 (flag, source, ts) 或 None。"""
+        """查 presolve 缓存：返回 (flag, source, ts) 或 None。
+
+        版本化：条目指纹与当前 presolve.py 不一致 → 视为旧逻辑产物，返回 None
+        （调用方正常走重扫路径，不误用脏缓存）。
+        """
         entry = self._data.get("presolve_cache", {}).get(str(task_id))
         if not entry:
             return None
+        if entry.get("fp") != self._presolve_fingerprint():
+            return None  # 源码已变更，旧缓存失效（防脏命中）
         return entry.get("flag"), entry.get("source"), entry.get("ts")
 
     def set_presolve(self, task_id: str, flag: str, source: str = "presolve") -> None:
-        """写 presolve 缓存（解出成功后调用）。"""
+        """写 presolve 缓存（解出成功后调用，绑定当前源码指纹）。"""
         if not flag:
             return
         self._data.setdefault("presolve_cache", {})[str(task_id)] = {
             "flag": str(flag),
             "source": source,
             "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "fp": self._presolve_fingerprint(),
         }
         self.save()
 
