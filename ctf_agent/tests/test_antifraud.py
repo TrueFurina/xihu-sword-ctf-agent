@@ -59,12 +59,13 @@ def test_kpi_watermark_floor_is_nine():
     # 2026-09-11 specialcurve2 带证据晋级（完整攻击链 verifier + 官方 sha256 真值闭环，
     # 最后一个 KNOWN_GAP 清零，水位 12→13）
     assert af.BASE_WATERMARK == 9
-    assert af.KPI_WATERMARK == 13
-    assert len(af.AUTHORIZED_KPI_SOLVES) == 13
+    assert af.KPI_WATERMARK == 14
+    assert len(af.AUTHORIZED_KPI_SOLVES) == 14
     assert "real_crypto_ezrsa" in af.AUTHORIZED_KPI_SOLVES
     assert "real_crypto_simplelegendre" in af.AUTHORIZED_KPI_SOLVES
     assert "real_crypto_exciting_inverse" in af.AUTHORIZED_KPI_SOLVES
     assert "real_crypto_specialcurve2" in af.AUTHORIZED_KPI_SOLVES
+    assert "real_reverse_vnctf_cm1" in af.AUTHORIZED_KPI_SOLVES
     # 晋升必须带可审计证据（PROMOTION_WITHOUT_EVIDENCE 反之阻断）
     assert af.PROMOTION_EVIDENCE["real_crypto_ezrsa"].startswith("sha256:93be5f3a")
     assert "REGRESS_PASS" in af.PROMOTION_EVIDENCE["real_crypto_ezrsa"]
@@ -74,6 +75,8 @@ def test_kpi_watermark_floor_is_nine():
     assert "REGRESS_PASS" in af.PROMOTION_EVIDENCE["real_crypto_exciting_inverse"]
     assert af.PROMOTION_EVIDENCE["real_crypto_specialcurve2"].startswith("sha256:cd7e815f")
     assert "REGRESS_PASS" in af.PROMOTION_EVIDENCE["real_crypto_specialcurve2"]
+    assert af.PROMOTION_EVIDENCE["real_reverse_vnctf_cm1"].startswith("sha256:a9bb88af")
+    assert "REGRESS_PASS" in af.PROMOTION_EVIDENCE["real_reverse_vnctf_cm1"]
 
 
 # ── 治理修复防御性测试（防止 KPI 注水回归） ──
@@ -82,11 +85,11 @@ def test_10732_governance_fix_not_in_kpi_watermark():
     （KPI_WATERMARK 仍 12 / AUTHORIZED 不含 10732）双状态成立。
     防御：禁止任何人擅自把 10732 加入 BASE_AUTHORIZED_KPI_SOLVES 或 PROMOTION_EVIDENCE
     （会触发自我授权注水，违反诚信红线）。"""
-    # KPI_WATERMARK 应为 13（2026-09-11 specialcurve2 带证据晋级 12→13）
-    assert af.KPI_WATERMARK == 13, (
-        f"KPI_WATERMARK 应为 13，{af.KPI_WATERMARK} 表示被擅自篡改"
+    # KPI_WATERMARK 应为 14（2026-09-11 specialcurve2 带证据晋级 12→13；2026-09-15 vnctf_cm1 晋升 13→14）
+    assert af.KPI_WATERMARK == 14, (
+        f"KPI_WATERMARK 应为 14，{af.KPI_WATERMARK} 表示被擅自篡改"
     )
-    assert len(af.AUTHORIZED_KPI_SOLVES) == 13
+    assert len(af.AUTHORIZED_KPI_SOLVES) == 14
     # 10732 不应在 AUTHORIZED_KPI_SOLVES（会触发 WATERMARK_DRIFT 因台账已可机器复现）
     assert "10732" not in af.AUTHORIZED_KPI_SOLVES, (
         "10732 不应在 AUTHORIZED_KPI_SOLVES，否则与台账题块"
@@ -113,25 +116,25 @@ def test_vnctf_flag_governance_fix_in_base_authorized():
     # 验证它真在 AUTHORIZED_KPI_SOLVES 中（防后续误移出）。
     assert "real_misc_vnctf_flag" in af.BASE_AUTHORIZED_KPI_SOLVES
     assert "real_misc_vnctf_flag" in af.AUTHORIZED_KPI_SOLVES
-    # 治理修复不新增 PROMOTION_EVIDENCE 项（2026-09-11 specialcurve2 晋级后共 4 项）
-    assert len(af.PROMOTION_EVIDENCE) == 4
-    assert len(af.AUTHORIZED_KPI_SOLVES) == 13
-    assert af.KPI_WATERMARK == 13
+    # 治理修复不新增 PROMOTION_EVIDENCE 项（2026-09-15 vnctf_cm1 晋升后共 5 项）
+    assert len(af.PROMOTION_EVIDENCE) == 5
+    assert len(af.AUTHORIZED_KPI_SOLVES) == 14
+    assert af.KPI_WATERMARK == 14
 
 
 # ── WATERMARK_DRIFT / WATERMARK_REGRESSION ──
 def test_watermark_drift_blocked(tmp_violation_log, monkeypatch):
     # 计数溢出地板+晋升（无对应晋升记录）→ 阻断
-    # 2026-09-11 specialcurve2 晋级后水位 13，mock 计数 14（溢出）触发 DRIFT
-    monkeypatch.setattr(af, "count_offline_verified", lambda: 14)
+    # 2026-09-15 vnctf_cm1 晋级后水位 14（地板9+晋升5），mock 计数 15（溢出）触发 DRIFT
+    monkeypatch.setattr(af, "count_offline_verified", lambda: 15)
     v = af.check_kpi_watermark()
     assert any(r["rule"] == "WATERMARK_DRIFT" for r in v)
     assert any(r["rule"] == "WATERMARK_DRIFT" for r in _read_log(tmp_violation_log))
 
 
 def test_watermark_above_floor_blocked(tmp_violation_log, monkeypatch):
-    # 14 > 地板9+晋升4=水位13 但无对应晋升记录 → 仍判 WATERMARK_DRIFT（溢出无证据）
-    monkeypatch.setattr(af, "count_offline_verified", lambda: 14)
+    # 15 > 地板9+晋升5=水位14 但无对应晋升记录 → 仍判 WATERMARK_DRIFT（溢出无证据）
+    monkeypatch.setattr(af, "count_offline_verified", lambda: 15)
     v = af.check_kpi_watermark()
     assert any(r["rule"] == "WATERMARK_DRIFT" for r in v)
 

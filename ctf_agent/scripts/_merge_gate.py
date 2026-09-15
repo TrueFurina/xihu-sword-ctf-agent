@@ -162,6 +162,15 @@ REGRESSION_CHECKS = [
         "cmd": [sys.executable, "scripts/verify_specialcurve2.py"],
         "flag_contains": "REGRESS_PASS",
     },
+    # 2026-09-15 严格诚实晋升（B类·presolve确定性变换）：real_reverse_vnctf_cm1
+    # VNCTF2022 cm1 Android reverse——`_solve_vnctf_cm1.py` 从 writeup 公开密文 AIM
+    # + XXTEA 密钥 "H4pPY_VNCTF!!OvO" 确定性解密还原 flag，flag_sha256 逐字匹配题面真值
+    # （flag 不出现于任何附件/题面，非读泄露答案）。实测 REGRESS_PASS(71ms)。
+    {
+        "id": "real_reverse_vnctf_cm1",
+        "cmd": [sys.executable, "scripts/_regress_one.py", "real_reverse_vnctf_cm1"],
+        "flag_contains": "REGRESS_PASS",
+    },
 ]
 
 # 2026-09-11：KNOWN_GAP 清零——specialcurve2 经完整攻击链重写后可机器复现（带官方

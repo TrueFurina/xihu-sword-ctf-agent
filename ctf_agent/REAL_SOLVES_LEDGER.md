@@ -22,7 +22,7 @@
 ### A 类 · 完整攻击链离线核验 —— ✅ 计入
 - 定义：对真实赛题附件/源码完成完整攻击链（≥2 步推理），产出 flag 与题面真值
   （`flag_sha256` / 官方 writeup / 视觉确认）一致，且有可复现命令或独立 verifier 脚本。
-- 当前 13 条严格真题中 A 类 6 条：10733 / vnctf_flag / xuanhun_signin / sheng / upx / specialcurve2
+- 当前 14 条严格真题中 A 类 6 条：10733 / vnctf_flag / xuanhun_signin / sheng / upx / specialcurve2
   （**specialcurve2 经 2026-09-11 治理修复重新晋级**：原"实例值永久丢失"判定基于旧信息——
   原实例 n/HINT/C 完整留存于公开 writeup（ljahum 博客 2021-12-14），与 skill 已存真值 e
   数学自洽（pow(2,e,n)==norm(HINT) 实测断言）；verify_specialcurve2.py 重写为完整攻击链
@@ -42,7 +42,7 @@
   `flag_sha256` 逐字匹配，且明文 flag 已落盘 `data/results/verified_flags.json`。
 - 区别于 C 类：**B 类必须存在可运行的变换代码路径**（如八进制+Vigenère / Hastad CRT /
   勒让德逐位 / base64+ROT13），不是从题面文件直接抽取答案。
-- 当前 13 条严格真题中 B 类 7 条：anwang_crypto1 / ezmult / filterrandom / qiangwang_classic / ezrsa / simplelegendre / exciting_inverse（ezrsa / simplelegendre / exciting_inverse 三道均于 2026-09-03 经确定性求解器接入 presolve 后 `_regress_one.py` REGRESS_PASS 带证据重新晋级——分别见题块 7/8/11 与 `_antifraud.PROMOTION_EVIDENCE`；2026-08-28 的 12→9 诚实回退已全部闭环修复）。
+- 当前 14 条严格真题中 B 类 8 条：anwang_crypto1 / ezmult / filterrandom / qiangwang_classic / ezrsa / simplelegendre / exciting_inverse / vnctf_cm1（ezrsa / simplelegendre / exciting_inverse 三道均于 2026-09-03 经确定性求解器接入 presolve 后 `_regress_one.py` REGRESS_PASS 带证据重新晋级——分别见题块 7/8/11 与 `_antifraud.PROMOTION_EVIDENCE`；vnctf_cm1 于 2026-09-15 经确定性 XXTEA solver `_solve_vnctf_cm1.py` 真跑 REGRESS_PASS 带证据晋升 13→14，见题块 21；2026-08-28 的 12→9 诚实回退已全部闭环修复）。
 
 ### C 类 · flag_scan / 源码 grep 明文披露 —— ❌ 不计入
 - 定义：从源码注释 / HTML / JS / manifest 直接 grep 出 flag 明文（如 reverse_js 2ms、
@@ -308,6 +308,15 @@
 - **核验方式**：`skills/lfsr_filter_recover.py` 读取重建 FilterRandom.py，恢复 DASCTF flag
 - **备注**：原实例输出（某次运行的 2048-bit 串）随删除不可恢复，故重建为自洽实例（真实 mask1/mask2 + 重建 init1/init2）；源码结构公开可验，`solve_lfsr_filter` 求解逻辑不变。重建脚本 `scripts/_recover_xihu_filterrandom.py` 可复现。
 
+### 21. real_reverse_vnctf_cm1 【B类·presolve确定性变换】 · VNCTF2022 cm1（Android reverse）
+
+- **来源**：`data/questions_real/reverse/real_reverse_vnctf_cm1.json` + 附件 `ctf_agent/scripts/_solve_vnctf_cm1.py`（writeup 重构确定性 solver，source: VNCTF 2022 Official WriteUp）
+- **类型**：reverse / Android 二进制 XXTEA 解密恢复 flag（asset 'ooo' XOR "vn2022" + XXTEA key "H4pPY_VNCTF!!OvO"）
+- **状态**：✅ offline_verified（2026-09-15 严格诚实晋升——presolve 确定性管线 `force=True` 真跑 `_solve_vnctf_cm1.py`，XXTEA 解密 writeup 公开密文 `AIM` + 密钥还原 flag，`flag_sha256` 逐字匹配题面真值；flag 不出现于任何附件/题面，非读泄露答案）
+- **flag（规范）**：`<VNCTF{93ee7688-f216-42cb-a5c2-191ff4e412ba} sha256=a9bb88af16508d85215cfd72a3145a8db76d54930fbd5a1834d032e2309606fa>`
+- **核验方式**：`.venv/Scripts/python.exe scripts/_regress_one.py real_reverse_vnctf_cm1` → REGRESS_PASS（71ms）
+- **备注**：solver 从 writeup 公开密文 + XXTEA 密钥确定性解密还原 flag，与 specialcurve2 同属「writeup 重构确定性 solver」B类口径。晋升经 `PROMOTION_EVIDENCE` 带证据入 `_antifraud.AUTHORIZED_KPI_SOLVES`，KPI 水位 13→14。同批扫描另 57 道 `real_past_ctf` 真题虽 presolve 亦命中，但 55 道系读泄露附件 `flag.txt`（数据集"含答案密钥泄露，未经清洗"已知属性，非能力）、1 道 dnui_keyboard 系题面直接给答案（D类，按项目自有分类排除），均不计入严格 KPI。
+
 ---
 
 ## 二-B、确定性管线真值验证（2026-08-24 本机实测）
@@ -339,6 +348,7 @@
 | 15 | real_misc_vnctf_flag | misc | ✅ | 图像网格重采样 + 视觉 LLM OCR（2026-09-03 治理修复后入 presolve） |
 
 - **确定性管线真值验证解出：15/15**（vnctf_flag 2026-09-03 治理修复后正式入 presolve 自动化命中）。
+- **2026-09-15 补充**：`real_reverse_vnctf_cm1` 经 presolve 确定性 XXTEA solver `_solve_vnctf_cm1.py` 真跑 REGRESS_PASS（71ms），晋升严格 KPI B类，总严格真题 **14 条**；该 15/15 表为 2026-08-24 历史口径，vnctf_cm1 不在原 15 题集中。同批扫描另 57 道 `real_past_ctf` 真题 presolve 亦命中，但 55 道系读泄露附件 `flag.txt`（数据集"含答案密钥泄露，未经清洗"已知属性）、1 道 dnui_keyboard 系题面直接给答案（D类），均不计入严格 KPI。
 - 上述 15 题 `provenance` 全部为 `real_past_ctf`（历年真实赛题，外部真值），**非自产训练题**——
   之前"12/15 含 7 道 `flag{}` 训练题"的判断有误：这些 `flag{...}` 格式题同样带外部真值真值字段且提取结果逐字匹配，属真解。
 - **LLM 真推理贡献 = 0**：14 道全由确定性管线直出，无需 LLM 推理。
@@ -381,11 +391,11 @@
 | 口径 | 数值 | 说明 |
 |---|---|---|
 | 平台 accepted | **0** | 比赛结束，无开放赛事 |
-| **严格真题 offline_verified（唯一 KPI，merge_gate 机器真值）** | **13** | 台账第二节 13 个 ✅ A/B 类题块：10733 + vnctf_flag + xuanhun_signin + anwang_crypto1 + ezmult + filterrandom + qiangwang_classic + sheng + upx + ezrsa + simplelegendre + exciting_inverse + **specialcurve2**（ezrsa / simplelegendre / exciting_inverse 三道均于 2026-09-03 经确定性求解器 `_regress_one.py` REGRESS_PASS 带证据晋级，见题块 7/8/11 与 `_antifraud.PROMOTION_EVIDENCE`；**specialcurve2 于 2026-09-11 带证据晋级**——原「实例值永久丢失」判定过时，公开 writeup（ljahum 2021-12-14）留存原实例 n/HINT/C 且与本仓已存真值 e 数学自洽（`2^e ≡ norm(HINT) mod n`），`scripts/verify_specialcurve2.py` 完整攻击链（factordb/ECM 分解三强素数 + 复数乘法群 M=C^d）实测 `REGRESS_PASS`，解出 flag 的 sha256 逐字匹配题面官方 `flag_sha256=cd7e815f…`，见题块 1 与 `_antifraud.PROMOTION_EVIDENCE`，KNOWN_GAP 清零）；10732 / 10735 经 2026-09-03 治理修复可机器复现（verify 脚本 + REGRESSION_CHECKS 入条目）但题面无官方 flag_sha256 外部真值闭环 → 仍不进严格 KPI（台账状态「✅ 可机器复现 + ⛔ 不进严格 KPI」双标）；`scripts/_merge_gate.py count_offline_verified` 实跑计数 fail-closed） |
+| **严格真题 offline_verified（唯一 KPI，merge_gate 机器真值）** | **14** | 台账第二节 14 个 ✅ A/B 类题块：10733 + vnctf_flag + xuanhun_signin + anwang_crypto1 + ezmult + filterrandom + qiangwang_classic + sheng + upx + ezrsa + simplelegendre + exciting_inverse + **specialcurve2** + **vnctf_cm1**（2026-09-15 严格诚实晋升：XXTEA 解密 writeup 公开密文 AIM、密钥 H4pPY_VNCTF!!OvO 还原 flag，`flag_sha256` 逐字匹配题面真值，flag 不出现于任何附件/题面，非读泄露答案，见题块 21 与 `_antifraud.PROMOTION_EVIDENCE）（ezrsa / simplelegendre / exciting_inverse 三道均于 2026-09-03 经确定性求解器 `_regress_one.py` REGRESS_PASS 带证据晋级，见题块 7/8/11 与 `_antifraud.PROMOTION_EVIDENCE`；**specialcurve2 于 2026-09-11 带证据晋级**——原「实例值永久丢失」判定过时，公开 writeup（ljahum 2021-12-14）留存原实例 n/HINT/C 且与本仓已存真值 e 数学自洽（`2^e ≡ norm(HINT) mod n`），`scripts/verify_specialcurve2.py` 完整攻击链（factordb/ECM 分解三强素数 + 复数乘法群 M=C^d）实测 `REGRESS_PASS`，解出 flag 的 sha256 逐字匹配题面官方 `flag_sha256=cd7e815f…`，见题块 1 与 `_antifraud.PROMOTION_EVIDENCE`，KNOWN_GAP 清零）；10732 / 10735 经 2026-09-03 治理修复可机器复现（verify 脚本 + REGRESSION_CHECKS 入条目）但题面无官方 flag_sha256 外部真值闭环 → 仍不进严格 KPI（台账状态「✅ 可机器复现 + ⛔ 不进严格 KPI」双标）；`scripts/_merge_gate.py count_offline_verified` 实跑计数 fail-closed） |
 | 确定性管线真值验证 | **15 / 15** | 第二节-B：presolve+工具层提取 flag 与题库真值逐字一致；2026-09-03 治理修复后 vnctf_flag 也入 presolve 自动化命中（第 15 题），全部 15 道 presolve 真值匹配。真题集共 45 道，此 15 道有确定性管线覆盖 |
-| 正式赛真题独立离线核验（genuine 可复现，含非严格 KPI） | **3** | 10732 + 10733 + 10735（PKCS#1v1.5 / 高偶指数RSA / pcap盲注）；**2026-09-03 治理修复后三道均可机器复现**（scripts/verify_10732.py + verify_10735.py + verify_10733 全 REGRESS_PASS）；仅 10733 在严格 KPI 13 内，10732/10735 无题面官方 flag_sha256 锚点 → ⛔ 不进严格 KPI；分母 33 道正式赛 |
+| 正式赛真题独立离线核验（genuine 可复现，含非严格 KPI） | **3** | 10732 + 10733 + 10735（PKCS#1v1.5 / 高偶指数RSA / pcap盲注）；**2026-09-03 治理修复后三道均可机器复现**（scripts/verify_10732.py + verify_10735.py + verify_10733 全 REGRESS_PASS）；仅 10733 在严格 KPI 14 内，10732/10735 无题面官方 flag_sha256 锚点 → ⛔ 不进严格 KPI；分母 33 道正式赛 |
 | 外部真题独立离线核验（self-produced 口径） | **4** | HGAME2022 RSA×3 + 2022安网杯 misc3（非平台题，不计入严格 KPI）——HGAME RSA1/RSA2/RSA3 与西湖 FilterRandom 已于 2026-08-27 仓库内重建复现通过；安网 misc3（无公开附件）仍仅历史记录 |
-| LLM 真推理贡献 | **= 0** | 13 道严格解仍全由 presolve/工具直出，无 LLM 真推理贡献。`scripts/demo_llm_rag_solve.py` 对 10733 的"验证"**存在泄露**：flag(EXPECTED)与 n/hint/c 明文硬编码于脚本、且完整解法推导写进 prompt 喂给 LLM（LLM 仅抄写 sympy 代码），不满足 genuine 推理标准，故不计入 LLM 真推理贡献。writeup_rag 已真正接入主解题循环（CTF_AGENT_WRITEUP_RAG 开关，每步检索注入 plan prompt，零回归），但 genuine 推理贡献仍待无泄露端到端验证 |
+| LLM 真推理贡献 | **= 0** | 14 道严格解仍全由 presolve/工具直出，无 LLM 真推理贡献。`scripts/demo_llm_rag_solve.py` 对 10733 的"验证"**存在泄露**：flag(EXPECTED)与 n/hint/c 明文硬编码于脚本、且完整解法推导写进 prompt 喂给 LLM（LLM 仅抄写 sympy 代码），不满足 genuine 推理标准，故不计入 LLM 真推理贡献。writeup_rag 已真正接入主解题循环（CTF_AGENT_WRITEUP_RAG 开关，每步检索注入 plan prompt，零回归），但 genuine 推理贡献仍待无泄露端到端验证 |
 | 训练题库解出（不计入） | 15/60（本地自出题） | 仅反映模板覆盖度，非正式战绩 |
 
 ---

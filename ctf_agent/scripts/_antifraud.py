@@ -214,6 +214,12 @@ PROMOTION_EVIDENCE = {
         "|skill:skills/crypto_complex_mult_group.py (复数乘法群: 自洽验证+ECM分解+M=C^d, ~190s)"
         "|source:writeup(ljahum 2021-12-14) 原实例 n/HINT/C + pow(2,e,n)==norm(HINT) 自洽断言"
     ),
+    "real_reverse_vnctf_cm1": (
+        "sha256:a9bb88af16508d85215cfd72a3145a8db76d54930fbd5a1834d032e2309606fa"
+        "|verify:scripts/_regress_one.py real_reverse_vnctf_cm1 (REGRESS_PASS 2026-09-15, 71ms)"
+        "|skill:scripts/_solve_vnctf_cm1.py (VNCTF2022 cm1: XXTEA decrypt of writeup ciphertext AIM, recovered flag)"
+        "|source:VNCTF 2022 Official WriteUp (本地 PDF)"
+    ),
 }
 
 # 派生（写死常量，不读文件）：授权题块全集 = 基线 ∪ 晋升；水位 = 基线 + 晋升数。
