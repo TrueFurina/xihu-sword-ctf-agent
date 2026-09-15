@@ -38,8 +38,18 @@ def _locate_tesseract():
     if not exe:
         return None, None
     bindir = os.path.dirname(exe)
+    # Linux distros install tessdata into a versioned dir (Debian/Ubuntu:
+    # /usr/share/tesseract-ocr/<ver>/tessdata), so probing only next to the
+    # binary misses it and makes every OCR path silently return None.
+    _linux_tessdata = (
+        "/usr/share/tesseract-ocr/5/tessdata",
+        "/usr/share/tesseract-ocr/4/tessdata",
+        "/usr/share/tesseract-ocr/tessdata",
+        "/usr/local/share/tessdata",
+        "/usr/share/tessdata",
+    )
     for cand in (os.path.join(bindir, "..", "share", "tessdata"),
-                 os.path.join(bindir, "tessdata")):
+                 os.path.join(bindir, "tessdata")) + _linux_tessdata:
         d = os.path.abspath(cand)
         if os.path.isfile(os.path.join(d, "eng.traineddata")):
             return exe, d
