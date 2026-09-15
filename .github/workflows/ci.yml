@@ -12,7 +12,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.13"]
+        # 3.11 dropped: ctf_agent/pyproject.toml declares requires-python >= 3.13 and
+        # the pinned numpy (2.5.2) itself requires >= 3.12 (no cp311 wheel exists),
+        # so the 3.11 leg could only ever fail once the numpy dep was honoured.
+        python-version: ["3.13"]
     steps:
       - uses: actions/checkout@v4
 
@@ -22,12 +25,22 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
+        # Single source of truth: ctf_agent/requirements.txt.
+        # The previous hand-written list drifted from it and was missing numpy/pillow,
+        # which skills.misc_grid_resample imports unconditionally - that made pytest
+        # abort at collection (2 ImportError) and fail the whole gate.
+        # pytest-timeout is a gate-only tool, not a runtime dep, so it is installed separately.
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-timeout httpx aiohttp fastapi uvicorn pycryptodome gmpy2
+          pip install -r ctf_agent/requirements.txt
+          pip install pytest-timeout
 
       - name: Run offline test gate
+        # Run inside ctf_agent/ so ctf_agent/pytest.ini is actually loaded
+        # (testpaths=tests and the `slow` marker registration). Running from the repo
+        # root silently skipped that config, hence the Unknown pytest.mark.slow warnings.
         # Default gate: offline, per-case seconds-level, no real attachments/network/token.
         # `slow` tests (real attachment unzip / live LLM / wallclock) are excluded here
         # and run manually before a competition.
         run: pytest -q -m "not slow" --timeout=120
+        working-directory: ctf_agent
