@@ -48,7 +48,11 @@ def _sha256_hex(s: str) -> str:
 
 # 各 provider 常见凭证环境变量（best-effort 预检，避免把"无 key 挂死"误标成"推理失败"）
 _PROVIDER_KEY_ENV = {
-    "baidu": ("QIANFAN_AK", "QIANFAN_SK", "BAIDU_API_KEY", "CTF_AGENT_BAIDU_KEY", "QIANFAN_ACCESS_KEY", "QIANFAN_SECRET_KEY"),
+    # 与 config.resolve_api_key 对齐：千帆单 key 走 QIANFAN_API_KEY（Bearer）。
+    # 旧表只列 QIANFAN_AK/SK 等 OAuth 双密钥，漏掉了单 API Key 形式——
+    # 会导致环境里明明有 QIANFAN_API_KEY 却被预检误判 INFRA_NO_CREDENTIAL。
+    "baidu": ("QIANFAN_API_KEY", "QIANFAN_AK", "QIANFAN_SK", "BAIDU_API_KEY",
+              "CTF_AGENT_BAIDU_KEY", "QIANFAN_ACCESS_KEY", "QIANFAN_SECRET_KEY"),
     "deepseek": ("DEEPSEEK_API_KEY", "CTF_AGENT_DEEPSEEK_KEY"),
     "qwen": ("DASHSCOPE_API_KEY", "QWEN_API_KEY", "CTF_AGENT_QWEN_KEY"),
     "moonshot": ("MOONSHOT_API_KEY", "CTF_AGENT_MOONSHOT_KEY"),
