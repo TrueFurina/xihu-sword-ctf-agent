@@ -24,6 +24,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install system OCR dependency
+        # tests/test_jpeg_png_ocr.py::test_tesseract_locatable and the vision-fallback
+        # path in tests/test_presolve_jpeg_vision.py need the tesseract binary on PATH.
+        # ubuntu-latest images do not ship it.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr
+          tesseract --version
+
       - name: Install dependencies
         # Single source of truth: ctf_agent/requirements.txt.
         # The previous hand-written list drifted from it and was missing numpy/pillow,
