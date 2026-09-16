@@ -1,6 +1,7 @@
 """crypto_keyboard_path 确定性解码单测（暗泉杯 DNUICTF「键盘侠」）。"""
 from __future__ import annotations
 
+import pytest
 import os
 import sys
 
@@ -21,6 +22,8 @@ def test_decode_known_sample():
     assert decode(sample) == "CLCKOUTHK"
 
 
+# 依赖 data/questions_real/_attachments/ 下的真实附件（.gitignore 排除，防明文 flag 泄露）。
+@pytest.mark.local
 def test_run_on_real_attachment():
     # 独立从附件推导出 flag（不读题面答案），sha256 与官方真值一致
     r = run({"path": ATT})
