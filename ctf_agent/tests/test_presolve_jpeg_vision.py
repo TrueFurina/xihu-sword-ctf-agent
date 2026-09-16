@@ -25,6 +25,10 @@ JPG = os.path.join(_REPO, "data/questions_real/_attachments/misc/real_misc_xuanh
 IMG = os.path.join(_REPO, "data/questions_real/_attachments/misc/real_misc_xuanhun_signin/_extracted.png")
 
 
+# 本文件全部用例都依赖 data/questions_real/_attachments/ 下的真实附件（.gitignore 排除）。
+# 附件缺失时 isfile 守卫判 false，*_returns_none 会恰好返回 None 而假绿 —— 一并移出默认门禁。
+pytestmark = pytest.mark.local
+
 def _q(flag_sha256=""):
     return SimpleNamespace(id="real_misc_xuanhun_signin", category="misc",
                            attachments=[JPG], flag_sha256=flag_sha256,
