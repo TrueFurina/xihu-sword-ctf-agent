@@ -46,6 +46,8 @@ def _read_log(p):
 
 
 # ── 干净态：真实仓库执法应通过 ──
+# 依赖 ctf_agent/REAL_SOLVES_LEDGER.md（.gitignore 排除的本地真值台账），CI 上不存在。
+@pytest.mark.local
 def test_clean_enforce_passes():
     ok, v = af.enforce("full")
     assert ok is True, f"干净态不应检出注水：{v}"
