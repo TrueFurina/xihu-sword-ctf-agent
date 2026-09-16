@@ -49,7 +49,9 @@ jobs:
         # (testpaths=tests and the `slow` marker registration). Running from the repo
         # root silently skipped that config, hence the Unknown pytest.mark.slow warnings.
         # Default gate: offline, per-case seconds-level, no real attachments/network/token.
+        # `local` additionally excludes tests that need gitignored truth artifacts
+        # (REAL_SOLVES_LEDGER.md, real attachments) - see ctf_agent/pytest.ini.
         # `slow` tests (real attachment unzip / live LLM / wallclock) are excluded here
         # and run manually before a competition.
-        run: pytest -q -m "not slow" --timeout=120
+        run: pytest -q -m "not slow and not local" --timeout=120
         working-directory: ctf_agent
