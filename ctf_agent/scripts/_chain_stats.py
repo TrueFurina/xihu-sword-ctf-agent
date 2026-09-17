@@ -40,9 +40,13 @@ STEPS = ["1_平台轮询", "2_分诊", "3_附件下载", "4_presolve", "5_LLM主
 
 # error_struct.category → 失败步（第 5 步细分）
 LLM_CATS = {"stuck_loop", "wrong_direction", "hallucination",
-            "wallclock_timeout", "tool_failure"}
+            "wallclock_timeout", "tool_failure", "budget_exceeded"}
 EXTRACT_CAT = "extract_fail"
 ENV_CATS = {"env_failure"}
+# 分诊失败（第 2 步）：分类器未能产出攻击方向。当前 goal_log 无此 category，
+# 且 skill_require 字段恒缺失（实测 2787/2787 为空），故真实 2_分诊 归零——
+# 见 classify 末尾对"skill_require 误判"的修正说明。
+TRIAGE_CATS = {"triage_failure"}
 
 
 def classify(record: dict) -> str:
@@ -67,18 +71,28 @@ def classify(record: dict) -> str:
     # 环境/附件类失败 → 第 3 步
     if cat in ENV_CATS:
         return "3_附件下载"
+    # 分诊类失败 → 第 2 步
+    if cat in TRIAGE_CATS:
+        return "2_分诊"
     # 工具/LLM 类失败 → 第 5 步
     if cat in LLM_CATS:
         return "5_LLM主Agent"
     # 提取校验失败 → 第 6 步
     if cat == EXTRACT_CAT:
         return "6_校验"
-    # 无任何错误信息：task_id/question_type 为空 → 第 1-2 步（早期断裂）
+    # 无 flag/validated 且无可归类错误：早期断裂 vs 走完链路但无归因
     if not flag and not validated:
+        # 早期断裂：task_id/question_type 缺失 → 第 1 步（平台轮询/字段映射）
         if not record.get("task_id") or not record.get("question_type"):
             return "1_平台轮询"
-        if not record.get("skill_require"):
-            return "2_分诊"
+        # ⚠️ 旧逻辑用 skill_require 缺省判"2_分诊失败"，但该字段在 goal_log 中恒缺失
+        # （实测 2787/2787 记录为空），导致所有"走完链路但无 error 归因失败"的题被
+        # 误归 2_分诊，制造"分诊 41.4%"假象。改为：无 error_struct.category 归因且有
+        # 题型 → 归"未知"桶，暴露归因日志缺口，而非误判分诊。真·分诊失败须
+        # category in TRIAGE_CATS（当前日志无，故 2_分诊 真实归零）。
+        if not (record.get("error_struct") or {}).get("category"):
+            return "未知"
+        # 有 category 但非分诊/环境/LLM/提取类（已在上游分支处理）→ 兜底归 1_平台轮询
         return "1_平台轮询"
     # 兜底：无法归类
     return "未知"
@@ -250,7 +264,10 @@ def analyze(log_path: str) -> dict:
         "worst_step": worst,
         "recommendation": _recommend(worst, steps),
         "note": "删一步 > 加固一步（误差复利：单步 95% × 10 步 ≈ 59.9%）；"
-                "最高失败步优先删除/降级，次高步才加固。",
+                "最高失败步优先删除/降级，次高步才加固。"
+                "「未知」桶=走完链路但 error_struct.category 无归因的失败"
+                "（实测占多数，指向归因日志缺口/自主解题无归因失败），"
+                "已不再因 skill_require 缺失误归 2_分诊。",
     }
 
 

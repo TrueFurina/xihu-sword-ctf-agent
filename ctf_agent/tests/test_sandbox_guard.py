@@ -3,7 +3,7 @@
 
 背景：sandbox/subprocess_executor.py 已有防护（AST 校验 / bash 分层拦截 /
 敏感环境变量剥离），但此前零测试。本文件锁定已落地防护（应全绿），
-并对安全卫士"整改中"的两项做探测式 skip（落地后自动转绿）：
+并已锁定单&拦截与 zip 路径穿越校验为硬断言（防护缺失即 FAIL，杜绝"探测式 skip"掩盖回归）：
 
 已落地（本文件直接断言）：
 1. Python 代码 AST 校验：危险导入（subprocess）/危险调用（os.system/
@@ -12,7 +12,7 @@
    敏感目标（reg query、/etc/passwd、api_key 等）
 3. 敏感环境变量剥离 sanitized_env（API_KEY/TOKEN/SECRET/...）
 
-待修复（探测式 skip，未落地则 skip 并注明"待修复后启用"）：
+已落地（硬断言，防护缺失即 FAIL，杜绝"探测式 skip"掩盖回归）：
 - 单 &（Windows cmd 拼接符）拦截
 - zip 成员 ../ 路径穿越校验（解压前拒绝恶意成员名）
 
@@ -120,24 +120,18 @@ def test_sanitized_env_strips_secrets(monkeypatch):
 
 
 def test_shell_single_ampersand_rejected():
-    """Windows cmd 单 & 拼接（安全卫士整改中）：未拦截则 skip。"""
+    """Windows cmd 单 & 拼接：沙盒必须拦截（安全卫士已落地，防护缺失即 FAIL）。"""
     err = _check_bash_command("echo a & echo b")
-    if err is None:
-        pytest.skip("待修复后启用：沙盒未拦截单 &（安全卫士整改中）")
-    assert err is not None
+    assert err is not None, "沙盒未拦截单 &（命令注入面，防护回归）"
 
 
 def test_zip_traversal_member_rejected():
     """zip 成员含 ../ 必须被拒绝（zip-slip 防护，对齐安全卫士 _validate_zip_member）。
 
     契约：_validate_zip_member(info) 接受 zipfile.ZipInfo 类对象（有 .filename），
-    返回错误描述（None=安全）。安全卫士已落地；若回退则 skip。
+    返回错误描述（None=安全）。硬断言：防护缺失即 FAIL，杜绝"探测式 skip"掩盖回归。
     """
-    try:
-        from tools.adapters.zip_chain_adapter import _validate_zip_member
-    except Exception as exc:  # noqa: BLE001 - 未落地时 skip
-        pytest.skip(f"待修复后启用：zip 成员 ../ 路径穿越校验未落地（{exc}）")
-
+    from tools.adapters.zip_chain_adapter import _validate_zip_member
     import zipfile
 
     # 拒绝面
