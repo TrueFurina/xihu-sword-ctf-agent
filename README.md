@@ -18,7 +18,7 @@ Most "CTF agents" are just an LLM with a shell. This one is the opposite: **dete
 ctf_agent/
 ├── core/          main loop, presolve static analyzer, supervisor agent, wall-clock stop-loss
 ├── agents/        per-category solvers (crypto_toolkit / misc / web / reverse / pwn …)
-├── skills/        52 deterministic skills (run(params) -> dict interface)
+├── skills/        56 deterministic skills (run(params) -> dict interface; machine count = `scripts/_kpi_canonical.py`)
 ├── llm/           LLM client (provider whitelist, fail-closed circuit breaking)
 ├── ctfplatform/   contest-platform client (DASCTF-style), retry / fail-open submit path
 ├── sandbox/       code-execution sandbox (subprocess isolation)
@@ -33,12 +33,12 @@ ctf_agent/
 
 ```
 platform poll → triage/classify → attachment download + target probe
-             → deterministic skills (52) ⇄ LLM reasoning (whitelisted providers)
+             → deterministic skills (56) ⇄ LLM reasoning (whitelisted providers)
              → flag validation → platform submit (fail-closed on request errors)
 ```
 
 - **Supervisor architecture**: `core/main_agent.py` plans per challenge, `core/supervisor_agent.py` enforces step budgets, tool-first discipline, and the request-failure-vs-wrong-flag separation (the post-incident fix for a submit-circuit-breaker bug).
-- **Deterministic-first**: `skills/` holds 52 runnable skills. `core/presolve.py` runs them before any LLM token is spent.
+- **Deterministic-first**: `skills/` holds 56 runnable skills (`scripts/_kpi_canonical.py` machine count). `core/presolve.py` runs them before any LLM token is spent.
 - **Whitelisted LLM only** (contest rule §3); multi-source fallback with 401/402 circuit breaking, per-question token budgets, heavy-model upgrade policy.
 - **Race harness**: `scripts/_race_start.py --compete` = first-blood scan → stable polling → final report, with a mandatory e2e data-link preflight (fail-closed).
 
@@ -74,7 +74,7 @@ The single machine-enforced KPI is **`offline_verified`** — the number of *his
 |--------|--------|
 | **offline_verified** (strict real-problem KPI) | **14** |
 | Deterministic pipeline coverage (presolve direct-solve) | **14 / 92** full-corpus (15.2%) (presolve direct-solve coverage — NOT a "solved" claim; full 92-problem corpus coverage tracked in REAL_SOLVES_LEDGER.md; `real_misc_vnctf_flag` 2026-09-03 governance fix —题面 `flag_pattern` 修订 + vision LLM 兜底链路修复后正式入 presolve) |
-| LLM autonomous-reasoning contribution | **0** (all 14 verified solves are deterministic presolve/tooling; zero LLM reasoning) |
+| LLM autonomous-reasoning contribution | **0 / 14** (all 14 verified solves are deterministic presolve/tooling; zero LLM reasoning) |
 | Regression-set reproducible count | **16 / 16** (13 题严格 KPI 集 + 10732/10735 治理修复：`scripts/verify_10732.py` + `verify_10735.py` + `verify_specialcurve2.py` 可机器复现攻击链；REGRESSION_CHECKS 16 道全过；10732/10735 **不进** PROMOTION_EVIDENCE 因题面无官方 sha256 真值闭环；specialcurve2 **有**题面官方 flag_sha256 闭环，经 PROMOTION_EVIDENCE 带证据晋级 12→13，详见台账题块 1/2 + `scripts/_antifraud.py`) |
 | **held-out reasoning pool** (unseen, non-trivial) | **10 problems** — disjoint from the 14 KPI solves |
 | LLM reasoning on the held-out pool | **0 / 10 — NOT YET MEASURED** (no working LLM provider at the time of writing: HTTP 402 / 401) |
