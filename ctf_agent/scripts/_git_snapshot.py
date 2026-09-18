@@ -95,6 +95,23 @@ def newest_bundle(dirpath: str) -> str | None:
     return bundles[-1] if bundles else None
 
 
+def _unique_path(out_dir: str, stamp: str) -> str:
+    """给出不冲突的 bundle 路径。
+
+    2026-09-19 修：文件名时间戳精度仅到秒，而新节流会"每次提交都补落"——同一秒内的
+    两次 bundle 会**同名互相覆盖**（实测：连做两次提交，第二次覆盖第一次，最终只剩 1 份）。
+    冲突时追加 `-1/-2/...`。list_bundles 用前缀/后缀匹配，`repo-<stamp>-1.bundle` 仍被识别。
+    """
+    base = os.path.join(out_dir, f"{NAME_PREFIX}{stamp}{NAME_SUFFIX}")
+    if not os.path.exists(base):
+        return os.path.abspath(base)
+    for n in range(1, 1000):
+        cand = os.path.join(out_dir, f"{NAME_PREFIX}{stamp}-{n}{NAME_SUFFIX}")
+        if not os.path.exists(cand):
+            return os.path.abspath(cand)
+    return os.path.abspath(base)
+
+
 # ── HEAD / 落后提交数探测（含纯函数判定，便于单测）────────────────────────
 def _rev_parse_head(git_dir: str | None = None) -> str | None:
     """当前 HEAD 的 sha；失败返回 None。"""
@@ -203,7 +220,7 @@ def make_bundle(out_dir: str = DEFAULT_DIR, keep: int = 10, daily: bool = False,
         print(f"ℹ️ 需补落 bundle：{reason}")
 
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    out = os.path.abspath(os.path.join(out_dir, f"{NAME_PREFIX}{stamp}{NAME_SUFFIX}"))
+    out = _unique_path(out_dir, stamp)
 
     cmd = ["git"]
     if git_dir:
