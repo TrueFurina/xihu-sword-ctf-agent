@@ -284,3 +284,66 @@ def test_kpi_allowed_denominators_from_canonical():
 def test_live_repo_inline_idiom_consistent():
     """真实仓库回归：两个公开 README 的正文习语 / LLM 贡献分母必须自洽。"""
     assert dc.check_kpi_inline_idiom_drift() == []
+
+
+# ── C① break-ice 分母口径限定语（2026-09-19 新增）───────────────────────
+# 事故遗留：README.md break-ice 段落的 `11/15` / `8/15` 用的是**该实验自身题集**
+# 的分母，与已作废的「presolve 覆盖度 15 题子集（15/15、86.7%）」口径无关，
+# 但两者都写 `15`，读者极易混读。它不是 `0/N` 形式的贡献比，闸门按设计不查它，
+# 故用本节的 present 测试兜底（并显式记录「不靠闸门守」这一事实）。
+
+_BREAKICE_QUALIFIER_MARK = "Denominator caveat (do not conflate)"
+
+
+def _breakice_section(text):
+    """截取 README 的 break-ice 实验段落（从实验标题到诚实 caveat 标题之间）。"""
+    lines = text.split("\n")
+    start = next(i for i, l in enumerate(lines) if "LLM reasoning break-ice experiment" in l)
+    end = next(i for i, l in enumerate(lines) if "Honesty caveat on the 4 unsolved" in l)
+    assert start < end, "break-ice 段落标题顺序异常"
+    return "\n".join(lines[start:end])
+
+
+def test_live_repo_breakice_denominator_qualifier_present():
+    """break-ice 段落必须带「15 是实验自身题集、与作废口径无关」的口径限定语。
+
+    防回归锚（C①）：清掉上文的 `15 / 15` 后，若旁边的 `11/15`/`8/15` 不限定语，
+    读者仍会把两个 15 当成同一个分母——等于白清。该限定语**只由本测试守**。
+    """
+    text = dc._read_text(os.path.join(dc._repo_root(), "README.md"))
+    assert text is not None, "仓库根缺少 README.md"
+    section = _breakice_section(text)
+    assert _BREAKICE_QUALIFIER_MARK in section, "break-ice 段落缺少分母口径限定语"
+    # 要点 1：明说与该作废口径无关
+    assert "unrelated" in section
+    # 要点 2：明说不计入 KPI（与既有 'not counted in KPI'/'superseded' 并存）
+    assert "not counted in the KPI" in section and "superseded" in section
+    # 要点 3：数字可溯源（不得发明新数字）
+    assert "llm_breaking_ice_20260901-050201.json" in section
+    assert "llm_breaking_ice_20260828-022534.json" in section
+
+
+def test_breakice_qualifier_not_gate_enforced(monkeypatch, tmp_path):
+    """记录设计取舍：删掉该限定语后闸门（D1/D2/D3）仍全绿——它只靠测试守，不靠闸门守。
+
+    限定语是散文性说明，既不是 `offline_verified=<n>` 习语，也不在含 contribution
+    的行上，故闸门按设计不查它；防回归由 test_live_repo_..._qualifier_present 负责。
+    """
+    real = dc._read_text(os.path.join(dc._repo_root(), "README.md"))
+    assert real is not None
+    qualifier = ("**Denominator caveat (do not conflate):** the `15` in `11/15` "
+                 "and `8/15` ")
+    assert qualifier in real
+    stripped = real.replace(qualifier, "**Denominator note removed:** ", 1)
+    assert _BREAKICE_QUALIFIER_MARK not in stripped
+
+    root = tmp_path / "ctf_agent"
+    root.mkdir()
+    monkeypatch.setattr(dc, "ROOT", str(root))
+    (tmp_path / "README.md").write_text(stripped, encoding="utf-8")
+    (tmp_path / "README.zh.md").write_text(
+        "| **offline_verified**（严格真题 KPI） | **14** |\n", encoding="utf-8")
+    monkeypatch.setattr(dc, "machine_kpi_truth", lambda: (14, 14, 14))
+    # 闸门不报 → 证明限定语不靠闸门守，只靠上面那条 present 测试守
+    assert dc.check_kpi_number_consistency() == []
+    assert dc.check_kpi_inline_idiom_drift() == []
