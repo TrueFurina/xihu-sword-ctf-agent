@@ -141,37 +141,65 @@ def is_stale(lease: dict) -> bool:
 ZOMBIE_FACTOR = 2.0
 
 
-def reap_zombies(coor_path: str = COOR_DEFAULT, factor: float = ZOMBIE_FACTOR,
-                 dry_run: bool = False) -> list:
-    """回收僵尸租约：last_active 距今 > TTL×factor 的租约（2026-09-19 防复发）。
+def find_zombies(coor_path: str | None = None,
+                 factor: float = ZOMBIE_FACTOR) -> list:
+    """**纯只读**：返回疑似僵尸租约的会话名（last_active 距今 > TTL×factor）。
 
-    背景（架构师诊断层2 / 缺口 G4）：lease 当前"能记录、不能保护"——stale 僵尸租约
-    （如曾长期未清的 atomcode-hardening）不自动回收，堵住 scope 判定还留下"接管即可
-    绕过互斥"的缺口。本函数把"僵尸自动回收"落到机器执行：会话启动时调用即可清理
-    TTL×factor 以上的死租约（默认 ×2）。返回被回收的会话名列表。
+    零副作用——不读锁、不写盘、不删任何租约。供会话启动（boot）路径安全调用。
+
+    ⚠️ 判据局限（A1 修订，2026-09-19）：仅凭 `age > ttl*factor` **无法**区分
+    「死会话残留」与「存活但长时间无心跳的会话」——本环境 lease 不存 PID，
+    没有存活检查。故本函数的产出是**怀疑名单**，不是删除决定；真正删除必须
+    由人工经 `reap_zombies(..., force=True)` / CLI `reap --force` 执行。
     """
+    coor_path = coor_path or COOR_DEFAULT
+    doc = load(coor_path)
+    if not doc or not doc.get("leases"):
+        return []
+    now = _now()
+    zombies = []
+    for sid, lease in doc.get("leases", {}).items():
+        ttl = float(lease.get("ttl_min", DEFAULT_TTL_MIN)) * 60
+        age = now - _lease_ts(lease)
+        if age > ttl * float(factor):
+            zombies.append(sid)
+    return zombies
+
+
+def reap_zombies(coor_path: str | None = None, factor: float = ZOMBIE_FACTOR,
+                 force: bool = False) -> list:
+    """回收僵尸租约。**默认只报告（不写盘）**；仅 `force=True` 才真删。
+
+    （A1 修订，2026-09-19，team-lead 决策）
+
+    背景：初版把「僵尸自动回收」接到会话启动路径（boot 即删），QA 实测发现判据
+    纯 `age > ttl*factor`、零存活检查 → 一个「存活但 90min 无心跳」的会话租约会被
+    另一会话 boot 时**自动删掉**，等于给并发写开了一道隐蔽后门。故：
+      · 删掉「自动」这一半——boot 路径改用 `find_zombies`，**一个字节都不写**；
+      · 保留「手动」这一半——本函数默认 `force=False` 即只返回怀疑名单、不落盘；
+      · `force=True` 才删除，且删除前由调用方/CLI 打印警示（不可逆、无存活核验）。
+    返回**疑似**僵尸的会话名列表（force=False 时名单即"将被删"预览）。
+    """
+    coor_path = coor_path or COOR_DEFAULT
+    zombies = find_zombies(coor_path, factor)
+    if not zombies:
+        return []
+    if not force:
+        return zombies  # 只报告：绝不写盘
     doc = load(coor_path)
     if not doc or not doc.get("leases"):
         return []
     leases = doc.get("leases", {})
-    now = _now()
-    reaped = []
-    for sid, lease in list(leases.items()):
-        ttl = float(lease.get("ttl_min", DEFAULT_TTL_MIN)) * 60
-        age = now - _lease_ts(lease)
-        if age > ttl * float(factor):
-            reaped.append(sid)
-            if not dry_run:
-                del leases[sid]
-    if reaped and not dry_run:
-        if leases:
-            _write(coor_path, doc)
-        else:
-            try:
-                os.unlink(coor_path)
-            except OSError:
-                pass
-    return reaped
+    for sid in zombies:
+        leases.pop(sid, None)
+    if leases:
+        _write(coor_path, doc)
+    else:
+        try:
+            os.unlink(coor_path)
+        except OSError:
+            pass
+    return zombies
 
 
 def _write(coor_path: str, doc: dict) -> None:
@@ -421,10 +449,13 @@ def main() -> int:
     ps = sub.add_parser("status", help="查看租约")
     ps.add_argument("--coor", default=COOR_DEFAULT)
 
-    prp = sub.add_parser("reap", help="回收僵尸租约（last_active 超 TTL×factor）")
+    prp = sub.add_parser("reap", help="巡检僵尸租约（默认只报告；--force 才真删）")
     prp.add_argument("--coor", default=COOR_DEFAULT)
     prp.add_argument("--factor", type=float, default=ZOMBIE_FACTOR)
-    prp.add_argument("--dry-run", action="store_true", help="只报告不删除")
+    prp.add_argument("--force", action="store_true",
+                     help="真正删除（不可逆；判据无存活核验，会连「存活但长时间无心跳」的租约一起删）")
+    prp.add_argument("--dry-run", action="store_true",
+                     help="只报告不删除（已是默认行为，保留仅为兼容）")
 
     a = ap.parse_args()
     if a.cmd == "acquire":
@@ -439,12 +470,16 @@ def main() -> int:
         status(a.coor)
         return 0
     if a.cmd == "reap":
-        reaped = reap_zombies(a.coor, a.factor, a.dry_run)
-        if reaped:
-            tag = "（dry-run）" if a.dry_run else ""
-            print(f"🧹{tag} 回收僵尸租约 {len(reaped)} 个：{', '.join(reaped)}")
+        found = reap_zombies(a.coor, a.factor, force=a.force)
+        if not found:
+            print("（无怀疑僵尸租约）")
+            return 0
+        if a.force:
+            print(f"🧹 已删除僵尸租约 {len(found)} 个：{', '.join(found)}")
         else:
-            print("（无僵尸租约）")
+            print(f"👀 怀疑僵尸租约 {len(found)} 个（未删除）：{', '.join(found)}")
+            print("   ⚠️ 判据仅 age>ttl×factor、无存活核验：可能误删「存活但长时间无心跳」的会话。")
+            print("   确认这些会话确已死亡后，再执行：python scripts/_lease.py reap --force")
         return 0
     return 2
 

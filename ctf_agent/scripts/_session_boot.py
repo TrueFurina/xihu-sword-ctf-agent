@@ -67,11 +67,11 @@ def fix_env() -> bool:
         return False
 
 
-def main() -> int:
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="会话启动门禁（车道方案）")
     ap.add_argument("--fix-env", action="store_true", help="自动创建 .venv junction")
     ap.add_argument("--smoke", action="store_true", help="额外跑快速回归冒烟")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     # ── ⓪ 仓库健康门禁 L0（纯文件系统，2026-09-19 防复发；必须在任何 git 调用之前）──
     # 根因：.git/refs/ 目录缺失时 git 报 `fatal: not a git repository`，此后本脚本现有
@@ -89,14 +89,21 @@ def main() -> int:
         return 1
     print(f"✅ 仓库健康（L0）：{gd}")
 
-    # ── ⓪b 僵尸租约自动回收（2026-09-19 防复发，缺口 G4；best-effort 不阻断开工）──
+    # ── ⓪b 僵尸租约「只报告不修改」（2026-09-19 防复发 A1 修订，缺口 G4）──
+    # 决策（team-lead A1）：**boot 路径一个字节都不写 coordination.json**。
+    # 原因：初版把「僵尸自动回收」接到 boot，判据纯 age>ttl*factor、零存活检查、lease
+    # 不存 PID → 一个「存活但 90min 无心跳」的会话租约会被另一会话 boot 时自动删掉，
+    # 等于给并发写开了隐蔽后门（QA 已实测复现）。故 boot 只**巡检并报告**怀疑名单，
+    # 真正回收须人工确认会话已死后跑 `python scripts/_lease.py reap --force`。
     try:
         import _lease  # noqa: PLC0415 - 局部导入
-        reaped = _lease.reap_zombies()
-        if reaped:
-            print(f"🧹 回收僵尸租约 {len(reaped)} 个：{', '.join(reaped)}")
-    except Exception as exc:  # noqa: BLE001 - 回收失败绝不阻断开工
-        print(f"ℹ️ 僵尸租约回收跳过（{exc}）")
+        zombies = _lease.find_zombies()  # 纯只读：不写盘、不删租约
+        if zombies:
+            print(f"👀 怀疑僵尸租约 {len(zombies)} 个（仅报告，未删除）：{', '.join(zombies)}")
+            print("   判据仅 age>ttl×factor、无存活核验；确认其确已死后执行：")
+            print("   python scripts/_lease.py reap --force")
+    except Exception as exc:  # noqa: BLE001 - 巡检失败绝不阻断开工
+        print(f"ℹ️ 僵尸租约巡检跳过（{exc}）")
 
     ok = True
     print("══ 会话启动门禁（阶段2 车道方案）══")
