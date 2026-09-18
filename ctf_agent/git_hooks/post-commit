@@ -166,4 +166,11 @@ PYEOF
 #    喂 Windows python.exe 会 exit 2（could not open file）；cd 后走相对路径与其它钩子一致。
 ( cd "$REPO_ROOT" && "$PY" scripts/_git_guard.py --snapshot --quiet ) >/dev/null 2>&1 || true
 
+# ── 对象库兜底快照（2026-09-19 防复发；缺口修复：bundle 曾因纯时间节流落后多个提交）──
+# 每次提交后补落 bundle：节流改为"时间到 OR 落后 ≥ commit_lag 提交"（--commit-lag 1），
+# 保证「防复发修复本身」的提交也被纳入兜底——对象库真丢时，bundle 是唯一救生艇，
+# 若它落后于修复提交，灾难恢复会回退到一个不含修复的旧状态。
+# best-effort：失败绝不阻断提交；--keep 10 滚动保留。
+( cd "$REPO_ROOT" && "$PY" scripts/_git_snapshot.py --daily --commit-lag 1 --keep 10 ) >/dev/null 2>&1 || true
+
 exit 0

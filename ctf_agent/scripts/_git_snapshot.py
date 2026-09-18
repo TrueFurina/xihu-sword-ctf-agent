@@ -11,14 +11,21 @@
 
 用法：
   python scripts/_git_snapshot.py                  # 落一份 bundle（滚动保留 10）
-  python scripts/_git_snapshot.py --daily          # 24h 内已有则跳过（每日一次语义）
+  python scripts/_git_snapshot.py --daily          # 时间到 OR 落后 ≥1 提交才落（见下）
   python scripts/_git_snapshot.py --keep 20        # 保留 20 份
   python scripts/_git_snapshot.py --min-interval-hours 6
+  python scripts/_git_snapshot.py --commit-lag 2   # 落后 ≥2 提交才强制补落
   python scripts/_git_snapshot.py --list           # 列出已有 bundle
   python scripts/_git_snapshot.py --strict         # 失败时 exit 1（默认 0，不阻断主流程）
 
+节流语义（`--daily`，2026-09-19 修正）：**时间到 OR 落后 ≥ commit_lag 个提交**即补落。
+  原为纯时间（24h），导致 bundle 落后多个提交——对象库真丢时会恢复到一个**不含
+  防复发修复本身**的旧状态（"修事故的代码不在事故兜底范围内"）。修正后，任何一个
+  新提交都会让"落后提交数"≥1 → 补落，故防复发提交自身被纳入兜底。
+  每个 bundle 落盘时写 `.head` 边车（该 bundle 覆盖的 HEAD sha），供下次判定落后数。
+
 失败语义：默认**不阻断**主流程（exit 0，仅打印错误）——快照是兜底，不应把主流程
-拖下水；需要硬失败时加 `--strict`。`--daily` 命中"已有新快照"时返回 skip（非失败）。
+拖下水；需要硬失败时加 `--strict`。节流命中时返回 skip（非失败）。
 """
 from __future__ import annotations
 
@@ -32,6 +39,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ctf_agent
 DEFAULT_DIR = os.path.join(ROOT, "logs", "git_bundles")
 NAME_PREFIX = "repo-"
 NAME_SUFFIX = ".bundle"
+HEAD_SIDECAR_SUFFIX = ".head"  # 边车：记录该 bundle 覆盖的 HEAD sha（用于"落后 N 提交"判定）
 
 
 # ── 纯函数（可单测）──────────────────────────────────────────────────────
@@ -52,7 +60,10 @@ def list_bundles(dirpath: str) -> list[str]:
 
 
 def prune_bundles(dirpath: str, keep: int = 10) -> list[str]:
-    """滚动保留最新 `keep` 份，删除更旧的。返回被删除的路径列表。"""
+    """滚动保留最新 `keep` 份，删除更旧的。返回被删除的路径列表。
+
+    同时清理对应的 `.head` 边车文件（记录该 bundle 覆盖的 HEAD）。
+    """
     keep = max(0, int(keep))
     bundles = list_bundles(dirpath)
     to_remove = bundles[:max(0, len(bundles) - keep)]
@@ -61,6 +72,10 @@ def prune_bundles(dirpath: str, keep: int = 10) -> list[str]:
         try:
             os.remove(p)
             removed.append(p)
+        except OSError:
+            pass
+        try:
+            os.remove(p + HEAD_SIDECAR_SUFFIX)
         except OSError:
             pass
     return removed
@@ -74,18 +89,118 @@ def newest_age_hours(dirpath: str) -> float | None:
     return (time.time() - os.path.getmtime(bundles[-1])) / 3600.0
 
 
+def newest_bundle(dirpath: str) -> str | None:
+    """最新（mtime 最大）bundle 路径；无则 None。"""
+    bundles = list_bundles(dirpath)
+    return bundles[-1] if bundles else None
+
+
+# ── HEAD / 落后提交数探测（含纯函数判定，便于单测）────────────────────────
+def _rev_parse_head(git_dir: str | None = None) -> str | None:
+    """当前 HEAD 的 sha；失败返回 None。"""
+    cmd = ["git"] + (["--git-dir", git_dir] if git_dir else []) + ["rev-parse", "HEAD"]
+    try:
+        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=30)
+    except Exception:  # noqa: BLE001 - git 缺失/超时
+        return None
+    return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
+
+
+def bundle_tip(bundle_path: str, git_dir: str | None = None) -> str | None:
+    """该 bundle 覆盖的 HEAD sha：优先读 `.head` 边车，回退 `git bundle list-heads`。"""
+    side = bundle_path + HEAD_SIDECAR_SUFFIX
+    try:
+        if os.path.isfile(side):
+            with open(side, encoding="utf-8") as f:
+                v = f.read().strip()
+            if v:
+                return v
+    except OSError:
+        pass
+    cmd = ["git"] + (["--git-dir", git_dir] if git_dir else []) + \
+        ["bundle", "list-heads", bundle_path]
+    try:
+        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=120)
+    except Exception:  # noqa: BLE001
+        return None
+    if r.returncode != 0:
+        return None
+    lines = [ln.split() for ln in (r.stdout or "").splitlines() if ln.strip()]
+    for parts in lines:
+        if len(parts) >= 2 and parts[1] == "HEAD":
+            return parts[0]
+    for parts in lines:  # 退而求其次：任一 ref 的 sha
+        if parts:
+            return parts[0]
+    return None
+
+
+def commits_between(old_sha: str | None, new_sha: str | None,
+                    git_dir: str | None = None) -> int | None:
+    """`git rev-list --count old..new`；无法判定返回 None。"""
+    if not old_sha or not new_sha:
+        return None
+    cmd = ["git"] + (["--git-dir", git_dir] if git_dir else []) + \
+        ["rev-list", "--count", f"{old_sha}..{new_sha}"]
+    try:
+        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=60)
+    except Exception:  # noqa: BLE001
+        return None
+    if r.returncode != 0:
+        return None
+    try:
+        return int((r.stdout or "0").strip() or "0")
+    except ValueError:
+        return None
+
+
+def should_bundle(age_hours: float | None, lag: int | None,
+                  min_interval_hours: float, commit_lag: int) -> tuple[bool, str]:
+    """节流判定（纯函数）：**时间到** OR **落后 ≥ commit_lag 个提交** 即需补落。
+
+    背景（team-lead 发现的缺口）：原节流纯时间（24h），导致 bundle 落后多个提交——
+    对象库真丢时会恢复到一个**不含防复发修复本身**的旧状态。故加"落后即补"这一半：
+      · age 未知（无 bundle）→ 必须落；
+      · 距上次 ≥ min_interval_hours → 落（时间到）；
+      · 时间未到，但无法确认已覆盖 HEAD（lag 未知）→ 落（保守）；
+      · 时间未到，且落后提交数 < commit_lag → 跳过（唯一可跳过的情形）。
+    返回 (是否需落盘, 原因)。
+    """
+    if age_hours is None:
+        return True, "尚无 bundle"
+    if age_hours >= float(min_interval_hours):
+        return True, f"距上次 {age_hours:.2f}h ≥ {min_interval_hours}h（时间到）"
+    if lag is None:
+        return True, "时间未到，但无法确认最新 bundle 已覆盖 HEAD → 保守补落"
+    if lag < max(1, int(commit_lag)):
+        return False, (f"距上次 {age_hours:.2f}h < {min_interval_hours}h 且仅落后 "
+                       f"{lag} 提交 < {commit_lag} → 跳过")
+    return True, f"时间未到但已落后 {lag} 提交 ≥ {commit_lag} → 补落"
+
+
 # ── 主流程 ────────────────────────────────────────────────────────────────
 def make_bundle(out_dir: str = DEFAULT_DIR, keep: int = 10, daily: bool = False,
-                min_interval_hours: float = 24.0,
+                min_interval_hours: float = 24.0, commit_lag: int = 1,
                 git_dir: str | None = None) -> tuple[str, str | None]:
-    """产出 bundle。返回 (status, path)；status ∈ {"ok", "skip", "fail"}。"""
+    """产出 bundle。返回 (status, path)；status ∈ {"ok", "skip", "fail"}。
+
+    `daily=True` 时节流为 **时间到 OR 落后 ≥ commit_lag 个提交**（见 should_bundle）。
+    """
     os.makedirs(out_dir, exist_ok=True)
+    head = _rev_parse_head(git_dir)
 
     if daily:
         age = newest_age_hours(out_dir)
-        if age is not None and age < float(min_interval_hours):
-            print(f"ℹ️ 距上次 bundle 仅 {age:.1f}h（< {min_interval_hours}h），跳过（--daily）")
+        newest = newest_bundle(out_dir)
+        lag = commits_between(bundle_tip(newest, git_dir), head, git_dir) if newest else None
+        do_bundle, reason = should_bundle(age, lag, min_interval_hours, commit_lag)
+        if not do_bundle:
+            print(f"ℹ️ 跳过 bundle 快照：{reason}")
             return "skip", None
+        print(f"ℹ️ 需补落 bundle：{reason}")
 
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     out = os.path.abspath(os.path.join(out_dir, f"{NAME_PREFIX}{stamp}{NAME_SUFFIX}"))
@@ -112,8 +227,17 @@ def make_bundle(out_dir: str = DEFAULT_DIR, keep: int = 10, daily: bool = False,
             pass
         return "fail", None
 
+    # 边车：记录本 bundle 覆盖的 HEAD，供下次"落后 N 提交"判定（无需再解析 bundle 内部）
+    if head:
+        try:
+            with open(out + HEAD_SIDECAR_SUFFIX, "w", encoding="utf-8") as f:
+                f.write(head + "\n")
+        except OSError:
+            pass
+
     size_mb = os.path.getsize(out) / 1024 / 1024
-    print(f"✅ bundle 已落盘：{out}（{size_mb:.2f} MB）")
+    tip = (head or "?")[:12]
+    print(f"✅ bundle 已落盘：{out}（{size_mb:.2f} MB，HEAD={tip}）")
     removed = prune_bundles(out_dir, keep=keep)
     if removed:
         print(f"🧹 滚动清理 {len(removed)} 份旧 bundle（保留最新 {keep}）")
@@ -127,6 +251,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--daily", action="store_true", help="间隔内已有快照则跳过")
     ap.add_argument("--min-interval-hours", type=float, default=24.0,
                     help="--daily 的最小间隔小时数（默认 24）")
+    ap.add_argument("--commit-lag", type=int, default=1,
+                    help="--daily 时：最新 bundle 落后 ≥ 此提交数即强制补落（默认 1）")
     ap.add_argument("--list", action="store_true", help="列出已有 bundle")
     ap.add_argument("--strict", action="store_true", help="失败时 exit 1（默认 0，不阻断）")
     ap.add_argument("--git-dir", default=None, help="显式指定 .git（默认 cwd 发现）")
@@ -144,7 +270,7 @@ def main(argv: list[str] | None = None) -> int:
 
     status, _ = make_bundle(args.dir, keep=args.keep, daily=args.daily,
                             min_interval_hours=args.min_interval_hours,
-                            git_dir=args.git_dir)
+                            commit_lag=args.commit_lag, git_dir=args.git_dir)
     if status == "fail" and args.strict:
         return 1
     return 0
