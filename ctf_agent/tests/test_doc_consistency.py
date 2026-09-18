@@ -6,8 +6,13 @@
 - KPI 数字漂移（2026-09-12 新增）：声明位数字 ≠ 机器计数即报红，含 README / 台账 /
   基线 / KPI_WATERMARK 四个位，以及「锚点缺失不误报」「取不到真值不误报」
   「历史演进叙述（12→13）不误报」三条边界
-- 真实仓库回归守卫 test_live_repo_kpi_declarations_consistent：
-  只改一处文档即红（已做变异验证：台账汇总行 13→12 → 该测试 FAIL）
+- KPI 闸门盲区加固（2026-09-19 新增，P0-3）：
+  D1 公开声明文件（README.md / README.zh.md）必须保留声明行，整行删掉即红；
+  D2 正文习语 `offline_verified=<n>` 全文扫，≠ 机器计数即红（箭头式历史叙述不误报）；
+  D3 含 contribution/自主推理贡献 的行，`0/<分母>` 分母白名单 = {count, heldout}
+  （heldout 取自 _kpi_canonical，禁硬编码）
+- 真实仓库回归守卫 test_live_repo_*：只改一处文档即红
+  （已做变异验证：台账汇总行 13→12 / README 正文 =13 / ZH 删声明行 / 0/13 → FAIL）
 """
 import os
 import sys
@@ -138,3 +143,144 @@ def test_live_repo_kpi_declarations_consistent():
     这条是「口径单一真值」的常驻守卫——若有人只改一处文档，CI 立刻红。
     """
     assert dc.check_kpi_number_consistency() == []
+
+
+# ── KPI 闸门盲区加固（2026-09-19 新增，P0-3）─────────────────────────────
+# 事故：README.md 正文写 `offline_verified=13`（表格是 14）却全绿通过；README.zh.md
+# 全文 0 次出现唯一机器强制 KPI，中文版与英文版对外讲两个不同的能力水位。
+# 根因：闸门只锚定精确表格行，正文与整文件都在网外；且 README 不在 DOC_ROOT 遍历范围。
+
+def _mk_repo(monkeypatch, tmp_path, readme=None, zh_readme=None):
+    """构造一个「仓库根 + ctf_agent 子目录」的最小结构，ROOT 指向 ctf_agent。
+
+    README 声明锚点与正文扫描均以仓库根（ROOT 上一级）为基准，故文件写在 tmp_path。
+    """
+    root = tmp_path / "ctf_agent"
+    root.mkdir()
+    monkeypatch.setattr(dc, "ROOT", str(root))
+    if readme is not None:
+        (tmp_path / "README.md").write_text(readme, encoding="utf-8")
+    if zh_readme is not None:
+        (tmp_path / "README.zh.md").write_text(zh_readme, encoding="utf-8")
+    return root
+
+
+# ── D1：公开声明文件必须保留声明行 ──────────────────────────────────────
+
+def test_kpi_zh_declaration_missing_detected(monkeypatch, tmp_path):
+    """D1 变异：README.zh.md 声明行整行删掉 → 必须红（防「删声明行」绕过）。"""
+    _mk_repo(
+        monkeypatch, tmp_path,
+        readme="| **offline_verified** (strict real-problem KPI) | **14** |\n",
+        zh_readme="## 诚实 KPI\n本表格没有 offline_verified 声明行\n",
+    )
+    monkeypatch.setattr(dc, "machine_kpi_truth", lambda: (14, 14, 14))
+    hits = dc.check_kpi_number_consistency()
+    assert any("README.zh.md" in h and "声明缺失" in h for h in hits), hits
+
+
+def test_kpi_zh_declaration_present_green(monkeypatch, tmp_path):
+    """D1 恢复：README.zh.md 保留声明行且数字正确 → 绿。"""
+    _mk_repo(
+        monkeypatch, tmp_path,
+        readme="| **offline_verified** (strict real-problem KPI) | **14** |\n",
+        zh_readme="| **offline_verified**（严格真题 KPI，机器棘轮只升不降） | **14** |\n",
+    )
+    monkeypatch.setattr(dc, "machine_kpi_truth", lambda: (14, 14, 14))
+    assert dc.check_kpi_number_consistency() == []
+
+
+def test_kpi_zh_declaration_drift_detected(monkeypatch, tmp_path):
+    """D1 补齐的 ZH 锚点：ZH 声明数字 ≠ 机器计数 → 报漂移。"""
+    _mk_repo(
+        monkeypatch, tmp_path,
+        readme="| **offline_verified** (strict real-problem KPI) | **14** |\n",
+        zh_readme="| **offline_verified**（严格真题 KPI） | **9** |\n",
+    )
+    monkeypatch.setattr(dc, "machine_kpi_truth", lambda: (14, 14, 14))
+    hits = dc.check_kpi_number_consistency()
+    assert any("README.zh.md" in h and "9" in h and "14" in h for h in hits), hits
+
+
+# ── D2：正文习语 `offline_verified=<n>` 全文扫 ───────────────────────────
+
+def test_kpi_inline_idiom_drift_detected(monkeypatch, tmp_path):
+    """D2 变异（今天溜过去的那类）：表格 14 正确，只把正文改成 =13 → 必须红。"""
+    _mk_repo(
+        monkeypatch, tmp_path,
+        readme="| **offline_verified** (strict real-problem KPI) | **14** |\n"
+               "> ⚠️ **What `offline_verified=13` does and does NOT mean.**\n",
+    )
+    monkeypatch.setattr(dc, "machine_kpi_truth", lambda: (14, 14, 14))
+    hits = dc.check_kpi_inline_idiom_drift()
+    assert any("README.md" in h and "13" in h for h in hits), hits
+
+
+def test_kpi_inline_idiom_correct_green(monkeypatch, tmp_path):
+    """D2 恢复：正文 =14 与机器计数一致 → 绿。"""
+    _mk_repo(
+        monkeypatch, tmp_path,
+        readme="> ⚠️ **What `offline_verified=14` does and does NOT mean.**\n",
+    )
+    monkeypatch.setattr(dc, "machine_kpi_truth", lambda: (14, 14, 14))
+    assert dc.check_kpi_inline_idiom_drift() == []
+
+
+def test_kpi_inline_historical_arrows_not_flagged(monkeypatch, tmp_path):
+    """D2 零误报边界：箭头式历史叙述（12→13 / 回退 12→9 / nominal 12 to 9）不报。"""
+    _mk_repo(
+        monkeypatch, tmp_path,
+        readme="水位 12→13；2026-08-28 诚实回退 12→9；nominal 12 to 9；"
+               "specialcurve2 带证据晋级 12→13。\n",
+    )
+    monkeypatch.setattr(dc, "machine_kpi_truth", lambda: (14, 14, 14))
+    assert dc.check_kpi_inline_idiom_drift() == []
+
+
+# ── D3：LLM 贡献分母白名单 ──────────────────────────────────────────────
+
+def test_kpi_contribution_denominator_13_detected(monkeypatch, tmp_path):
+    """D3 变异：contribution 行 `0/13` → 分母非法 → 必须红。"""
+    _mk_repo(
+        monkeypatch, tmp_path,
+        readme="LLM autonomous-reasoning contribution is **0/13**.\n",
+    )
+    monkeypatch.setattr(dc, "machine_kpi_truth", lambda: (14, 14, 14))
+    hits = dc.check_kpi_inline_idiom_drift()
+    assert any("分母非法" in h and "13" in h for h in hits), hits
+
+
+def test_kpi_contribution_zh_denominator_1_detected(monkeypatch, tmp_path):
+    """D3 变异：ZH `自主推理贡献` 行 `0 / 1`（无来源分母）→ 必须红。"""
+    _mk_repo(
+        monkeypatch, tmp_path,
+        zh_readme="| LLM 自主推理贡献 | **0 / 1**（唯一未解题为数据集缺陷） |\n",
+    )
+    monkeypatch.setattr(dc, "machine_kpi_truth", lambda: (14, 14, 14))
+    hits = dc.check_kpi_inline_idiom_drift()
+    assert any("分母非法" in h and "1" in h for h in hits), hits
+
+
+def test_kpi_contribution_valid_denominators_green(monkeypatch, tmp_path):
+    """D3 正例：分母 14（KPI 集）合法；held-out 池分母取自 _kpi_canonical 后亦合法。"""
+    _mk_repo(
+        monkeypatch, tmp_path,
+        readme="LLM autonomous-reasoning contribution is **0/14**.\n",
+        zh_readme="| LLM 自主推理贡献 | **0 / 14** |\n",
+    )
+    monkeypatch.setattr(dc, "machine_kpi_truth", lambda: (14, 14, 14))
+    assert dc.check_kpi_inline_idiom_drift() == []
+
+
+def test_kpi_allowed_denominators_from_canonical():
+    """D3 铁律：held-out 分母必须来自 _kpi_canonical（禁硬编码），且 ∈ 白名单。"""
+    dens = dc._kpi_allowed_denominators(14)
+    assert 14 in dens
+    kc = dc._load_gov_module("_kpi_canonical")
+    assert kc is not None
+    assert int(kc.count_heldout_candidates()) in dens
+
+
+def test_live_repo_inline_idiom_consistent():
+    """真实仓库回归：两个公开 README 的正文习语 / LLM 贡献分母必须自洽。"""
+    assert dc.check_kpi_inline_idiom_drift() == []
