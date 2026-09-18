@@ -33,6 +33,16 @@ fi
 
 cd "$ROOT"
 
+# ── ⓪ 仓库健康门禁 L0（2026-09-19 防复发；纯文件系统，零 git 依赖）──
+# 兜底：.git/refs/ 目录缺失是致命的（git 报 `fatal: not a git repository`，所有门禁
+# 全线失效）。本钩子由 git 调用，正常时 refs 必在；此处覆盖"refs 在 git 启动后消失"
+# 的竞态窗口。fail-closed。
+"$PY" scripts/_git_guard.py --quiet || {
+    echo "❌ ⓪ 仓库健康门禁 L0 未过：.git 元数据损坏（诊断见上）"
+    echo "   处置：python scripts/_git_guard.py --rebuild   # 从最新 refs 快照重建"
+    exit 1
+}
+
 # ── ① 密钥扫描 ──
 "$PY" scripts/_scan_secrets.py --cached
 
@@ -103,13 +113,27 @@ fi
 # 没被改坏"，不是"本次改动功能全绿"——两者分工明确，避免每 commit 都跑 30s+ 全量。
 # 2026-08-23 扩充：加入 reviewer/task_board/coupling/closeout（防错体系全脚本，71 用例 <3s）
 echo "── ⑥ 快速回归（防错体系核心测试）──"
-"$PY" -m pytest \
+# 2026-09-19 补：加入防复发机制自检（git 健康门禁 / bundle 快照 / 僵尸租约），
+# 堵一个真实盲点——B 提交曾只改 _git_snapshot.py 而 test_git_guard.py 变红却照样过闸
+# （⑥ 未含这些文件），导致"全量红"被 commit 级放行。防复发的代码必须自身进 ⑥。
+#
+# 2026-09-19 再补两个"假红"缺陷（engineer-3 复现，团队走 `git commit -- <paths>` 时必踩）：
+#   ① 索引泄漏：`git commit -- <paths>` 会让 git 向本钩子导出
+#      GIT_INDEX_FILE=<绝对路径>/.git/next-index-*.lock（临时索引）。⑥ 里 pytest 的
+#      temp-repo 再跑 `git commit` 时继承该变量 → 用主仓的临时索引 → “nothing added to
+#      commit” → rc=1 → 假红。用 `env -u GIT_INDEX_FILE` 把变量隔离在 pytest 子进程之外
+#      （注意：不能全局 unset——①②的 --cached 扫描正需要该临时索引）。
+#   ② tmp 回收：pytest 会话启动的 tmp 垃圾回收会批量删除（>50 文件）→ 触发环境
+#      safe-delete 守卫 → pytest 非零退出 → 假红。已在 pytest.ini 固定
+#      tmp_path_retention_count（不删旧 tmp），此处不再重复传参，配置单一来源。
+env -u GIT_INDEX_FILE "$PY" -m pytest \
     tests/test_lease.py tests/test_lease_multiwriter.py \
     tests/test_sign.py tests/test_honesty_scan.py \
     tests/test_doc_consistency.py tests/test_facts.py \
     tests/test_reviewer_gate.py tests/test_task_board.py \
     tests/test_coupling_cluster.py tests/test_closeout.py \
     tests/test_antifraud.py \
+    tests/test_git_guard.py tests/test_git_snapshot.py tests/test_lease_reap.py \
     -q --no-header
 
 # ── ⑦ 文档一致性真实扫描（2026-08-23，堵 P1-6"三方谎言"复发）──
