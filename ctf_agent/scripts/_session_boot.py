@@ -73,6 +73,31 @@ def main() -> int:
     ap.add_argument("--smoke", action="store_true", help="额外跑快速回归冒烟")
     args = ap.parse_args()
 
+    # ── ⓪ 仓库健康门禁 L0（纯文件系统，2026-09-19 防复发；必须在任何 git 调用之前）──
+    # 根因：.git/refs/ 目录缺失时 git 报 `fatal: not a git repository`，此后本脚本现有
+    # 的 ① 车道分支（git branch --show-current）等一切 git 调用连启动都做不到——门禁会
+    # "自己先崩"。故先用纯文件系统（零 git 依赖）判健康，不健康即给恢复指引并短路，
+    # 而非让后续 git 调用吐一堆错误（修架构师诊断的 G5 缺口）。
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import _git_guard  # noqa: PLC0415 - 局部导入，避免非 scripts 上下文的导入副作用
+    gd = _git_guard.resolve_git_dir()
+    if not _git_guard.print_report(_git_guard.check_l0(gd), gd):
+        print()
+        print("❌ 仓库健康门禁 L0 未过：.git 元数据损坏（详见上方诊断），已短路后续检查。")
+        print("   处置：python scripts/_git_guard.py --rebuild        # 从最新 refs 快照一键重建")
+        print("        无快照时按上方「恢复目标值来源」从 ORIG_HEAD/FETCH_HEAD/info/refs 恢复")
+        return 1
+    print(f"✅ 仓库健康（L0）：{gd}")
+
+    # ── ⓪b 僵尸租约自动回收（2026-09-19 防复发，缺口 G4；best-effort 不阻断开工）──
+    try:
+        import _lease  # noqa: PLC0415 - 局部导入
+        reaped = _lease.reap_zombies()
+        if reaped:
+            print(f"🧹 回收僵尸租约 {len(reaped)} 个：{', '.join(reaped)}")
+    except Exception as exc:  # noqa: BLE001 - 回收失败绝不阻断开工
+        print(f"ℹ️ 僵尸租约回收跳过（{exc}）")
+
     ok = True
     print("══ 会话启动门禁（阶段2 车道方案）══")
 

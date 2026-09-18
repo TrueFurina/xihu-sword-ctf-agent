@@ -137,6 +137,43 @@ def is_stale(lease: dict) -> bool:
     return _now() > _lease_ts(lease) + float(lease.get("ttl_min", DEFAULT_TTL_MIN)) * 60
 
 
+# 僵尸租约阈值：last_active 距今超过 TTL×此倍数即视为僵尸（2026-09-19 防复发，G4）
+ZOMBIE_FACTOR = 2.0
+
+
+def reap_zombies(coor_path: str = COOR_DEFAULT, factor: float = ZOMBIE_FACTOR,
+                 dry_run: bool = False) -> list:
+    """回收僵尸租约：last_active 距今 > TTL×factor 的租约（2026-09-19 防复发）。
+
+    背景（架构师诊断层2 / 缺口 G4）：lease 当前"能记录、不能保护"——stale 僵尸租约
+    （如曾长期未清的 atomcode-hardening）不自动回收，堵住 scope 判定还留下"接管即可
+    绕过互斥"的缺口。本函数把"僵尸自动回收"落到机器执行：会话启动时调用即可清理
+    TTL×factor 以上的死租约（默认 ×2）。返回被回收的会话名列表。
+    """
+    doc = load(coor_path)
+    if not doc or not doc.get("leases"):
+        return []
+    leases = doc.get("leases", {})
+    now = _now()
+    reaped = []
+    for sid, lease in list(leases.items()):
+        ttl = float(lease.get("ttl_min", DEFAULT_TTL_MIN)) * 60
+        age = now - _lease_ts(lease)
+        if age > ttl * float(factor):
+            reaped.append(sid)
+            if not dry_run:
+                del leases[sid]
+    if reaped and not dry_run:
+        if leases:
+            _write(coor_path, doc)
+        else:
+            try:
+                os.unlink(coor_path)
+            except OSError:
+                pass
+    return reaped
+
+
 def _write(coor_path: str, doc: dict) -> None:
     os.makedirs(os.path.dirname(coor_path), exist_ok=True)
     tmp = coor_path + ".tmp"
@@ -384,6 +421,11 @@ def main() -> int:
     ps = sub.add_parser("status", help="查看租约")
     ps.add_argument("--coor", default=COOR_DEFAULT)
 
+    prp = sub.add_parser("reap", help="回收僵尸租约（last_active 超 TTL×factor）")
+    prp.add_argument("--coor", default=COOR_DEFAULT)
+    prp.add_argument("--factor", type=float, default=ZOMBIE_FACTOR)
+    prp.add_argument("--dry-run", action="store_true", help="只报告不删除")
+
     a = ap.parse_args()
     if a.cmd == "acquire":
         return 0 if acquire(a.session, a.scope, a.coor, a.ttl_min, a.force, a.reason) else 1
@@ -395,6 +437,14 @@ def main() -> int:
         return 0 if release(a.session, a.coor) else 1
     if a.cmd == "status":
         status(a.coor)
+        return 0
+    if a.cmd == "reap":
+        reaped = reap_zombies(a.coor, a.factor, a.dry_run)
+        if reaped:
+            tag = "（dry-run）" if a.dry_run else ""
+            print(f"🧹{tag} 回收僵尸租约 {len(reaped)} 个：{', '.join(reaped)}")
+        else:
+            print("（无僵尸租约）")
         return 0
     return 2
 

@@ -34,10 +34,38 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LEDGER = os.path.join(ROOT, "REAL_SOLVES_LEDGER.md")
 BASELINE = os.path.join(ROOT, "data", "results", "KPI_BASELINE.json")
 
+# ── 2026-09-19 防复发：git 健康门禁 / 对象库快照（同目录 scripts，本地导入）──
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _git_guard  # noqa: E402 - 同目录模块，import 前需先补 sys.path
+import _git_snapshot  # noqa: E402
+
 
 def sh(cmd, cwd=ROOT, timeout=600):
     return subprocess.run(cmd, cwd=cwd, capture_output=True, timeout=timeout,
                           text=True, encoding="utf-8", errors="replace")
+
+
+def _pre_merge_snapshot(kpi_only: bool = False) -> bool:
+    """合并前 L1 深度检查 + 对象库 bundle 兜底快照（2026-09-19 防复发）。
+
+    L0 纯文件系统健康已由 main() 前置；此处做 git 存活时的 L1
+    （show-ref 非空 / HEAD 可达 / fsck --connectivity-only 无 missing|broken|corrupt）
+    并 best-effort 落一份 bundle（--daily，24h 内已有则跳过）。
+    kpi_only=True（pre-commit ⑧ 复用）时跳过较慢的 fsck，仅做 show-ref/rev-parse。
+    """
+    gd = _git_guard.resolve_git_dir()
+    l1 = _git_guard.check_l1(gd, explicit=False, deep=not kpi_only)
+    for r in l1:
+        print(f"{'✅' if r.get('ok') else '❌'} L1[{r['id']}] {r['detail']}")
+    if not _git_guard.all_ok(l1):
+        print("❌ L1 未过：引用/对象库异常，merge 中止（fail-closed）")
+        return False
+    # 对象库兜底快照（每日一次，best-effort，失败不阻断合并）
+    try:
+        _git_snapshot.make_bundle(daily=True)
+    except Exception as exc:  # noqa: BLE001 - 快照是兜底，绝不阻断主流程
+        print(f"ℹ️ bundle 兜底快照跳过（{exc}）")
+    return True
 
 
 # ── P0-1：已解出题回归集（真值通道，2026-08-24）──
@@ -557,8 +585,22 @@ def main() -> int:
                     help="全量真题真值跑并落盘基线（每日定时，不阻塞合并）")
     args = ap.parse_args()
 
+    # ── ⓪ 仓库健康门禁 L0（2026-09-19 防复发，纯文件系统，零 git 依赖）──
+    # 本闸门第一步 dirty_check/kpi_check 就调 git，refs 丢失时会"自己先崩"；
+    # 故先纯文件系统判健康——不健康即中止并给恢复指引（修架构师 G1/G5 缺口）。
+    gd = _git_guard.resolve_git_dir()
+    if not _git_guard.print_report(_git_guard.check_l0(gd), gd, quiet=True):
+        print("❌ ⓪ 仓库健康门禁 L0 未过：.git 元数据损坏，merge 门禁中止（fail-closed）。")
+        print("   处置：python scripts/_git_guard.py --rebuild   # 从最新 refs 快照重建")
+        return 1
+    print(f"✅ ⓪ 仓库健康（L0）：{gd}")
+
     if args.full_baseline:
         return 0 if full_baseline() else 1
+
+    # ⓪b L1 深度检查 + 合并前对象库兜底快照（覆盖"分歧合并"这类非 commit 操作）
+    if not _pre_merge_snapshot(kpi_only=args.kpi_only):
+        return 1
 
     # 收尾门禁（2026-08-24 调控落地）：合并回 main 前工作树必须干净——
     # 在飞改动（未收尾的 M/D/??）禁止经车道合并进 main（纲领 §4 炸弹）。
