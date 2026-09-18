@@ -22,6 +22,8 @@ wt-*/
 _backup/
 _git_backup/
 _git_corrupt_backup_*/
+# 2026-09-19：恢复期手工备份的损坏 .git（含完整对象库快照；本地留证/兜底，绝不入库）
+_git_backup_manual_*/
 _restore_tmp/
 _upload_stage/
 _archive_defense/
