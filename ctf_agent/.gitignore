@@ -59,8 +59,14 @@ data/results_backup*/
 **/平台接入交接文档.md
 **/环境变量对照清单-*.md
 data/results/*.md
-# 真实解出台账 REAL_SOLVES_LEDGER.md 现已脱敏（flag 仅 REDACTED+sha256），纳入版本控制以保真值源可追溯；
-# 若后续重新写入明文 flag，必须恢复忽略。
+# 真实解出台账 ctf_agent/REAL_SOLVES_LEDGER.md —— 事实（2026-09-19 校正，勿再写"已脱敏"）：
+#   该文件**处于版本控制中**（git ls-files 可见、存在于 HEAD 树），且**含明文 flag**
+#   （如 L35 / L103 / L106 / L316 / L418），**并未脱敏**。
+#   按现行政策明文 flag 公开无实质风险（用户指令 2026-08-29「全都不管了，全都公开！除了我的 api,token」
+#   + 2026-09-01「永远，不管答案密钥泄露」），且它是 machine-verified KPI 的第一手真值源
+#   （机器验证器期望值 = 可复现验证的基础），故**保持跟踪、不纳入 ignore**。
+#   唯一必须忽略的是凭据/密钥（API key/token/私钥）——见上方 P0 安全段，
+#   硬红线规则集在 scripts/release_export.py 的 SECRET_PATTERNS。
 _sec_*.txt
 # 一次性 diff/诊断输出（可能含 setx 注入的 sk- API Key 明文，如 _p0_diff.txt）
 /_p0_diff.txt
