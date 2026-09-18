@@ -113,6 +113,9 @@ fi
 # 没被改坏"，不是"本次改动功能全绿"——两者分工明确，避免每 commit 都跑 30s+ 全量。
 # 2026-08-23 扩充：加入 reviewer/task_board/coupling/closeout（防错体系全脚本，71 用例 <3s）
 echo "── ⑥ 快速回归（防错体系核心测试）──"
+# 2026-09-19 补：加入防复发机制自检（git 健康门禁 / bundle 快照 / 僵尸租约），
+# 堵一个真实盲点——B 提交曾只改 _git_snapshot.py 而 test_git_guard.py 变红却照样过闸
+# （⑥ 未含这些文件），导致"全量红"被 commit 级放行。防复发的代码必须自身进 ⑥。
 "$PY" -m pytest \
     tests/test_lease.py tests/test_lease_multiwriter.py \
     tests/test_sign.py tests/test_honesty_scan.py \
@@ -120,6 +123,7 @@ echo "── ⑥ 快速回归（防错体系核心测试）──"
     tests/test_reviewer_gate.py tests/test_task_board.py \
     tests/test_coupling_cluster.py tests/test_closeout.py \
     tests/test_antifraud.py \
+    tests/test_git_guard.py tests/test_git_snapshot.py tests/test_lease_reap.py \
     -q --no-header
 
 # ── ⑦ 文档一致性真实扫描（2026-08-23，堵 P1-6"三方谎言"复发）──

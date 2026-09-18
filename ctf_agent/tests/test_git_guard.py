@@ -221,15 +221,29 @@ def test_newest_age_hours_none_when_empty(tmp_path):
 
 
 def test_snapshot_daily_skips_when_fresh(tmp_path):
-    """--daily：目录里已有新 bundle → 返回 skip 且不新建。"""
-    d = os.path.join(str(tmp_path), "bundles")
-    os.makedirs(d)
-    fresh = os.path.join(d, "repo-existing.bundle")
-    with open(fresh, "w") as f:
+    """--daily（2026-09-19 新语义）：已有**覆盖当前 HEAD**的新 bundle → skip 且不新建。
+
+    旧语义是"纯时间跳过"；新语义要求"时间未到 AND 已确认覆盖 HEAD"才跳过
+    （防"bundle 落后于防复发修复提交"）。故此处用真实 repo + `.head` 边车构造"已覆盖"。
+    """
+    repo = os.path.join(str(tmp_path), "repo")
+    os.makedirs(repo)
+    for a in (["init", "-q"], ["config", "user.email", "d@d"], ["config", "user.name", "d"]):
+        subprocess.run(["git", *a], cwd=repo, check=True, capture_output=True)
+    with open(os.path.join(repo, "f.txt"), "w") as f:
         f.write("x")
-    os.utime(fresh, None)  # 现在
-    status, path = _git_snapshot.make_bundle(d, keep=10, daily=True)
-    assert status == "skip"
+    subprocess.run(["git", "add", "f.txt"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-q", "-m", "x"], cwd=repo, check=True, capture_output=True)
+    gitdir = os.path.join(repo, ".git")
+
+    d = os.path.join(str(tmp_path), "bundles")
+    s0, p0 = _git_snapshot.make_bundle(d, keep=10, daily=False, git_dir=gitdir)
+    assert s0 == "ok" and p0  # 先落一份真实 bundle（含 .head 边车）
+
+    status, path = _git_snapshot.make_bundle(d, keep=10, daily=True,
+                                             min_interval_hours=24.0, commit_lag=1,
+                                             git_dir=gitdir)
+    assert status == "skip"          # 时间未到 且 落后 0 → 唯一可跳过情形
     assert path is None
     assert len(_git_snapshot.list_bundles(d)) == 1  # 未新建
 
