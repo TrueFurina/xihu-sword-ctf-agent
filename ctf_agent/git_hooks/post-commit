@@ -162,6 +162,8 @@ PYEOF
 # ── refs 轻量快照（2026-09-19 防复发）：每次提交后落一份 HEAD/packed-refs/refs 清单 ──
 # 对冲"refs 被破坏"——有一份可回溯快照即可 `_git_guard.py --rebuild` 一键重建。
 # best-effort：快照失败绝不阻断（post-commit 本就不影响提交结果）。
-"$PY" "$REPO_ROOT/scripts/_git_guard.py" --snapshot --quiet >/dev/null 2>&1 || true
+# ⚠️ 必须 (cd "$REPO_ROOT" && 相对路径)：$REPO_ROOT 是 MSYS 形式 /e/...，直接作文件参数
+#    喂 Windows python.exe 会 exit 2（could not open file）；cd 后走相对路径与其它钩子一致。
+( cd "$REPO_ROOT" && "$PY" scripts/_git_guard.py --snapshot --quiet ) >/dev/null 2>&1 || true
 
 exit 0
