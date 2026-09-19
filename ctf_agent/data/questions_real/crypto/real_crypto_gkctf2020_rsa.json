@@ -4,7 +4,7 @@
   "category": "crypto",
   "title": "GKCTF2020 RSA 并行分解",
   "description": "并行迭代求解 p,q 分解 n。",
-  "flag": "<redacted>",
+  "flag": "69f42f7dd30fe78e924113e7c5b1a60bc579e4e74e37ae8ddd92302562ca8d8b",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
     "data/questions_real/_attachments/crypto/real_crypto_gkctf2020_rsa/flag.txt"

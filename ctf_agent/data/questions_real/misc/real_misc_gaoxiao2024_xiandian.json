@@ -4,7 +4,7 @@
   "category": "misc",
   "title": "2024高校运维赛 冰蝎流量分析",
   "description": "冰蝎流量(默认密码 rebeyond)+Zip已知明文攻击；提取 secret2.txt 与 temp.zip。",
-  "flag": "<redacted>",
+  "flag": "760099fac655cced25f37362b52a75a5bee90bf81161763f994a8b49decb952b",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
     "data/questions_real/_attachments/misc/real_misc_gaoxiao2024_xiandian/flag.txt"

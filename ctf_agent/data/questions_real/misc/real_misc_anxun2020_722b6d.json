@@ -4,7 +4,7 @@
   "category": "misc",
   "title": "安洵杯 2020 (misc: 722b6d90...)",
   "description": "Misc challenge from 安洵杯 2020. Reconstructed from 安洵杯官方wp (local PDF). Flag from official writeup. (Original challenge file needed for a fully automated re-solve.)",
-  "flag": "<redacted>",
+  "flag": "01ef7cc4ea5b32c11bdb148dfb427d06e862d759778423c49aa07a16c112ba08",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
     "recovered_external/wp_text/anxun2020_official.txt"

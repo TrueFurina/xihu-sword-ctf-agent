@@ -4,7 +4,7 @@
   "category": "reverse",
   "title": "Where is the flag",
   "description": "一个前端页面校验用户输入的 flag，附件是页面引用的 JS 与 HTML。分析校验逻辑，找出正确 flag。",
-  "flag": "<redacted>",
+  "flag": "aec640f00c418c309bd68dcbfd389df969fa3393a68aee14690393908d2f6ef9",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
     "data/questions_real/_attachments/reverse/real_reverse_js/coso.js",
