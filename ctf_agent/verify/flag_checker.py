@@ -23,6 +23,31 @@ V_WARN = "warn"          # 有瑕疵但可接受
 V_REJECT = "reject"      # 拒绝（格式明显非法）
 
 
+def sha256_matches(flag: str, expected_sha256: Optional[str]) -> Optional[bool]:
+    """确定性真值仲裁：候选 flag 与题面 flag_sha256 比对（2026-09-19 幻觉攻坚）。
+
+    返回：
+      None  —— 题面无 flag_sha256，无法确定性判定（走既有格式/证据门）。
+      True  —— 候选与真值匹配（最强证据，可早接受，节省预算）。
+      False —— 候选确定错误（比"无工具证据"更强的拒绝依据）。
+
+    同时比对「全串 flag{...}」与「内文」两种形态（题库登记口径存在两种）。
+    """
+    if not expected_sha256:
+        return None
+    import hashlib
+    truth = str(expected_sha256).strip().lower()
+    if not truth:
+        return None
+    cands = [str(flag).strip()]
+    m = re.search(r"flag\{(.+)\}", cands[0], re.IGNORECASE | re.DOTALL)
+    if m:
+        cands.append(m.group(1))
+    return any(
+        hashlib.sha256(c.encode("utf-8")).hexdigest() == truth for c in cands if c
+    )
+
+
 class FlagChecker:
     """flag 格式验证与提取。"""
 

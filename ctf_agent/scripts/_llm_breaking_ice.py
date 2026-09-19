@@ -63,14 +63,26 @@ _PROVIDER_KEY_ENV = {
 
 
 def _credential_available(provider: str) -> bool:
-    """best-effort 凭证预检：真实 LLM 开关 + 该 provider 的 key 环境变量至少存在一个。
+    """best-effort 凭证预检：真实 LLM 开关 + 该 provider 的 key 至少存在一个。
 
     仅是诚实性护栏——不能 100% 保证 key 有效，但能拦住"本环境压根没配置 key
     却把失败算到 LLM 推理能力头上"这种典型造假。无 key 时 harness 会标
     INFRA_NO_CREDENTIAL，绝不混入 UNSOLVED/推理失败统计。
+
+    2026-09-17 修复（实测 bug）：本项目多数 key 存于**注册表**、仅在 `config`
+    导入时同步进 `os.environ`；本脚本只 `import eval.cases`（不触发 config 同步），
+    故旧实现仅查 `os.environ` 会把"注册表里有 key"误判为 INFRA_NO_CREDENTIAL
+    （实测 qwen/DASHSCOPE 全 15 题被误判）。改为**优先用 `config.resolve_api_key`**
+    （含注册表回退），与文件注释「与 config.resolve_api_key 对齐」一致。
     """
     if os.environ.get("CTF_AGENT_USE_REAL_LLM", "").strip() not in ("1", "true", "True"):
         return False
+    try:
+        from config import resolve_api_key  # 触发配置/注册表同步，并含注册表回退
+        if resolve_api_key(provider):
+            return True
+    except Exception:  # noqa: BLE001 - 预检失败不阻断，落回 env 检查
+        pass
     for k in _PROVIDER_KEY_ENV.get(provider, ()):
         if os.environ.get(k):
             return True

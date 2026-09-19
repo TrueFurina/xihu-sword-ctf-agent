@@ -58,7 +58,16 @@
 | 失败结构 | budget_exceeded 6 / hallucination 3 | **hallucination 4 / tool_failure 1 / budget_exceeded 0** |
 | tokens | 696,506 | 617,302（更省——真值匹配早接受） |
 
-**诚实声明**：此前所有 held-out 历史数字（含 9-17 断供跑的 1/10）都被 bug 2 系统性压低；4/10 才是该协议下的真实水位。反注水纪律不受影响：3 道 LLM 解全部经题面 flag_sha256 确定性验证，零自报。
+**诚实声明**：此前所有 held-out 历史数字（含 9-17 断供跑的 1/10）都被 bug 2 系统性压低；修复后才是真实水位。反注水纪律不受影响：LLM 解全部经题面 flag_sha256 确定性验证，零自报。
+
+### 修复后两轮独立重跑（LLM 固有波动如实报）
+
+| 轮次 | 战绩 | tokens | 备注 |
+|------|------|--------|------|
+| selftruth_full | 4/10（LLM 3/9） | 617K | dnui/notright/gongye 解出 |
+| stepfault_full（+步级容错） | 3/10（LLM 2/9） | 816K | dnui/notright 复现；gongye 波动未解；步级容错后题目跑满预算（budget_exceeded 5，无炸穿） |
+
+**最终口径（答辩用）**：**稳定 3/10（presolve 1 + LLM 2 恒定复现），最好 4/10（LLM 3/9）**。波动为 LLM 推理固有属性，两跑并集 5 题位。绝不允许只报最好数字。
 
 ## 三、可复现命令
 

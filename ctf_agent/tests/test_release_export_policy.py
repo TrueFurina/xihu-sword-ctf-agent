@@ -128,7 +128,7 @@ def test_policy_rationale_documented_in_source():
         text = fh.read()
     for needle in ("2026-08-29", "2026-09-01", "永远，不管答案密钥泄露",
                    "全都不管了，全都公开", "machine-verified", "SECRET_PATTERNS",
-                   "硬红线"):
+                   "硬红线", "flag_sha256", "92 题"):
         assert needle in text, f"release_export.py 政策注释缺失关键依据：{needle}"
 
 
@@ -141,12 +141,14 @@ def test_redact_flags_defaults_off():
 
 
 def test_redact_question_flags_covers_only_top_level_flag(tmp_path):
-    """如实覆盖范围：只动路径含 questions 的 JSON 的顶层 flag 键，description 不动。"""
+    """如实覆盖范围：只动路径含 questions 的 JSON 的顶层 flag 键，description/flag_sha256 不动。"""
     qdir = tmp_path / "data" / "questions_real" / "web"
     qdir.mkdir(parents=True)
     q = qdir / "real_web_demo.json"
+    sha = "a1a65ec215e740dfead9be11ad54c534cac6848d1fe49d0b398254255942d0d2"
     q.write_text(json.dumps({
-        "flag": "3038d6fe45d417582fabf6218644d30b8b1c4909e4361047e64a32b42629eed0",
+        "flag": sha,               # 实测：题库 flag 字段本身就是 sha256 真值载体
+        "flag_sha256": sha,
         "description": "真 flag 明文写在 description 里 flag{wwwWow_u_2re_sql_master}",
     }, ensure_ascii=False), encoding="utf-8")
     other = tmp_path / "config" / "settings.json"
@@ -156,6 +158,8 @@ def test_redact_question_flags_covers_only_top_level_flag(tmp_path):
     assert rel.redact_question_flags(tmp_path) == 1
     data = json.loads(q.read_text(encoding="utf-8"))
     assert data["flag"] == "<redacted>"
+    assert data["flag_sha256"] == sha, \
+        "flag_sha256 绝不能被抹掉（那才是真的丢真值）"
     assert "flag{wwwWow_u_2re_sql_master}" in data["description"], \
         "description 不在覆盖范围（这正是'不等于题库已脱敏'的原因）"
     assert json.loads(other.read_text(encoding="utf-8"))["flag"] == "keep-me", \

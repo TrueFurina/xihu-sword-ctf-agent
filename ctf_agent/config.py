@@ -178,8 +178,12 @@ class AppConfig:
         # 走 _resolve_settings 的 provider 分支，不受此净化影响）。
         import logging as _logging
         _logger = _logging.getLogger(__name__)
+        # 模型-端点匹配白名单（2026-09-17）：登记在册的合法模型（与其 provider 端点匹配）
+        # 允许被 CTF_AGENT_LIGHT/HEAVY_MODEL 显式覆盖，不触发回退——否则无法在 qwen 端点
+        # 上选用 deepseek/kimi/glm 等千问平台免费模型（它们本就在 dashscope 端点上）。
+        _allowed_models = _PROVIDER_MODEL_ALLOWLIST.get(provider, set())
         _env_light = os.getenv("CTF_AGENT_LIGHT_MODEL", "").strip()
-        if _env_light and _env_light != light_model:
+        if _env_light and _env_light != light_model and _env_light not in _allowed_models:
             _wkey = ("light", _env_light, provider)
             if _wkey not in _SANITIZE_WARNED:
                 _SANITIZE_WARNED.add(_wkey)
@@ -189,7 +193,7 @@ class AppConfig:
                 )
             _env_light = ""
         _env_heavy = os.getenv("CTF_AGENT_HEAVY_MODEL", "").strip()
-        if _env_heavy and _env_heavy != heavy_model_def:
+        if _env_heavy and _env_heavy != heavy_model_def and _env_heavy not in _allowed_models:
             _wkey = ("heavy", _env_heavy, provider)
             if _wkey not in _SANITIZE_WARNED:
                 _SANITIZE_WARNED.add(_wkey)
@@ -311,6 +315,104 @@ def list_baidu_models(free_only: bool = False, vision_only: bool = False) -> lis
     if vision_only:
         items = [(n, m) for n, m in items if m["vision"]]
     return [n for n, _ in sorted(items, key=lambda kv: kv[1]["ctx"], reverse=True)]
+
+
+# ── 阿里千问AI平台（DashScope）免费模型登记表（2026-09-17 用户实测核对）──
+# 平台：https://platform.qianwenai.com（千问AI平台 = 阿里 Qwen 平台）
+# 端点：https://dashscope.aliyuncs.com/compatible-mode/v1（= 项目 qwen provider，白名单内）
+# Key：环境变量 DASHSCOPE_API_KEY（前缀 sk-ws-）。实测 qwen3.7-flash/deepseek-v3.1/kimi-k2.6 均 200。
+# 🔴 每模型 1M tokens 免费、用尽即停（无超额扣费），到期 2026-12-05。
+# 用途：① CTF_AGENT_LIGHT_MODEL/HEAVY_MODEL 显式覆盖；② 跨模型分摊跑批（单模型额度仅 1M）。
+# kind：chat=通用对话 / reasoner=深推理 / coder=代码 / mt=翻译 / ocr=OCR / video=视频(非对话)。
+DASHSCOPE_FREE_MODELS: dict[str, dict] = {
+    # deepseek 系
+    "deepseek-v3.2-exp": {"kind": "chat", "vendor": "deepseek"},
+    "deepseek-v3.1": {"kind": "chat", "vendor": "deepseek"},
+    "deepseek-r1": {"kind": "reasoner", "vendor": "deepseek"},
+    "deepseek-r1-0528": {"kind": "reasoner", "vendor": "deepseek"},
+    "deepseek-r1-distill-qwen-32b": {"kind": "reasoner", "vendor": "deepseek"},
+    "deepseek-r1-distill-qwen-14b": {"kind": "reasoner", "vendor": "deepseek"},
+    "deepseek-r1-distill-qwen-7b": {"kind": "reasoner", "vendor": "deepseek"},
+    "deepseek-v3": {"kind": "chat", "vendor": "deepseek"},
+    # kimi / moonshot 系
+    "kimi-k2.5": {"kind": "chat", "vendor": "kimi"},
+    "kimi-k2.6": {"kind": "chat", "vendor": "kimi"},
+    "kimi-k2-thinking": {"kind": "reasoner", "vendor": "kimi"},
+    "Moonshot-Kimi-K2-Instruct": {"kind": "chat", "vendor": "kimi"},
+    "kimi-k2.7-code": {"kind": "coder", "vendor": "kimi"},
+    # qwen3.7 系
+    "qwen3.7-plus": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.7-plus-2026-05-26": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.7-max-2026-06-08": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.7-max-2026-05-20": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.7-max-2026-05-17": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.7-max-preview": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.7-flash": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.7-flash-2026-07-15": {"kind": "chat", "vendor": "qwen"},
+    # qwen3.6 系
+    "qwen3.6-max-preview": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.6-plus": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.6-plus-2026-04-02": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.6-27b": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.6-35b-a3b": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.6-flash": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.6-flash-2026-04-16": {"kind": "chat", "vendor": "qwen"},
+    # qwen3.5 系
+    "qwen3.5-plus": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.5-plus-2026-04-20": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.5-plus-2026-02-15": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.5-ocr": {"kind": "ocr", "vendor": "qwen"},
+    "qwen3.5-flash": {"kind": "chat", "vendor": "qwen"},
+    "qwen3.5-flash-2026-02-23": {"kind": "chat", "vendor": "qwen"},
+    # qwen3-max 系
+    "qwen3-max": {"kind": "chat", "vendor": "qwen"},
+    "qwen3-max-preview": {"kind": "chat", "vendor": "qwen"},
+    "qwen3-max-2026-01-23": {"kind": "chat", "vendor": "qwen"},
+    "qwen3-max-2025-09-23": {"kind": "chat", "vendor": "qwen"},
+    # qwen-mt 翻译系
+    "qwen-mt-lite": {"kind": "mt", "vendor": "qwen"},
+    "qwen-mt-flash": {"kind": "mt", "vendor": "qwen"},
+    "qwen-mt-plus": {"kind": "mt", "vendor": "qwen"},
+    "qwen-mt-turbo": {"kind": "mt", "vendor": "qwen"},
+    # qwen3-coder 系
+    "qwen3-coder-plus": {"kind": "coder", "vendor": "qwen"},
+    "qwen3-coder-plus-2025-09-23": {"kind": "coder", "vendor": "qwen"},
+    "qwen3-coder-plus-2025-07-22": {"kind": "coder", "vendor": "qwen"},
+    "qwen3-coder-flash": {"kind": "coder", "vendor": "qwen"},
+    "qwen3-coder-flash-2025-07-28": {"kind": "coder", "vendor": "qwen"},
+    "qwen3-coder-30b-a3b-instruct": {"kind": "coder", "vendor": "qwen"},
+    # glm 系（开放平台，dashscope 亦有配额）
+    "glm-5.2": {"kind": "chat", "vendor": "glm"},
+    "glm-5.1": {"kind": "chat", "vendor": "glm"},
+    "glm-5": {"kind": "chat", "vendor": "glm"},
+    "glm-4.7": {"kind": "chat", "vendor": "glm"},
+    "glm-4.6": {"kind": "chat", "vendor": "glm"},
+    "glm-4.5-air": {"kind": "chat", "vendor": "glm"},
+    "glm-4.5": {"kind": "chat", "vendor": "glm"},
+    # wanx 视频系（非对话，200 秒额度）
+    "wanx2.1-kf2v-plus": {"kind": "video", "vendor": "wanx"},
+    "wanx2.1-i2v-turbo": {"kind": "video", "vendor": "wanx"},
+    "wanx2.1-i2v-plus": {"kind": "video", "vendor": "wanx"},
+    "wanx2.1-t2v-plus": {"kind": "video", "vendor": "wanx"},
+    "wanx2.1-t2v-turbo": {"kind": "video", "vendor": "wanx"},
+}
+
+
+def list_dashscope_free_models(kind: str | None = None, chat_only: bool = True) -> list[str]:
+    """千问平台免费模型清单。chat_only=True 时排除 video/mt/ocr 等非通用对话档。"""
+    items = DASHSCOPE_FREE_MODELS.items()
+    if chat_only:
+        items = [(n, m) for n, m in items if m["kind"] in ("chat", "reasoner", "coder")]
+    if kind:
+        items = [(n, m) for n, m in items if m["kind"] == kind]
+    return [n for n, _ in items]
+
+
+# 每个 provider 端点"合法可覆盖"的模型白名单（防端点-模型不匹配回退）。
+# from_env 的净化逻辑仅在模型不在本白名单时才回退默认——登记在册即视为与端点匹配。
+_PROVIDER_MODEL_ALLOWLIST: dict[str, set] = {
+    "qwen": set(DASHSCOPE_FREE_MODELS.keys()) | {"qwen3.7-flash", "qwen3.8-max"},
+}
 
 
 def _resolve_provider_defaults(provider: str) -> tuple[str, str, str, str]:
