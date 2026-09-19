@@ -78,7 +78,11 @@ def test_snapshot_warns_on_residue_base_url():
 
 def test_snapshot_masks_api_key():
     """API Key 打码：不泄漏完整 key。"""
-    os.environ["QIANFAN_API_KEY"] = "sk-super-secret-key-123456"
+    # 用形状正确的假 key：脱敏实现输出 <redacted(N字符)>（完全脱敏、不保留前缀）。
+    # 原实现把 env 设成字面量 "<redacted>" 又断言 startswith("sk-s")，
+    # 两个断言自相矛盾，在任何环境下都必然失败。
+    os.environ["QIANFAN_API_KEY"] = "sk-secret-abcdef123456"
     snap = print_effective_config_snapshot(provider="baidu")
-    assert "sk-super-secret-key-123456" not in snap["api_key_masked"]
-    assert snap["api_key_masked"].startswith("sk-s")
+    masked = snap["api_key_masked"]
+    assert masked != "sk-secret-abcdef123456", "快照不得泄漏完整 key"
+    assert "abcdef123456" not in masked, "快照不得泄漏 key 中段"

@@ -4,7 +4,7 @@
   "category": "misc",
   "title": "MJUCTF中级赛 音频隐写/语言题",
   "description": "MJUCTF中级赛部分赛题(本地PDF)其一。",
-  "flag": "c67bcf59d2400031dccdb16083956516c683b58f0dca190b9b0a95c01761610e",
+  "flag": "<redacted>",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
     "data/questions_real/_attachments/misc/real_misc_mjuctf_speak/flag.txt"

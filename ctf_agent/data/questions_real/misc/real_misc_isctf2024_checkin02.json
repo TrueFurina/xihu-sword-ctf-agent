@@ -4,7 +4,7 @@
   "category": "misc",
   "title": "ISCTF2024 小蓝鲨签到02/游园地1",
   "description": "地理定位签到题。",
-  "flag": "1fedad704d70a2a904eb5dde4f4e85dc53b5be3115914e11ead7f990afab631f",
+  "flag": "<redacted>",
   "flag_pattern": "ISCTF\\{[^}]+\\}",
   "attachments": [
     "data/questions_real/_attachments/misc/real_misc_isctf2024_checkin02/flag.txt"

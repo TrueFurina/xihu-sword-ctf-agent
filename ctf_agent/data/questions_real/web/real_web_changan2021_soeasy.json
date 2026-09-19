@@ -4,7 +4,7 @@
   "category": "web",
   "title": "长安杯2021 Web soeasy (JWT爆破+SSTI)",
   "description": "jwt secret=CTf4r 爆破; user 处 SSTI 模板注入读到 /flag; 响应回显 flag。",
-  "flag": "95a8f144fd20374d4231e799f4d281c62e3802ae47c11deed9c004e4dba45a9c",
+  "flag": "<redacted>",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
     "data/questions_real/_attachments/web/real_web_changan2021_soeasy/flag.txt"

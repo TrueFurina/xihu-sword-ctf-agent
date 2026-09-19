@@ -5,7 +5,7 @@
   "category": "misc",
   "title": "安洵杯2020 MISC 开始抑郁（图片混合+Brainfuck+跳舞的人+宽高修改）",
   "description": "图片混合 zip，IHDR 修复后得 Brainfuck→JsFuck→时间戳密码；嵌套压缩包内 flag.png 宽高被改，修正后按格式填《你的名字》时间片段得 flag。二进制原题见官方仓库。",
-  "flag": "flag{1200-2016-GRANDMENU-RCHITECTURE-1335}",
+  "flag": "<redacted>",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": ["data/questions_real/_attachments/anxun2020/misc/depressed.md"],
   "difficulty": "HARD"

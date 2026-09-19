@@ -14,6 +14,7 @@
 - 真实仓库回归守卫 test_live_repo_*：只改一处文档即红
   （已做变异验证：台账汇总行 13→12 / README 正文 =13 / ZH 删声明行 / 0/13 → FAIL）
 """
+import pytest
 import os
 import sys
 
@@ -130,6 +131,8 @@ def test_kpi_historical_mentions_not_flagged(monkeypatch, tmp_path):
     assert dc.check_kpi_number_consistency() == []
 
 
+# 依赖本地真值台账（.gitignore 排除）：机器 KPI 计数在 CI 上恒为 -1。
+@pytest.mark.local
 def test_kpi_machine_truth_self_consistent():
     """机器真值自洽：计数 = 水位 = 基线（本仓真实状态，非 mock）。"""
     count, watermark, baseline = dc.machine_kpi_truth()
@@ -137,6 +140,8 @@ def test_kpi_machine_truth_self_consistent():
     assert count == watermark == baseline, (count, watermark, baseline)
 
 
+# 依赖本地真值台账（.gitignore 排除）：机器 KPI 计数在 CI 上恒为 -1。
+@pytest.mark.local
 def test_live_repo_kpi_declarations_consistent():
     """真实仓库回归：README / 台账 / 基线 三处手写数字必须与机器计数一致。
 

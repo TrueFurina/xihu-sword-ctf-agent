@@ -4,7 +4,7 @@
   "category": "misc",
   "title": "2024高校运维赛 钓鱼邮件-发件人域名",
   "description": "分析钓鱼邮件，发件人域名可疑。base64(ZmxhZ3tXZWxjT01lVE99) 解码得 flag。",
-  "flag": "f8510e717fcdfa4d0b3e6342ada8d0e726e46610bbe1d169be826610f889b949",
+  "flag": "<redacted>",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
     "data/questions_real/_attachments/misc/real_misc_gaoxiao2024_phish_sender/flag.txt"
