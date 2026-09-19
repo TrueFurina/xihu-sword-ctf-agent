@@ -98,6 +98,11 @@ Thumbs.db
 data/results/*.jsonl
 # 根级运行产物目录（看板状态/目标日志），不入库
 /data/
+# 根目录 _ 前缀调试残留（grep 快照/se2 输出/kpi 回显/一次性 rerun 脚本，内容已落正式文件，纯垃圾）
+/_g*.txt
+/_se2*.txt
+/_out.txt
+/_rerun*.py
 
 # ---------- 10. 开发过程冗余副本/破损备份(不入库) ----------
 wt-delivery/
