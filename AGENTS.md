@@ -18,7 +18,7 @@
 | `ctf_agent/` | 核心代码（git 仓库，自有门禁） | agent / scheduler / scripts / tests |
 | `data/` | 数据集（真标题/自产训练） | `questions_real/`、`questions/` |
 | `idea-stage/` | **科研/idea 管线产物** | `IDEA_REPORT.md`、`refine-logs/`（提案+实验计划）、`proposals/`、`research/`、`research-wiki/` |
-| `deliverables/` | **工程/运营交付物**（本地不入库） | `复盘赛报/` `治理协议/` `工程补丁/` `锐评质检/` `规划手册/` `可视化看板/` `归档_禁用引用/` |
+| `deliverables/` | **工程/运营交付物**（默认本地不入库；唯一例外 `复盘赛报/` 已于 2026-09-19 经用户裁决「可以公开」全文入库，见根 `.gitignore`） | `复盘赛报/` `治理协议/` `工程补丁/` `锐评质检/` `规划手册/` `可视化看板/` `归档_禁用引用/` |
 | `docs/` | 项目元文档/索引 | `_INDEX.md`、结构说明 |
 | `logs/` | 一切 agent 运行日志（**项目内**） | 跑批记录、自检输出 |
 | `research-wiki/`（已并入 `idea-stage/research-wiki/`） | — | — |

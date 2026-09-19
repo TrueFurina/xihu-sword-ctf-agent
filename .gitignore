@@ -132,7 +132,10 @@ ctf_agent/docs/*
 # 历史归档 / Ghidra 调试工具链 / 交付草稿（非项目源码，本地保留）
 /_archive/
 /_tools_ghidra/
-/deliverables/
+# deliverables/ 默认不入库（交付草稿），唯一例外：复盘赛报/ —— 2026-09-19 用户裁决「可以公开」全文。
+# 注意写法必须是 /* 而非 /（目录整体排除时 git 无法再包含其子项）。
+/deliverables/*
+!/deliverables/复盘赛报/
 
 # ---------- 14. 真题集附件 / 散落明文 flag（含真 flag，绝不入库，纵深防御） ----------
 # _attachments 下含 flag.txt / flag.png / 赛题源码包等明文真 flag，一旦 push 即泄露
