@@ -585,6 +585,24 @@ async def _try_keyboard_path(question) -> Optional[str]:
             if not decoded or "?" in decoded or not (4 <= len(decoded) <= 30):
                 continue
             if flag:
+                # sha256 真值闸（2026-09-19）：与 _vision_read_flag / _try_hastad_broadcast
+                # 家规对齐。实证（heldout 预算 2x 对照跑）：dnui_keyboard 解码不完整产出
+                # flag{CLCKOUTHK}（sha256 不符），无闸时被当"确定性预扫命中"直灌
+                # candidate_flag → goal 记 flag=✅ → 主循环 8+ 次复读同一错答案直到
+                # 预算耗尽（幻觉桶）。有真值即仲裁：不符不采信，降级为普通候选。
+                try:
+                    from verify.flag_checker import sha256_matches
+                    _v = sha256_matches(str(flag), getattr(question, "flag_sha256", None))
+                except Exception as _vexc:  # noqa: BLE001 - 校验器异常不阻塞预扫
+                    _warn_import_once("verify.flag_checker.sha256_matches", _vexc)
+                    _v = None
+                if _v is False:
+                    logger.info(
+                        "[presolve:keyboard_path] %s 解码候选 %s 与题面 sha256 真值不符"
+                        "（不采信，降级普通候选，禁止当确定性命中）",
+                        getattr(question, "id", "?"), decoded)
+                    _save_candidates(question, [str(flag)])
+                    continue
                 logger.info("[presolve:keyboard_path] %s 命中 decoded=%s",
                             getattr(question, "id", "?"), decoded)
                 _save_candidates(question, [str(flag)])

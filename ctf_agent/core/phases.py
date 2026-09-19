@@ -382,6 +382,23 @@ def _mark_hallucination(ctx) -> None:
                 ctx._hallucination_strike)
 
 
+def _sha256_arbitrate(ctx, flag: str) -> Optional[bool]:
+    """sha256 真值仲裁（2026-09-19 幻觉攻坚）。
+
+    题面带 flag_sha256 时做确定性裁决：
+      True  —— 候选与官方真值匹配（最强证据，可早接受省预算）；
+      False —— 候选确定错误（比"无工具证据"更强的拒绝依据）；
+      None  —— 无真值，交由既有格式/证据门判定。
+    """
+    try:
+        from verify.flag_checker import sha256_matches
+    except Exception as _exc:  # noqa: BLE001 - 校验器异常不阻塞提取
+        logger.warning("sha256_matches 导入失败，退回既有校验: %s", _exc)
+        return None
+    q = getattr(ctx, "question", None)
+    return sha256_matches(flag, getattr(q, "flag_sha256", None))
+
+
 def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
     """从执行结果中提取 flag（优先用 checker，其次正则）。原 MainAgent._extract_flag。
 
@@ -409,6 +426,20 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
                             flag[:40])
                 ctx._extract_failed = True  # 提取错埋点（2026-08-22 M1.3）
                 _mark_hallucination(ctx)    # 2026-09-01 P1：累计幻觉命中，强制下一步实算
+                return None
+            # sha256 真值仲裁（2026-09-19）：有官方真值时确定性裁决，优先于 provenance 门
+            _v256 = _sha256_arbitrate(ctx, flag)
+            if _v256 is True:
+                logger.info("[%s] flag 与题面 sha256 真值匹配（确定性采信，早接受）: %s",
+                            getattr(ctx, "question", None) and ctx.question.id or "?",
+                            flag[:40])
+                return flag
+            if _v256 is False:
+                logger.info("[%s] flag 与题面 sha256 真值不符（确定性幻觉，丢弃）: %s",
+                            getattr(ctx, "question", None) and ctx.question.id or "?",
+                            flag[:40])
+                ctx._extract_failed = True
+                _mark_hallucination(ctx)
                 return None
             kind = str(act.get("kind") or "")
             act_output = str(act.get("output") or "")
@@ -461,6 +492,21 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
         m = re.search(pattern, str(output))
         if m:
             _f = m.group(0)
+            # sha256 真值仲裁（2026-09-19）：先于工具证据门——官方真值是最强证据，
+            # 匹配即确定性采信（早接受省预算），不符即确定性幻觉（两路与 checker 路一致）
+            _v256 = _sha256_arbitrate(ctx, _f)
+            if _v256 is True:
+                logger.info("[%s] 兜底 flag 与题面 sha256 真值匹配（确定性采信）: %s",
+                            getattr(ctx, "question", None) and ctx.question.id or "?",
+                            _f[:40])
+                return _f
+            if _v256 is False:
+                logger.info("[%s] 兜底 flag 与题面 sha256 真值不符（确定性幻觉，丢弃）: %s",
+                            getattr(ctx, "question", None) and ctx.question.id or "?",
+                            _f[:40])
+                ctx._extract_failed = True
+                _mark_hallucination(ctx)
+                return None
             if not _has_tool_call:
                 logger.info("[%s] 正则兜底 flag 无工具证据（疑似猜 flag，拒绝）: %s",
                             getattr(ctx, "question", None) and ctx.question.id or "?", _f[:40])

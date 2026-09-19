@@ -289,6 +289,27 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
         except Exception:  # noqa: BLE001 - 预检失败降级 LLM 推理
             pass
         out = await loop.run(question, solve_once, max_retries=_cfg.max_retries)
+        # ── P0 修复（2026-09-19 heldout 首测实证）：本题自身真值优先仲裁 ──
+        # 旧逻辑只查 build_solver 启动时加载的 data/questions 混合集答案表；
+        # heldout（data/questions_real/）等其它目录题不在表内 → 主 Agent/内部预扫
+        # 解出的正确 flag（实证：dnui_keyboard 的 flag{CLCKOUTHK}，sha256 与题面
+        # 真值逐字匹配）被误判 hallucination 且 flag 置 None——正确答案被自己的
+        # 验证器枪毙。本题自带 flag_sha256/flag 是最权威真值，先裁决；无真值
+        # （缺字段）才回落下方旧答案表逻辑（兼容自产训练题）。
+        try:
+            if out.get("flag") and getattr(question, "flag_sha256", None):
+                if question.flag_matches(out["flag"]):
+                    out["validated"] = True
+                    out["error"] = None
+                    logger.info("[%s] flag 与本题 flag_sha256 真值匹配（自身真值仲裁通过）",
+                                getattr(question, "id", "?"))
+                else:
+                    out["validated"] = False
+                    out["error"] = {"category": "hallucination",
+                                    "detail": "flag 不匹配本题 flag_sha256 真值（确定性裁决）"}
+        except Exception as _exc:  # noqa: BLE001 - 自身真值仲裁异常不阻塞旧逻辑
+            logger.warning("[%s] 自身真值仲裁异常，回落答案表逻辑: %s",
+                           getattr(question, "id", "?"), _exc)
         # 精确校验：本地评测时 flag 必须匹配本题答案（防跨题误判，如 web-004 输出 web-010 的 flag）
         # 2026-08-24 真 flag 红线整改：答案可能是 sha256 占位，用 Question.flag_matches 统一比对。
         expected = answers.get(str(question.id)) if answers else None

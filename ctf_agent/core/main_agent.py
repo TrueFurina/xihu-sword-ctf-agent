@@ -446,6 +446,16 @@ class MainAgent:
                     logger.warning("[%s] 单步 _plan 超时(>%.0fs)，记一步失败继续循环",
                                    getattr(question, "id", "?"), self.step_timeout_s)
                     continue
+                except Exception as _pexc:  # 2026-09-19 步级容错：单步异常不再炸穿主循环
+                    # 实证（heldout selftruth_full）：coolboy 的 LLM 产出脚本语法错误
+                    # （invalid syntax）从 _act 冒泡到 solve() 兜底 → 提前终止整题、
+                    # 误归因 hallucination。单步失败应记 tool_failure 继续循环。
+                    ctx.record(StepRecord(stage=STAGE_STUCK, action="reason",
+                                          observation=f"plan 异常: {_pexc}",
+                                          error_category=ERR_TOOL_FAILURE))
+                    logger.warning("[%s] plan 步异常(记失败继续循环，不终止整题): %s",
+                                   getattr(question, "id", "?"), _pexc)
+                    continue
                 # 仅当已有经校验的候选 flag 才 break；
                 # 模型 plan 声称 done 时仍走 _act（触发 flag→crypto/misc 兜底真算，防猜 flag）
                 if ctx.candidate_flag:
@@ -460,6 +470,13 @@ class MainAgent:
                                           observation="", error_category=ERR_TOOL_FAILURE))
                     logger.warning("[%s] 单步 _act 超时(>%.0fs)，记一步失败继续循环",
                                    getattr(question, "id", "?"), self.step_timeout_s)
+                    continue
+                except Exception as _aexc:  # 2026-09-19 步级容错（同 plan：单步异常不终止整题）
+                    ctx.record(StepRecord(stage=STAGE_STUCK, action=plan.get("action", "reason"),
+                                          observation=f"act 异常: {_aexc}",
+                                          error_category=ERR_TOOL_FAILURE))
+                    logger.warning("[%s] act 步异常(记失败继续循环，不终止整题): %s",
+                                   getattr(question, "id", "?"), _aexc)
                     continue
 
                 # ── Observe：解析结果，更新上下文 ──
