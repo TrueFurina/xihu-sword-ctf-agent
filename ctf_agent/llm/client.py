@@ -734,51 +734,89 @@ def _post_chat(
         "Content-Type": "application/json",
         "Authorization": f"Bearer {settings['api_key']}",
     }
-    try:
-        with _LLM_HTTP_SEMAPHORE:
-            response = httpx.post(
-                settings["base_url"],
-                json=payload,
-                headers=headers,
-                timeout=settings["timeout"],
-                trust_env=False,
-            )
-            if response.status_code == 400:
-                # P0-5 降级兜底（2026-08-21）：400 通常是 payload 里有非法
-                # 控制字符或超长字段（plan 附件 base64/hex 全文进上下文）。
-                # 剥控制字符 + 截断超长字段后重发一次；仍 400 才走失败路径。
-                degraded = _degrade_messages(messages)
-                if degraded != messages:
-                    logger.warning(
-                        "LLM 400 响应，已做降级重试（剥控制字符+截断超长字段）| 响应体: %s",
-                        response.text[:500],
-                    )
-                    payload["messages"] = degraded
-                    response = httpx.post(
-                        settings["base_url"],
-                        json=payload,
-                        headers=headers,
-                        timeout=settings["timeout"],
-                        trust_env=False,
-                    )
-            response.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        # 4xx/5xx：记录响应体供赛中定位（彩排暴露 400 被吞，高难题攻坚必备）
-        body = ""
+    # ── 429 / 瞬时超时 有界指数退避重试（2026-09-19 修复）──────────────
+    # 根因：moonshot 免费账户组织并发=1 + 强 RPM 限流，原实现 429 直接返回 None
+    # 无退避 → 主 Agent 重试循环把限流端点锤爆（实测 5 题 320 个 429 / 仅 12 个 200），
+    # 题被 wallclock 放弃。此处对 429 与瞬时网络异常做 1/2/4s 退避重试（最多 4 次），
+    # 让调用自然错峰；401/402/403 仍为永久性故障走熔断，400 保留降级重发。
+    import time as _time  # 局部导入，避免污染模块顶部
+    _MAX_ATTEMPTS = 4
+    _BACKOFF = 1.0
+    response = None
+    for _attempt in range(_MAX_ATTEMPTS):
         try:
-            body = exc.response.text[:500]
-        except Exception:  # noqa: BLE001
-            pass
-        logger.warning(
-            "LLM HTTP %s 失败：payload.model=%s messages=%d条 max_tokens=%s | 响应体: %s",
-            exc.response.status_code, settings.get("model", ""),
-            len(messages), max_tokens, body,
-        )
-        # P0 熔断（2026-08-21）：401/402/403 为永久性故障，连续计数达阈值即熔断
-        _circuit_record_failure(settings.get("provider", ""), exc.response.status_code)
-        return None, dict(_ZERO)
-    except Exception as exc:  # noqa: BLE001 - 失败开放
-        logger.warning("LLM HTTP 请求失败: %s", exc)
+            with _LLM_HTTP_SEMAPHORE:
+                response = httpx.post(
+                    settings["base_url"],
+                    json=payload,
+                    headers=headers,
+                    timeout=settings["timeout"],
+                    trust_env=False,
+                )
+                if response.status_code == 400:
+                    # P0-5 降级兜底（2026-08-21）：400 通常是 payload 里有非法
+                    # 控制字符或超长字段（plan 附件 base64/hex 全文进上下文）。
+                    # 剥控制字符 + 截断超长字段后重发一次；仍 400 才走失败路径。
+                    degraded = _degrade_messages(messages)
+                    if degraded != messages:
+                        logger.warning(
+                            "LLM 400 响应，已做降级重试（剥控制字符+截断超长字段）| 响应体: %s",
+                            response.text[:500],
+                        )
+                        payload["messages"] = degraded
+                        response = httpx.post(
+                            settings["base_url"],
+                            json=payload,
+                            headers=headers,
+                            timeout=settings["timeout"],
+                            trust_env=False,
+                        )
+                response.raise_for_status()
+            break  # 成功（含 400 降级后 2xx）
+        except httpx.HTTPStatusError as exc:
+            sc = exc.response.status_code
+            if sc == 429 and _attempt < _MAX_ATTEMPTS - 1:
+                _wait = _BACKOFF * (2 ** _attempt)
+                logger.warning(
+                    "LLM 429 限流，退避 %.1fs 重试(%d/%d) model=%s",
+                    _wait, _attempt + 1, _MAX_ATTEMPTS, settings.get("model", ""),
+                )
+                _time.sleep(_wait)
+                continue
+            # 非 429 的 4xx/5xx（含 400 仍失败 / 5xx）：记录响应体供赛中定位
+            body = ""
+            try:
+                body = exc.response.text[:500]
+            except Exception:  # noqa: BLE001
+                pass
+            logger.warning(
+                "LLM HTTP %s 失败：payload.model=%s messages=%d条 max_tokens=%s | 响应体: %s",
+                sc, settings.get("model", ""),
+                len(messages), max_tokens, body,
+            )
+            # P0 熔断（2026-08-21）：401/402/403 为永久性故障，连续计数达阈值即熔断
+            _circuit_record_failure(settings.get("provider", ""), sc)
+            return None, dict(_ZERO)
+        except Exception as exc:  # noqa: BLE001 - 失败开放
+            # 瞬时网络异常（read timeout / connect error）退避重试；其它直接失败开放
+            _transient = (
+                isinstance(exc, (httpx.TimeoutException, httpx.ConnectError,
+                                httpx.ReadError, httpx.ConnectTimeout,
+                                httpx.ReadTimeout))
+            )
+            if _transient and _attempt < _MAX_ATTEMPTS - 1:
+                _wait = _BACKOFF * (2 ** _attempt)
+                logger.warning(
+                    "LLM 请求异常(%s)，退避 %.1fs 重试(%d/%d) model=%s",
+                    type(exc).__name__, _wait, _attempt + 1, _MAX_ATTEMPTS,
+                    settings.get("model", ""),
+                )
+                _time.sleep(_wait)
+                continue
+            logger.warning("LLM HTTP 请求失败: %s", exc)
+            return None, dict(_ZERO)
+    if response is None:
+        logger.warning("LLM 请求耗尽重试仍失败 model=%s", settings.get("model", ""))
         return None, dict(_ZERO)
     data = response.json()
     usage = _extract_usage(data)
