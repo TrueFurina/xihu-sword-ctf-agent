@@ -16,6 +16,9 @@ Held-out 未见题自主解题基准（续评-20260917 P0）。
   - 附件含 flag.txt（读泄露答案型，非能力）→ 排除（数据集已知"答案密钥泄露"）
   - answer_disclosed=True（教学题自带明文 flag）→ 排除（load_questions 护栏一致）
   - provenance/source 含 self_authored_training（自产训练题）→ 排除（非真题）
+  - WRITEUP 重建题（附件路径含 recovered_external/wp_text，或描述含 reconstruct/官方wp/
+    官方题解/writeup 等）→ 排除（题面由官方 wp 反推、flag 明文在 wp_text 附件，读附件=看答案，
+    非自主推理能力，且污染 held-out 分母）
 剩余 = 真·未见·非平凡候选池。
 
 运行
@@ -129,6 +132,35 @@ def _is_self_authored(q: dict) -> bool:
     return any(m in blob.lower() for m in SELF_AUTHORED_MARKERS)
 
 
+# WRITEUP 重建题：题面由官方 writeup 反推、flag 明文藏在 wp_text 附件里。
+# 读附件=看答案，不是自主推理能力；且 flag 在附件而非题面，现有 leaked-attachment 只拦
+# flag.txt，漏掉 wp_text。这类题污染 held-out 分母（10→应为 3 道真·未见题）。
+WP_ATTACHMENT_MARKERS = ("recovered_external/wp_text",)
+WP_TEXT_MARKERS = ("reconstructed from", "reconstruct from", "官方wp", "官方题解",
+                   "official writeup", "from official writeup", "flag from official",
+                   "writeup")
+
+
+def _is_writeup_reconstructed(q: dict) -> bool:
+    """判定 WRITEUP 重建题（非真·未见题，答案在 wp_text 附件里）。
+
+    判定信号（任一命中即排除）：
+      - 附件路径含 recovered_external/wp_text（ definitive：7 道 WRITEUP 题统一特征）
+      - description/source/notes/provenance 含重建关键词（reconstructed / 官方wp /
+        官方题解 / official writeup / flag from official / writeup 等）
+    3 道真·未见题（dnui_keyboard / real_reverse_js / gongye_web2）附件在
+    data/questions_real/_attachments/，描述为真挑战文本，不会被误伤。
+    """
+    for a in (q.get("attachments") or []):
+        s = str(a).lower()
+        if any(m in s for m in WP_ATTACHMENT_MARKERS):
+            return True
+    blob = " ".join(str(q.get(k, "")) for k in
+                    ("description", "source", "notes", "provenance"))
+    blob_low = blob.lower()
+    return any(m in blob_low for m in WP_TEXT_MARKERS)
+
+
 def select_candidates(require_sha256: bool = True,
                       include_neutralized: bool = False) -> tuple[list[dict], list[dict]]:
     """返回 (候选池, 全部记录含排除原因)。
@@ -166,6 +198,8 @@ def select_candidates(require_sha256: bool = True,
             reason_excluded = "answer_disclosed"
         elif _is_self_authored(q):
             reason_excluded = "self_authored_training"
+        elif _is_writeup_reconstructed(q):
+            reason_excluded = "writeup-reconstructed(non-genuine)"
         elif not include_neutralized and _is_leaked_attachment(q):
             reason_excluded = "leaked-attachment(flag.txt)"
         elif not include_neutralized and has_plain:
@@ -199,7 +233,7 @@ def write_manifest(cands: list[dict], all_recs: list[dict], require_sha256: bool
     else:
         criteria = ("unseen(NOT in AUTHORIZED_KPI_SOLVES) AND NOT leaked-attachment(flag.txt) "
                     "AND NOT plaintext-flag-in-question AND NOT answer_disclosed "
-                    "AND NOT self_authored_training"
+                    "AND NOT self_authored_training AND NOT writeup-reconstructed(non-genuine)"
                     + (" AND has flag_sha256(validatable)" if require_sha256 else ""))
     payload = {
         "generated_by": "scripts/benchmark_heldout.py",

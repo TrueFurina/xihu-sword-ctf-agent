@@ -7,7 +7,7 @@
   "flag": "25f6112642aa21ac767425d264b7d95690feee4e245860580895e452e970ac28",
   "flag_pattern": "VNCTF\\{[^}]+\\}",
   "attachments": [
-    "recovered_external/wp_text/vnctf2022.txt"
+    "../_archive/recovered_external/wp_text/vnctf2022.txt"
   ],
   "difficulty": "MEDIUM",
   "flag_sha256": "25f6112642aa21ac767425d264b7d95690feee4e245860580895e452e970ac28",

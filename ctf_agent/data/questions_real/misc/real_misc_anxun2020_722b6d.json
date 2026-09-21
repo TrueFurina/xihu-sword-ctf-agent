@@ -7,7 +7,7 @@
   "flag": "01ef7cc4ea5b32c11bdb148dfb427d06e862d759778423c49aa07a16c112ba08",
   "flag_pattern": "flag\\{[^}]+\\}",
   "attachments": [
-    "recovered_external/wp_text/anxun2020_official.txt"
+    "../_archive/recovered_external/wp_text/anxun2020_official.txt"
   ],
   "difficulty": "MEDIUM",
   "flag_sha256": "01ef7cc4ea5b32c11bdb148dfb427d06e862d759778423c49aa07a16c112ba08",

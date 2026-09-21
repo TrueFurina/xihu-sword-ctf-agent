@@ -7,7 +7,7 @@
   "flag": "85ab27107d2a7cfa52f9a1dfd91df1b1d518ec307f531db5ab0421f91e779655",
   "flag_pattern": "VNCTF\\{[^}]+\\}",
   "attachments": [
-    "recovered_external/wp_text/vnctf2022.txt"
+    "../_archive/recovered_external/wp_text/vnctf2022.txt"
   ],
   "difficulty": "EASY",
   "flag_sha256": "85ab27107d2a7cfa52f9a1dfd91df1b1d518ec307f531db5ab0421f91e779655",
