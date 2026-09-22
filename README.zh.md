@@ -78,10 +78,10 @@ export DEEPSEEK_API_KEY=sk-xxx     # 你的密钥，勿提交
 | 确定性管线（presolve 直出） | **14 / 92**（全集，15.2%） |
 | LLM 自主推理贡献 | **0 / 14**（严格 KPI 集内无一题由 LLM 自主推理解出） |
 | 回归集可复现计数 | **16 / 16**（13 题严格 KPI 集 + 10732/10735 治理修复 + specialcurve2，攻击链可机器复现；REGRESSION_CHECKS 16 道全过） |
-| **held-out 推理池**（未见过的非平凡题） | **10 题** —— 与上述 14 道 KPI 题**不相交** |
-| held-out 池上的 LLM 自主推理（已实测 2026-09-19） | 池内 **1 / 10** 解出 —— 唯一解来自**确定性 presolve**（`real_reverse_js`），**非 LLM**；**LLM 自主推理 0 / 10** |
+| **held-out 推理池**（未见过的非平凡题） | **2 题** —— 与上述 14 道 KPI 题**不相交**（清洗后：排除 7 道 WRITEUP 重建题 + 1 道源码泄露 web 题；原「10 题」含这些） |
+| held-out 池上的 LLM 自主推理（2026-09-22 实测，干净池） | 池内 **2 / 2** 解出 —— **LLM 自主推理 1 / 2**（`real_crypto_dnui_keyboard`），**确定性 presolve 1 / 2**（`real_reverse_js`）；sha256 真值闭环 |
 
-> 我们从不把 14 除以 10 —— 两个集合不相交，`14/10=140%` 是欺骗性比率，故工具恒输出 `coverage_of_heldout=None` 而非一个数字。held-out 口径下（已实测 2026-09-19，原始报告归档于 `ctf_agent/heldout_evidence/`）LLM 自主推理 0 / 10。预算翻倍 `566,570 → 696,506` 后 `budget_exceeded` 从 `6 → 0`，但 LLM 解出恒 0 —— **瓶颈是能力不是预算**。
+> 我们从不把 14 除以 2 —— 两集合不相交，`14/2` 是欺骗性比率，故工具恒输出 `coverage_of_heldout=None` 而非一个数字。held-out 口径测的是**另一件事**——未见题上的真实自主 LLM 推理，不是 14 的几成。在干净 2 题池（2026-09-22 实测，deepseek + E3 证据注入，sha256 闭环，报告 `ctf_agent/heldout_evidence/benchmark_report_clean2_20260922_deepseek.json`）上 **LLM 自主推理 = 1 / 2**（`real_crypto_dnui_keyboard`；另一题 `real_reverse_js` 由确定性 presolve 解出）。旧「LLM 0 / 10」是**两个已修复 bug 的产物**：(1) `bug2`——验证器把正确 flag 拿去和退役混合集答案表比对，误判为幻觉（真解被记成失败）；(2) held-out 分母被 7 道 WRITEUP 重建题（flag 明文在附件）+ 1 道源码泄露 web 题（`real_web_gongye_web2`，flag 在提供的 `index.php` 里）污染。排掉污染后，干净未见池上的真实 LLM 自主推理率 = **1 / 2**（样本极小，扩池是待办）。
 
 即：**能力 = 静态分析器覆盖度**，不是 LLM 推理。要解更多题型，就写更多确定性 skill。我们直言此事，因为对开源安全工具而言，夸大能力是最容易翻车的方式。
 

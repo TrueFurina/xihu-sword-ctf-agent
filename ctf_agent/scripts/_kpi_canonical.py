@@ -63,16 +63,17 @@ _DEPRECATED_SUBSET = 15
 #   ② 本机 gitignored 的 data/results/heldout_rerun*（仅本地可得，降级兜底）。
 # A = 1× 预算（deepseek_full），B = 2× 预算（ds_budget2x）——二者构成「预算翻倍」对照。
 HELDOUT_EVIDENCE = ROOT / "heldout_evidence"
-_HELDOUT_1X_REPORTS = (
-    HELDOUT_EVIDENCE / "benchmark_report_A_deepseek_1x.json",
-    RESULTS / "heldout_rerun20260919_deepseek_full" / "benchmark_report.json",
-)
-_HELDOUT_2X_REPORTS = (
-    HELDOUT_EVIDENCE / "benchmark_report_B_deepseek_2x.json",
-    RESULTS / "heldout_rerun20260919_ds_budget2x" / "benchmark_report.json",
-)
-# 「最新」报告优先取 2× 预算对照（更强的一项）；两者皆缺 → 未实测。
-_HELDOUT_LATEST_REPORTS = _HELDOUT_2X_REPORTS + _HELDOUT_1X_REPORTS
+# 2026-09-22 清洗后「干净未见题」实测：P0-a 排除 43 道 WRITEUP 重建题 + 源码泄露闸
+# 排除 gongye_web2（flag 明文在提供的 index.php），分母 10→2。deepseek + E3 证据注入，
+# 2/2 解出（LLM 自主推理 1/2：dnui_keyboard；确定性 presolve 1/2：real_reverse_js），sha256 真值闭环。
+_HELDOUT_CLEAN_REPORT = HELDOUT_EVIDENCE / "benchmark_report_clean2_20260922_deepseek.json"
+# 旧 1×/2× 预算对照报告已更名 .SUPERSEDED_contaminated_pool_*（10 题污染池 + bug2 坏验证器），
+# 其「瓶颈是能力不是预算」结论基于坏数据，作废不再引用；clean-2 池太小不做对照。
+_HELDOUT_1X_REPORTS = (HELDOUT_EVIDENCE / "benchmark_report_A_deepseek_1x.json",)
+_HELDOUT_2X_REPORTS = (HELDOUT_EVIDENCE / "benchmark_report_B_deepseek_2x.json",)
+# 「最新」报告 = 清洗后干净池实测（clean-2）优先；旧 A/B（10 题污染池 + bug2 坏验证器）
+# 与 clean-3（含源码泄露题 gongye_web2）均已更名 .SUPERSEDED_*，仅留档溯源。
+_HELDOUT_LATEST_REPORTS = (_HELDOUT_CLEAN_REPORT,) + _HELDOUT_2X_REPORTS + _HELDOUT_1X_REPORTS
 
 
 def count_skills() -> int:
@@ -249,19 +250,13 @@ def _heldout_clause(hs: dict, abl: dict) -> str:
     """由机器派生指标拼装 held-out 结论文本（禁止手写「未测量」与任何数字）。"""
     if not hs.get("measured"):
         return "该池尚未实测（本机与仓内均无 benchmark_report.json；须跑 benchmark_heldout --run）。"
-    clause = (
+    # 注：旧「预算翻倍对照」结论（"瓶颈是能力不是预算"）基于 10 题污染池 + bug2 坏验证器，
+    # 已作废；clean-2 池（n=2）太小不做对照，故此处不再追加任何预算结论。
+    return (
         f"该池已实测（{hs['report']}）：池内 {hs['solved_total']}/{hs['pool_total']}"
-        f"（唯一解来自确定性 presolve {hs['solved_by_presolve']}，非 LLM）/ "
+        f"（确定性 presolve {hs['solved_by_presolve']} + LLM 自主推理 {hs['solved_by_llm']}）/ "
         f"LLM 自主推理 {hs['solved_by_llm']}/{hs['pool_total']}；"
     )
-    if abl.get("available"):
-        b, d = abl["baseline"], abl["doubled"]
-        clause += (
-            f"预算翻倍 {b['tokens_global_total']}→{d['tokens_global_total']} 后 "
-            f"budget_exceeded {b['budget_exceeded']}→{d['budget_exceeded']}，"
-            f"LLM 解出恒 {d['solved_by_llm']} ⇒ 瓶颈是能力不是预算；"
-        )
-    return clause
 
 
 def canonical_kpi() -> dict:
@@ -298,7 +293,8 @@ def canonical_kpi() -> dict:
             f"15 题子集/86.7% 口径已作废。goal_log.jsonl 解出数恒 0，与 KPI 非同源。"
             f"⚠️ ledger-vs-corpus 1 项漂移：AUTHORIZED_KPI_SOLVES=14，但其中 10733 在"
             f"data/questions_real/ 无对应题文件（台账计 verified、语料缺文件）；"
-            f"held-out 10 题分母不受影响（已排除的 13 道均正确命中授权 ID）。"
+            f"held-out {heldout} 题分母不受影响（已排除的 13 道均正确命中授权 ID；"
+            f"另 7 道 WRITEUP 重建题于 2026-09-21 经 P0-a 排除，不再污染分母）。"
         ),
     }
 
@@ -316,7 +312,7 @@ def render_md(k: dict) -> str:
         f"- **regression_checks = {k['regression_checks']}**（merge-gate 可机器复现回归集条数）",
         f"- 全集覆盖率：{k['offline_verified']}/{k['real_corpus']} = {k['coverage_of_corpus']:.1%}",
         f"- held-out 自主推理池 = {k['heldout_candidates']} 题（unseen 非平凡，与 14 题不相交）",
-        "- held-out 覆盖率：N/A（14 与 10 不相交，14/10=140% 是欺骗性比率，已作废）",
+        f"- held-out 覆盖率：N/A（14 与 {k['heldout_candidates']} 不相交，14/{k['heldout_candidates']} 是欺骗性比率，已作废）",
     ]
     if hs.get("measured"):
         L.append(

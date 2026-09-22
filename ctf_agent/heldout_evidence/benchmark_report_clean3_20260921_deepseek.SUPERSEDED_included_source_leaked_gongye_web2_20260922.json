@@ -1,0 +1,122 @@
+{
+  "mode": "real_main_agent",
+  "disclaimer": "mock 数字禁止引用；真实模式=主 Agent 全链路可引用",
+  "summary": {
+    "total": 3,
+    "solved": 3,
+    "solve_rate": 1.0,
+    "by_category": {
+      "crypto": {
+        "total": 1,
+        "solved": 1,
+        "durations": [
+          2735
+        ],
+        "retries": [
+          1
+        ],
+        "solve_rate": 1.0,
+        "avg_duration_ms": 2735.0,
+        "avg_retries": 1.0
+      },
+      "reverse": {
+        "total": 1,
+        "solved": 1,
+        "durations": [
+          789
+        ],
+        "retries": [
+          1
+        ],
+        "solve_rate": 1.0,
+        "avg_duration_ms": 789.0,
+        "avg_retries": 1.0
+      },
+      "web": {
+        "total": 1,
+        "solved": 1,
+        "durations": [
+          2934
+        ],
+        "retries": [
+          1
+        ],
+        "solve_rate": 1.0,
+        "avg_duration_ms": 2934.0,
+        "avg_retries": 1.0
+      }
+    },
+    "by_provenance": {
+      "real_past_ctf": {
+        "total": 3,
+        "solved": 3,
+        "solve_rate": 1.0
+      }
+    },
+    "by_solved_by": {
+      "main_agent_llm": {
+        "total": 2,
+        "solved": 2,
+        "solved_list": [
+          "real_crypto_dnui_keyboard",
+          "real_web_gongye_web2"
+        ],
+        "solve_rate": 1.0
+      },
+      "presolve": {
+        "total": 1,
+        "solved": 1,
+        "solved_list": [
+          "real_reverse_js"
+        ],
+        "solve_rate": 1.0
+      }
+    },
+    "tokens": {
+      "global_total": 14372,
+      "per_question": {
+        "real_crypto_dnui_keyboard": 6528,
+        "real_reverse_js": 1689,
+        "real_web_gongye_web2": 6155
+      }
+    }
+  },
+  "results": [
+    {
+      "question_id": "real_crypto_dnui_keyboard",
+      "category": "crypto",
+      "provenance": "real_past_ctf",
+      "solved": true,
+      "solved_by": "main_agent_llm",
+      "flag": "flag{CLCKOUTHK}",
+      "confidence": 0.9,
+      "error": null,
+      "duration_ms": 2735,
+      "retries": 1
+    },
+    {
+      "question_id": "real_reverse_js",
+      "category": "reverse",
+      "provenance": "real_past_ctf",
+      "solved": true,
+      "solved_by": "presolve",
+      "flag": "flag{cslhahldlnst0day}",
+      "confidence": 0.9,
+      "error": null,
+      "duration_ms": 789,
+      "retries": 1
+    },
+    {
+      "question_id": "real_web_gongye_web2",
+      "category": "web",
+      "provenance": "real_past_ctf",
+      "solved": true,
+      "solved_by": "main_agent_llm",
+      "flag": "flag{MBeGEaS67008RGb9}",
+      "confidence": 0.9,
+      "error": null,
+      "duration_ms": 2934,
+      "retries": 1
+    }
+  ]
+}

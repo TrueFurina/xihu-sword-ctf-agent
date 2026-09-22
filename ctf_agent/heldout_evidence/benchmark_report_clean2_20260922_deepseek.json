@@ -1,0 +1,95 @@
+{
+  "mode": "real_main_agent",
+  "disclaimer": "mock 数字禁止引用；真实模式=主 Agent 全链路可引用",
+  "summary": {
+    "total": 2,
+    "solved": 2,
+    "solve_rate": 1.0,
+    "by_category": {
+      "crypto": {
+        "total": 1,
+        "solved": 1,
+        "durations": [
+          2892
+        ],
+        "retries": [
+          1
+        ],
+        "solve_rate": 1.0,
+        "avg_duration_ms": 2892.0,
+        "avg_retries": 1.0
+      },
+      "reverse": {
+        "total": 1,
+        "solved": 1,
+        "durations": [
+          1310
+        ],
+        "retries": [
+          1
+        ],
+        "solve_rate": 1.0,
+        "avg_duration_ms": 1310.0,
+        "avg_retries": 1.0
+      }
+    },
+    "by_provenance": {
+      "real_past_ctf": {
+        "total": 2,
+        "solved": 2,
+        "solve_rate": 1.0
+      }
+    },
+    "by_solved_by": {
+      "main_agent_llm": {
+        "total": 1,
+        "solved": 1,
+        "solved_list": [
+          "real_crypto_dnui_keyboard"
+        ],
+        "solve_rate": 1.0
+      },
+      "presolve": {
+        "total": 1,
+        "solved": 1,
+        "solved_list": [
+          "real_reverse_js"
+        ],
+        "solve_rate": 1.0
+      }
+    },
+    "tokens": {
+      "global_total": 8220,
+      "per_question": {
+        "real_crypto_dnui_keyboard": 6531,
+        "real_reverse_js": 1689
+      }
+    }
+  },
+  "results": [
+    {
+      "question_id": "real_crypto_dnui_keyboard",
+      "category": "crypto",
+      "provenance": "real_past_ctf",
+      "solved": true,
+      "solved_by": "main_agent_llm",
+      "flag": "flag{CLCKOUTHK}",
+      "confidence": 0.9,
+      "error": null,
+      "duration_ms": 2892,
+      "retries": 1
+    },
+    {
+      "question_id": "real_reverse_js",
+      "category": "reverse",
+      "provenance": "real_past_ctf",
+      "solved": true,
+      "solved_by": "presolve",
+      "flag": "flag{cslhahldlnst0day}",
+      "confidence": 0.9,
+      "error": null,
+      "duration_ms": 1310,
+      "retries": 1
+    }
+  ]
+}
