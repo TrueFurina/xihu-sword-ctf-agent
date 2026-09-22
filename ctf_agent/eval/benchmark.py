@@ -50,6 +50,20 @@ TRUNCATED_ERROR_CATEGORIES = frozenset({
 })
 
 
+# P0-3 修复（2026-09-23）：终态失败——本次 benchmark 运行内**不可通过"立即重跑同一题"恢复**，
+# 重试只会把整段预算/墙钟再烧一遍（实证：held-out 17 池 3 题各烧 19-22 万 token、第 4 题一步没走，
+# 缘于 benchmark 层 `for attempt in range(3)` 无条件重试，跨轮零记忆）。遇到这些类别直接短路跳过重试。
+# 注意：**不含** rate_limited / provider_error / infra_error / INFRA_NO_CREDENTIAL ——
+# 属瞬时外部故障，保留原有重试行为（尽管无退避，改动最小化原则）。
+NON_RETRYABLE_CATEGORIES = frozenset({
+    "budget_exceeded",      # 预算已烧穿，再跑还是 budget_exceeded
+    "wallclock_timeout",    # 墙钟已耗尽，确定性工具链都没机会跑完
+    "race_abandon",         # 已主动早停
+    "solver_exception",     # solver 已抛异常
+    "not_attempted",        # 显式未尝试
+})
+
+
 class BenchmarkResult:
     """单题评测结果。"""
 
@@ -129,6 +143,11 @@ def run_benchmark(
                 logger.warning("[%s] 求解异常: %s", getattr(q, "id", "?"), exc)
                 output = {"error": {"category": "solver_exception", "detail": str(exc)[:200]}}
             if output and output.get("flag"):
+                break
+            # P0-3 修复（2026-09-23）：终态失败类别不可通过立即重跑恢复，跳过重试避免空烧预算/墙钟。
+            _err_cat = (((output or {}).get("error") or {}).get("category")) if output else None
+            if _err_cat in NON_RETRYABLE_CATEGORIES:
+                logger.info("[%s] 终态失败(%s)，跳过重试避免空烧预算", getattr(q, "id", "?"), _err_cat)
                 break
             # race-intelligence 预算反思早停（默认关闭；开启后仅 ABANDON 时提前中断重试）
             if race_controller is not None and output is not None:

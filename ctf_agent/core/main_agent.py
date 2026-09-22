@@ -111,6 +111,13 @@ class AgentContext:
     steps: list = field(default_factory=list)
     candidate_flag: Optional[str] = None
     stuck_count: int = 0
+    # P0-1 修复（2026-09-23）：原 stuck_count 只在「工具报错」时累加、无报错即清零，
+    # 却被当「死循环/僵局检测器」用——导致「observation 非空、无报错、零候选」的空转循环里
+    # stuck_count 恒为 0，监督升级路径(:505)与死循环标注(:1015)永不触发（实证 166 步 卡壳=0）。
+    # 现拆成两个语义互不污染的计数器：
+    #   stuck_count        = 工具报错步数（仅供失败桶分类，语义不变）
+    #   no_progress_streak = 连续「无工具报错且无候选推进」步数（真正的空转检测器）
+    no_progress_streak: int = 0
     strategy_switches: int = 0
     model_upgrades: int = 0
     hint_text: Optional[str] = None
@@ -156,11 +163,16 @@ class AgentContext:
 
     def record(self, step: StepRecord) -> None:
         self.steps.append(step)
-        # 僵局计数：错误累计，无错误即重置（P0修复2026-08-21：所有错误类型都累加，成功即重置）
+        # 僵局计数（P0-1 修复 2026-09-23）：拆为两个语义清晰的计数器。
+        #   stuck_count        ：工具报错步数（失败桶分类用，语义不变）
+        #   no_progress_streak ：连续「无工具报错且无候选推进」步数（真正的空转检测器）
+        # 工具报错至少说明状态在变，不算空转 → 同时重置 no_progress_streak。
         if step.error_category is not None:
             self.stuck_count += 1
+            self.no_progress_streak = 0
         else:
             self.stuck_count = 0
+            self.no_progress_streak += 1
 
     def apply_verdict(self, verdict: SupervisionVerdict) -> None:
         """根据监督裁决更新上下文（策略切换/升级重置僵局计数）。
@@ -171,9 +183,11 @@ class AgentContext:
         if verdict.action == VERDICT_SWITCH:
             self.strategy_switches += 1
             self.stuck_count = 0
+            self.no_progress_streak = 0
         elif verdict.action == VERDICT_UPGRADE:
             self.model_upgrades += 1
             self.stuck_count = 0
+            self.no_progress_streak = 0
         # 定向提示注入：非 continue 且带 suggestion 时累积（避免重复覆盖）
         if (
             verdict.action != VERDICT_CONTINUE
@@ -502,7 +516,7 @@ class MainAgent:
                 # 监督的 upgrade/switch/reset 在连续失败场景永远到不了（死锁）。
                 # 现改为：连续失败先咨询监督——允许升级重型模型/换策略后重试一次；
                 # 已升级过（attempt>=2）仍连续失败才放弃。墙钟硬止损(300s)仍是最终兜底。
-                if ctx.stuck_count >= 2 or self._situation_override_triggered(ctx):
+                if ctx.stuck_count >= 2 or ctx.no_progress_streak >= 8 or self._situation_override_triggered(ctx):
                     verdict = await self._supervise(ctx)
                     if verdict.action == VERDICT_GIVE_UP:
                         # M3（2026-08-29）：放弃前给确定性工具链最后一次机会——
@@ -538,6 +552,7 @@ class MainAgent:
                     if all(_a and _a == _acts[0] for _a in _acts):
                         ctx.strategy_switches += 1
                         ctx.stuck_count = 0
+                        ctx.no_progress_streak = 0
                         ctx.advisor_hint = (
                             f"⚠️ 检测到连续 3 步执行相同动作（{_acts[0]}），疑似策略空转死循环，"
                             "强制切换解题策略：换个切入点/工具/参数，禁止重复同一动作。"
@@ -573,6 +588,7 @@ class MainAgent:
                                 logger.info("[%s] 确定性兜底命中: %s",
                                             question.id, _fb_flag[:60])
                                 ctx.candidate_flag = _fb_flag
+                                ctx.no_progress_streak = 0
                                 ctx.solved_by_presolve = True  # 2026-08-24 诚实化：兜底静态分析器直出，零 LLM
                                 break
                         except Exception as _exc:  # noqa: BLE001 - 兜底失败不阻塞止损
@@ -738,6 +754,7 @@ class MainAgent:
                 flag = self._extract_flag(ctx, act_result)
                 if flag:
                     ctx.candidate_flag = flag
+                    ctx.no_progress_streak = 0
                     if self.coordinator is not None:
                         self.coordinator.clear_human_flag(question.id)
                     break
@@ -1012,9 +1029,9 @@ class MainAgent:
             # 2026-08-28 修复兜底污染：此前所有"未解出 flag"都归 stuck_loop，但实测
             # 98.2% 案例 stuck_count=0（非真死循环）——只有连续同动作（stuck_count>=3）
             # 才算死循环，其余归 unresolved（未解出且无明确归因），使失败桶口径诚实。
-            if getattr(ctx, "stuck_count", 0) >= 3:
+            if getattr(ctx, "stuck_count", 0) >= 3 or getattr(ctx, "no_progress_streak", 0) >= 12:
                 err_category = ERR_STUCK_LOOP
-                err_detail = "未解出 flag（连续同动作死循环）"
+                err_detail = "未解出 flag（连续空转死循环：无工具报错且零候选推进）"
             else:
                 err_category = ERR_UNRESOLVED
                 err_detail = "未解出 flag（无明确归因，非死循环）"

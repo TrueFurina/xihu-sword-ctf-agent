@@ -449,6 +449,13 @@ def run(cands: list[dict], provider: str, wallclock: float, mock: bool,
         # mock 跑也透传，便于验证 E3 接线不改变流水线
         env["CTF_AGENT_E3"] = "1"
 
+    # 预算反思早停闸门（F1 rule⑥：零候选 + ≥60% 消耗 → ABANDON）：held-out 自主推理正是
+    # 预算烧穿重灾区（2026-09-22 三题各烧 19-22 万 token、第四题一步没走）。默认开启，
+    # 避免重跑再买一个 budget_exceeded（与 E3 同构：held-out 正是该机制测量场）。
+    # 仅非 mock 生效——mock 无真实预算，开启无意义。
+    if not mock:
+        env["CTF_AGENT_BUDGET_REFLECTION"] = "1"
+
     backup = None
     if cold_blackboard and not mock:
         backup = _backup_and_clear_blackboard()
