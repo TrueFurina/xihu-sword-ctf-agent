@@ -88,3 +88,61 @@ def test_build_solver_real_chain_assembles():
     assert inspect.iscoroutinefunction(solver), "真实链路 solver 必须是 async"
     assert hasattr(solver, "budget"), "solver 应暴露预算追踪器"
     assert hasattr(solver, "registry"), "solver 应暴露工具注册表"
+
+
+# ── 2026-09-23 诚实化：报告必须能区分"真跑输"与"根本没跑" ──
+# 实证来源：held-out 17 池 / deepseek / 2026-09-22 跑批——
+# 全局预算耗尽 → 第 4 题 0 token 完全没执行，却照样计入 total，
+# 报告面输出 "0/4 = 0.0%"，极易被读成"能力 0%"。同类事故已连续三次
+# （tokenhub 402 → 0/3；deepseek budget_exceeded → 0/4）。
+def _mk_result(qid, category, *, solved=False, error=None, duration_ms=1000, retries=1):
+    from eval.benchmark import BenchmarkResult
+
+    q = Question(id=qid, title=qid, category=category)
+    output = {"flag": "flag-x"} if solved else (
+        {"error": {"category": error}} if error else None
+    )
+    return BenchmarkResult(q, output, duration_ms, retries)
+
+
+def test_summarize_flags_uninterpretable_report_when_not_attempted():
+    """有零执行题 + 被预算掐断 → interpretable=False，且两者分别点名。"""
+    from eval.benchmark import summarize
+
+    results = [
+        _mk_result("burned", "crypto", error="budget_exceeded", duration_ms=80930, retries=3),
+        _mk_result("never_ran", "misc", error="budget_exceeded", duration_ms=0, retries=3),
+    ]
+    s = summarize(results)
+    ig = s["integrity"]
+
+    assert ig["attempted"] == 1, "零执行的题不应计入 attempted"
+    assert ig["zero_work_not_attempted"] == 1
+    assert ig["not_attempted_ids"] == ["never_ran"]
+    assert ig["truncated"] == 2
+    assert ig["interpretable"] is False
+    assert s["by_error"] == {"budget_exceeded": 2}
+    # 关键：solve_rate 仍是 0.0，但 integrity 明确标注不可作为能力率引用
+    assert s["solve_rate"] == 0.0
+
+
+def test_summarize_interpretable_when_all_attempted_and_clean():
+    """全部真跑、无掐断 → interpretable=True。
+    特别地：未解出但正常跑完（error=no_output）**不得**被误判为不可解释——
+    否则任何含失败题的基准报告都会天天告警，闸门沦为噪音。"""
+    from eval.benchmark import summarize
+
+    results = [
+        _mk_result("a", "crypto", solved=True, duration_ms=1200),
+        _mk_result("b", "misc", duration_ms=900),      # 未解出但正常跑完 → no_output
+    ]
+    s = summarize(results)
+    ig = s["integrity"]
+
+    assert ig["attempted"] == 2
+    assert ig["zero_work_not_attempted"] == 0
+    assert ig["truncated"] == 0
+    assert ig["interpretable"] is True
+    assert s["solved"] == 1
+    # no_output 仍如实记录在 by_error（信息性），但不影响可解释性判定
+    assert s["by_error"] == {"no_output": 1}

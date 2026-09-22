@@ -860,6 +860,9 @@ class MainAgent:
         _st = _BudgetState(
             budget_total=getattr(self, "llm_call_budget", 12) or 12,
             budget_used=len(ctx.steps),
+            # 2026-09-23 修复：把"是否已拿到候选 flag"这一不可自欺的信号喂给反思器。
+            # 此前只喂步数比例，导致真实链路（observation 恒非空）下 ABANDON 不可达。
+            candidates_found=1 if getattr(ctx, "candidate_flag", None) else 0,
         )
         _res = _reflect_budget(_st, ctx.steps, getattr(ctx, "last_confidence", None))
         ctx.last_reflection = {
@@ -890,6 +893,9 @@ class MainAgent:
         _st = _BudgetState(
             budget_total=getattr(self, "llm_call_budget", 12) or 12,
             budget_used=len(ctx.steps),
+            # 2026-09-23 修复：把"是否已拿到候选 flag"这一不可自欺的信号喂给反思器。
+            # 此前只喂步数比例，导致真实链路（observation 恒非空）下 ABANDON 不可达。
+            candidates_found=1 if getattr(ctx, "candidate_flag", None) else 0,
         )
         _res = _reflect_budget(_st, ctx.steps, getattr(ctx, "last_confidence", None))
         return _res.decision == DECISION_ABANDON

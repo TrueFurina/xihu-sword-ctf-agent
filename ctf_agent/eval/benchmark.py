@@ -33,6 +33,23 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 logger = logging.getLogger(__name__)
 
 
+# 2026-09-23 诚实化：「被外部条件掐断」的错误分类——这些题虽被计入分母，
+# 但并未走完正常求解流程，因此 solve_rate 对它们不构成能力度量。
+# 注意：**不含** "no_output"（solver 正常跑完但没解出，是正常判负，不是错误）
+# 也不含 None（解出）。混入它们会让告警天天响、沦为噪音。
+TRUNCATED_ERROR_CATEGORIES = frozenset({
+    "budget_exceeded",      # 预算耗尽（token/步数）——2026-09-22 held-out 17 池的主因
+    "wallclock_timeout",    # 墙钟先到，确定性工具链没机会跑完
+    "race_abandon",         # 预算反思早停
+    "solver_exception",     # solver 抛异常
+    "not_attempted",        # 显式未尝试
+    "rate_limited",         # 限流
+    "provider_error",       # provider 侧错误
+    "infra_error",
+    "INFRA_NO_CREDENTIAL",  # 无凭证（按项目铁律：不算推理失败）
+})
+
+
 class BenchmarkResult:
     """单题评测结果。"""
 
@@ -227,6 +244,36 @@ def summarize(results: list[BenchmarkResult]) -> dict:
     for bucket in by_solved_by.values():
         bucket["solve_rate"] = round(bucket["solved"] / bucket["total"], 3) if bucket["total"] else 0.0
 
+    # 2026-09-23 诚实化修复：区分「真尝试后判负」与「根本没跑/被预算掐死」。
+    # 根因：held-out 17 池跑批中全局预算耗尽 → 第 4 题 0 token 完全没执行，
+    # 但它照样被计入 total，报告面输出 "0/4 = 0.0%"——这个数字会被读成
+    # "能力 0%"，而事实是"钱不够、压根没试"。同类事故已连续发生三次
+    # （tokenhub 402 → 0/3；deepseek budget_exceeded → 0/4）。
+    # 口径：
+    #   zero_work  = duration_ms 为 0（一步没走成）
+    #   truncated  = 被外部条件掐断（预算/墙钟/异常/限流），**不含** no_output
+    #                （no_output = solver 正常跑完但没解出，是正常的判负，不是错误）
+    # interpretable=False 时，solve_rate **不得**作为能力率对外引用。
+    by_error: dict[str, int] = {}
+    for r in results:
+        _e = getattr(r, "error", None)
+        if _e:
+            _k = str(_e)
+            by_error[_k] = by_error.get(_k, 0) + 1
+    zero_work = [r for r in results if not int(getattr(r, "duration_ms", 0) or 0)]
+    truncated = [
+        r for r in results
+        if str(getattr(r, "error", "") or "") in TRUNCATED_ERROR_CATEGORIES
+    ]
+    integrity = {
+        "attempted": total - len(zero_work),
+        "zero_work_not_attempted": len(zero_work),
+        "not_attempted_ids": [getattr(r, "question_id", None) for r in zero_work],
+        "truncated": len(truncated),
+        "truncated_ids": [getattr(r, "question_id", None) for r in truncated],
+        "interpretable": (len(truncated) == 0 and len(zero_work) == 0),
+    }
+
     return {
         "total": total,
         "solved": solved,
@@ -234,6 +281,8 @@ def summarize(results: list[BenchmarkResult]) -> dict:
         "by_category": by_category,
         "by_provenance": by_provenance,
         "by_solved_by": by_solved_by,
+        "by_error": by_error,
+        "integrity": integrity,
     }
 
 
@@ -465,6 +514,16 @@ def _emit_report(args, mode: str, summary: dict, results, multi: Optional[dict])
                 f"({bucket['solved']}/{bucket['total']})  均耗时 {bucket['avg_duration_ms']}ms  "
                 f"均重试 {bucket['avg_retries']} 次"
             )
+        # 2026-09-23 诚实化：报告不可解释时**主动喊出来**，不让 0/N 被误读成能力率。
+        _ig = summary.get("integrity", {})
+        if not _ig.get("interpretable", True):
+            print("  !! 本报告不可作为能力率引用：分母含未真正执行的题 / 被基础设施掐断的题 !!")
+            print(f"     真尝试 {_ig.get('attempted')}/{summary['total']}；"
+                  f"零执行(未尝试) {_ig.get('zero_work_not_attempted')} 题"
+                  f"{_ig.get('not_attempted_ids') or ''}；"
+                  f"被外部掐断 {_ig.get('truncated')} 题 {_ig.get('truncated_ids') or ''}")
+            print(f"     错误分类分布: {summary.get('by_error')}")
+            print("     solve_rate 只反映'钱/配额够不够'，不反映能力；引用前必须重跑或声明口径。")
     print(f"报告已导出: {report_path}")
 
 
