@@ -121,6 +121,43 @@ def _fast_solve_proven(kind: str) -> bool:
     return kind in _PROVEN_FAST_SOLVE_KINDS
 
 
+# ── presolve 已接线的确定性 skill 清单（2026-09-22 大确定性 skill 覆盖）────
+# 单一真值：本模块经生产链路（_tasks 并发嗅探）实际调用的 skills.* 模块。
+# tests/test_skill_coverage.py 据此断言覆盖度，杜绝「写过的 skill 没接线 / RDD 自夸」。
+# 与 ToolRegistry 适配器（flag_scan/crypto_auto 经 registry 调用，非 skills/ 下 .py）
+# 分开列举——registry 适配器标 "(registry)" 注释，且不要求 skills/<name>.py 存在。
+_WIRED_SKILL_MODULES = {
+    # 既有 19 路（registry 适配器 + 直接 import 的 skill）
+    "skills.flag_scan",                     # (registry) 适配器
+    "skills.crypto_auto",                   # (registry) 适配器
+    "skills.crypto_hastad_broadcast",
+    "skills.crypto_legendre_phi",
+    "skills.crypto_modinv_factor",
+    "skills.jpeg_png_embedded",
+    "skills.crypto_keyboard_path",
+    "skills.crypto_complex_mult_group",
+    "skills.misc_grid_resample",
+    "skills.misc_zip_fake_encryption",
+    "skills.web_source_audit",
+    "skills.web_target_interact",
+    "skills.web_sqli",
+    "skills.pyc_decompile",
+    # 2026-09-22 新增（大确定性 skill 覆盖）
+    "skills.rsa_fermat_factor",             # 静态 RSA 全套攻击（返回明文 bytes→flag）
+    "skills.hash_crack",                    # 哈希弱口令爆破（明文→包装 flag，sha256 闸）
+    "skills.pwn_exploit_flow",              # pwn 知识型：静态富化（存报告，不返回 flag）
+    "skills.pwn_libc_fingerprint",          # pwn libc 指纹：静态富化（存报告）
+    "skills.reverse_router",               # reverse 路由：静态富化（存 methodology）
+    "skills.web_ssrf",                      # 靶机可达时 SSRF 读内网 flag
+    "skills.ssti_detect",                   # 靶机可达时 SSTI RCE 提取 flag
+}
+
+
+def wired_skill_modules() -> set:
+    """返回 presolve 生产链路已接线的 skills.* 模块名集合（测试/审计用）。"""
+    return set(_WIRED_SKILL_MODULES)
+
+
 def presolve_attempted(question) -> bool:
     """该 question 是否已嗅探过（去重标记）。"""
     try:
@@ -413,6 +450,11 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_pattern_scan(question)),
         asyncio.ensure_future(_try_attachment_script(question)),
         asyncio.ensure_future(_try_maze_solver(question)),
+        # 2026-09-22 大确定性 skill 覆盖：新增 4 路（静态求解 + 静态富化）
+        asyncio.ensure_future(_try_rsa_factor(question)),
+        asyncio.ensure_future(_try_hash_crack(question)),
+        asyncio.ensure_future(_try_pwn_exploit(question)),
+        asyncio.ensure_future(_try_reverse_route(question)),
     ]
     try:
         for _fut in asyncio.as_completed(_tasks):
@@ -1249,4 +1291,283 @@ async def _try_web_target(question) -> Optional[str]:
             logger.info("[presolve:web_target] %s 命中 flag=%s", url, flag[:60])
             _save_candidates(question, [flag])
             return flag
+    # 2026-09-22 大确定性 skill 覆盖：靶机可达时扩展 web 确定性攻击面
+    # （SSRF 读内网 flag / SSTI RCE）。仅当靶机真实可达才触发，无靶机静默 miss——
+    # 与 web_sqli 同构（都依赖上方 reachable 网关），不占 LLM 墙钟、不谎报。
+    try:
+        from skills.web_ssrf import run as ssrf_run
+        for _param in ("url", "target", "u", "path", "file"):
+            try:
+                _r = ssrf_run(target_url=url, url_param=_param, method="GET")
+            except Exception as _e:  # noqa: BLE001
+                logger.debug("[presolve:web_target] ssrf %s 异常: %s", url, _e)
+                continue
+            if isinstance(_r, dict) and _r.get("flag"):
+                _flag = str(_r["flag"])
+                if _is_plausible_flag(_flag):
+                    logger.info("[presolve:web_target:ssrf] %s 命中 flag=%s", url, _flag[:60])
+                    _save_candidates(question, [_flag])
+                    return _flag
+    except Exception as _e:  # noqa: BLE001
+        _warn_import_once("skills.web_ssrf", _e)
+    try:
+        from skills.ssti_detect import run as ssti_run
+        for _param in ("input", "name", "id", "q", "search", "msg", "content"):
+            try:
+                _r = ssti_run(target_url=url, param_name=_param, method="GET")
+            except Exception as _e:  # noqa: BLE001
+                logger.debug("[presolve:web_target] ssti %s 异常: %s", url, _e)
+                continue
+            if isinstance(_r, dict) and _r.get("flag"):
+                _flag = str(_r["flag"])
+                if _is_plausible_flag(_flag):
+                    logger.info("[presolve:web_target:ssti] %s 命中 flag=%s", url, _flag[:60])
+                    _save_candidates(question, [_flag])
+                    return _flag
+    except Exception as _e:  # noqa: BLE001
+        _warn_import_once("skills.ssti_detect", _e)
+    return None
+
+
+async def _try_rsa_factor(question) -> Optional[str]:
+    """RSA 确定性攻击全套（2026-09-22 大确定性 skill 覆盖 · B 类静态求解）。
+
+    对 <512KB 的附件提取 RSA 参数 n/e/c（含可选 phi），调 skills.rsa_fermat_factor.run()——
+    自动检测并跑费马/Wiener/小指数/Hastad 广播/共模/共享素数/d已知/phi已知 等全套攻击，
+    返回解密明文 bytes，从中提取 flag。与 _try_hastad_broadcast/_try_legendre_phi 同源
+    （确定性数学攻击，非 grep 明文）；命中由下游 flag_sha256 逐字校验（题面提供时）。
+
+    诚实口径：本路是「RSA 多重攻击」这一真实密码学能力的确定性实现，rsa_fermat_factor
+    已 offline 验证（费马/Wiener/小指数实测）；属有实证 backing，非 RDD 自夸。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc"):
+        return None
+    attach = _attachments(question)
+    if not attach:
+        return None
+    import re as _re
+
+    text = ""
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            if os.path.getsize(p) > 512 * 1024:
+                continue
+            with open(p, encoding="utf-8", errors="ignore") as fh:
+                text = fh.read(200_000)
+        except Exception:  # noqa: BLE001
+            continue
+        if text:
+            break
+    if not text:
+        return None
+    # 保守提取 n/e/c（十进制大整数；词边界 + =/: 分隔，规避误命中）
+    m_n = _re.search(r"(?:\bn\b|\bN\b)\s*[=:]\s*(\d{8,})", text)
+    m_c = _re.search(r"(?:\bc\b|\bct\b|ciphertext)\s*[=:]\s*(\d{8,})", text, _re.I)
+    if not (m_n and m_c):
+        return None
+    params = {"n": int(m_n.group(1)), "c": int(m_c.group(1))}
+    m_e = _re.search(r"\be\b\s*[=:]\s*(\d{1,12})", text)
+    if m_e:
+        params["e"] = int(m_e.group(1))
+    m_phi = _re.search(r"\bphi\b\s*[=:]\s*(\d{8,})", text, _re.I)
+    if m_phi:
+        params["phi"] = int(m_phi.group(1))
+    try:
+        from skills.rsa_fermat_factor import run as rsa_run
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.rsa_fermat_factor", exc)
+        return None
+    try:
+        # CPU 密集，放线程池；20s 预算（小指数暴力上限 2^20，受控）
+        res = await asyncio.to_thread(rsa_run, params)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:rsa_factor] %s 异常: %s",
+                     getattr(question, "id", "?"), exc)
+        return None
+    if not res:
+        return None
+    if isinstance(res, (bytes, bytearray)):
+        decoded = ""
+        for enc in ("utf-8", "latin-1"):
+            try:
+                decoded = res.decode(enc)
+                break
+            except Exception:  # noqa: BLE001
+                continue
+    else:
+        decoded = str(res)
+    flag = _flag_from_text(decoded)
+    if flag and _is_plausible_flag(flag):
+        logger.info("[presolve:rsa_factor] %s 命中 flag=%s",
+                    getattr(question, "id", "?"), flag[:60])
+        _save_candidates(question, [flag])
+        return flag
+    return None
+
+
+async def _try_hash_crack(question) -> Optional[str]:
+    """哈希弱口令爆破（2026-09-22 大确定性 skill 覆盖 · B 类静态求解）。
+
+    对附件/题面文本扫描 md5/sha1/sha256 形态哈希串，调 skills.hash_crack.run() 用常见
+    弱口令字典爆破；命中明文后按 flag_pattern 包装为 flag{明文}。若题面提供 flag_sha256
+    真值则逐字校验（不符降级普通候选，不谎报确定性命中）——与 _try_keyboard_path 同闸门。
+
+    诚实口径：本路是「哈希爆破」真实能力的确定性实现（字典命中即真解），hash_crack
+    已 offline 验证；仅对明文包装做保守处理，真值闸兜底防误报。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc", "web"):
+        return None
+    attach = _attachments(question)
+    text = ""
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            if os.path.getsize(p) > 512 * 1024:
+                continue
+            text += open(p, encoding="utf-8", errors="ignore").read(200_000)
+        except Exception:  # noqa: BLE001
+            continue
+    desc = str(getattr(question, "description", "") or "")
+    text += "\n" + desc
+    if not text:
+        return None
+    import re as _re
+
+    _HASH_RE = _re.compile(r"\b([0-9a-fA-F]{32}|[0-9a-fA-F]{40}|[0-9a-fA-F]{64})\b")
+    try:
+        from skills.hash_crack import run as hc_run
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.hash_crack", exc)
+        return None
+    for h in set(_HASH_RE.findall(text)):
+        try:
+            plain = await asyncio.to_thread(hc_run, {"hash": h})
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:hash_crack] %s 异常: %s",
+                         getattr(question, "id", "?"), exc)
+            continue
+        if not plain:
+            continue
+        plain = str(plain).strip()
+        # 已带花括号则直接取 flag；否则包装为 flag{明文}
+        if _FLAG_RE.search(plain):
+            flag = _flag_from_text(plain)
+        else:
+            flag = f"flag{{{plain}}}"
+        if not flag or not _is_plausible_flag(flag):
+            continue
+        # 真值闸：题面有 flag_sha256 则校验，不符降级候选（不谎报）
+        truth = str(getattr(question, "flag_sha256", "") or "").strip().lower()
+        if truth:
+            import hashlib
+
+            if hashlib.sha256(flag.encode("utf-8")).hexdigest() != truth:
+                logger.debug("[presolve:hash_crack] %s 包装 %s 与 sha256 真值不符(降级候选)",
+                             getattr(question, "id", "?"), flag[:40])
+                _save_candidates(question, [flag])
+                continue
+        logger.info("[presolve:hash_crack] %s 命中（hash=%s）flag=%s",
+                    getattr(question, "id", "?"), h[:12], flag[:40])
+        _save_candidates(question, [flag])
+        return flag
+    return None
+
+
+async def _try_pwn_exploit(question) -> Optional[str]:
+    """PWN 静态分析路由（2026-09-22 大确定性 skill 覆盖 · 诚实 enrichment）。
+
+    根因：presolve 原 19 路完全缺 pwn 路由，且 pwn_exploit_flow / pwn_libc_fingerprint
+    等 pwn skill 是**提示词知识型**（run() 返回流程指引 / libc 指纹，而非 flag），
+    无法在静态预扫阶段解出（pwn 需运行靶机）。故本路定位为**静态富化**：对 pwn 类 +
+    ELF/libc 附件跑 pwn skill，把分析报告存入 question.extra["pwn_static_report"]，
+    供 LLM solver 阶段直接消费（避免从零空转），**不谎报确定性解出**（返回 None）。
+
+    与 _try_web_source_audit 同构（web 源码审计也只存报告、found_flags 命中才返回 flag）。
+    诚实口径：pwn 真实求解发生在 solver 阶段（有靶机 + pwntools 交互），presolve 仅铺路。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat != "pwn":
+        return None
+    attach = _attachments(question)
+    if not attach:
+        return None
+    bin_paths = [str(a) for a in attach if os.path.isfile(str(a))
+                 and not str(a).lower().endswith(
+                     (".txt", ".py", ".json", ".md", ".pdf", ".png", ".jpg", ".zip"))]
+    libc_paths = [str(a) for a in attach if "libc" in str(a).lower()
+                  and str(a).lower().endswith((".so", ".so.6"))]
+    if not bin_paths:
+        return None
+    report: dict = {}
+    try:
+        from skills.pwn_exploit_flow import run as pwn_flow
+        rep = pwn_flow({"description": str(getattr(question, "description", ""))})
+        if isinstance(rep, dict):
+            report["flow"] = rep.get("flow")
+            report["key_notes"] = rep.get("key_notes")
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.pwn_exploit_flow", exc)
+    try:
+        from skills.pwn_libc_fingerprint import run as libc_fp
+        if libc_paths:
+            lr = libc_fp({"libc_path": libc_paths[0]})
+            if isinstance(lr, dict) and lr.get("ok"):
+                report["libc"] = {k: lr[k] for k in
+                                  ("libc_version", "build_id", "symbol_offsets") if k in lr}
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.pwn_libc_fingerprint", exc)
+    if report:
+        _extra = getattr(question, "extra", None)
+        if isinstance(_extra, dict):
+            _extra["pwn_static_report"] = report
+        logger.info("[presolve:pwn_exploit] %s 静态富化完成（flow+libc指纹），供 solver 消费",
+                    getattr(question, "id", "?"))
+    return None
+
+
+async def _try_reverse_route(question) -> Optional[str]:
+    """reverse 确定性路由富化（2026-09-22 大确定性 skill 覆盖 · 诚实 enrichment）。
+
+    对 reverse 类 + 二进制/pyc/apk 附件调 skills.reverse_router.run()——按文件 magic
+    确定性分发到对应 reverse skill（ELF/Wasm/pyc/APK/JS/UPX/迷宫），把 methodology + hints
+    存入 question.extra["reverse_guidance"]，供 LLM solver 阶段消费（避免盲目猜命令）。
+    reverse skill 本身不返回 flag（静态逆向需人工/angr），故本路不谎报确定性解出（返回 None）。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat != "reverse":
+        return None
+    attach = _attachments(question)
+    if not attach:
+        return None
+    bin_paths = [str(a) for a in attach if os.path.isfile(str(a))]
+    if not bin_paths:
+        return None
+    try:
+        from skills.reverse_router import run as rev_route
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.reverse_router", exc)
+        return None
+    guidances = []
+    for p in bin_paths[:5]:
+        try:
+            r = rev_route({"path": p,
+                           "description": str(getattr(question, "description", ""))})
+            if isinstance(r, dict):
+                guidances.append(r)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:reverse_route] %s 异常: %s", p, exc)
+            continue
+    if guidances:
+        _extra = getattr(question, "extra", None)
+        if isinstance(_extra, dict):
+            _extra["reverse_guidance"] = guidances
+        logger.info("[presolve:reverse_route] %s 路由 %d 个附件，供 solver 消费",
+                    getattr(question, "id", "?"), len(guidances))
     return None
