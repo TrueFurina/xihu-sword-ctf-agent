@@ -215,7 +215,14 @@ async def act_step(agent, ctx: AgentContext, plan: dict, attempt: int) -> dict:
 
     if action == "script" and agent.sandbox:
         from core.action_executor import execute_script
-        return await execute_script(agent.sandbox, plan)
+        res = await execute_script(agent.sandbox, plan)
+        # 反幻觉闸（2026-09-22）：把 LLM 写的脚本源码随结果带出，供 extract_flag 判
+        # 「脚本里 echo/print 硬编码 flag」的打印泄漏——源码里原样含 flag 字面量即拒绝。
+        # 仅 LLM 手写脚本注入；下方 crypto/reverse/misc/web 兜底脚本是 agent 确定性生成，
+        # 其 flag 来自附件分析，不带 source（hardcoded=False）仍正常采信。
+        if isinstance(res, dict):
+            res.setdefault("source", plan.get("detail", "") or "")
+        return res
 
     if (
         action not in ("tool", "script")
@@ -441,37 +448,16 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
                 ctx._extract_failed = True
                 _mark_hallucination(ctx)
                 return None
-            kind = str(act.get("kind") or "")
-            act_output = str(act.get("output") or "")
-            in_cur = (kind in ("tool", "script")) and flag in act_output
-            _hist_steps = getattr(ctx, "steps", None) or []
-            in_hist = any(
-                flag in str(getattr(s, "observation", ""))
-                for s in _hist_steps
-                if str(getattr(s, "action", "")).startswith("tool:")
-                or str(getattr(s, "action", "")) == "script"
-            )
-            if not (in_cur or in_hist):
-                logger.info("[%s] flag 不在任何工具产出（疑似猜 flag，丢弃）: %s",
+            # 反幻觉 provenance 闸（2026-09-22）：sha256 仲裁已完成，此处要求 flag 必须
+            # 来自真实工具/脚本产出（或历史工具 observation），禁止凭空猜、禁止脚本硬编码打印。
+            from core.anti_hallucination import provenance_allows, is_print_leak
+            _ok, _reason = provenance_allows(flag, ctx, act)
+            if not _ok:
+                if is_print_leak(flag, act):
+                    _reason = "print-leak(script-hardcoded-flag)"
+                logger.info("[%s] 反幻觉闸拒绝（%s）: %s",
                             getattr(ctx, "question", None) and ctx.question.id or "?",
-                            flag[:40])
-                ctx._extract_failed = True  # 提取错埋点（2026-08-22 M1.3）
-                _mark_hallucination(ctx)    # 2026-09-01 P1：累计幻觉命中，强制下一步实算
-                return None
-            q = getattr(ctx, "question", None)
-            cat = str(getattr(q, "category", "") or "").lower()
-            steps = getattr(ctx, "steps", None) or []
-            _TOOL_PREFIX = "tool:"
-            _TOOL_ACTIONS = ("script", "http_request", "file_analyze",
-                             "search", "submit_script", "bruteforce")
-            has_tool = any(
-                str(getattr(s, "action", "")).startswith(_TOOL_PREFIX)
-                or str(getattr(s, "action", "")) in _TOOL_ACTIONS
-                for s in steps
-            )
-            if not has_tool and cat in ("web", "crypto", "misc", "pwn", "reverse"):
-                logger.info("[%s] 强制工具前置：无工具调用证据，flag 拒绝（疑似瞎猜）: %s",
-                            getattr(q, "id", "?"), flag[:40])
+                            _reason, flag[:40])
                 ctx._extract_failed = True  # 提取错埋点（2026-08-22 M1.3）
                 _mark_hallucination(ctx)    # 2026-09-01 P1：累计幻觉命中，强制下一步实算
                 return None
@@ -480,14 +466,7 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
     # 2026-09-01 修复（LLM 幻觉根因，spookifier 实证）：正则/E1 兜底路径同样要过
     # 「工具证据」门——此前只有 checker 路径校验 in_cur/in_hist/has_tool，兜底路径对
     # LLM 自写文本里的 flag 型字符串直接放行 → 步骤#0 猜 flag 即 break（3 重试全同）。
-    # 门禁（与 checker 路径第二道一致）：全程无任何工具/脚本调用 → 拒绝（疑似瞎猜）。
-    _steps = getattr(ctx, "steps", None) or []
-    _has_tool_call = any(
-        str(getattr(s, "action", "")).startswith("tool:")
-        or str(getattr(s, "action", "")) in ("script", "http_request", "file_analyze",
-                                             "search", "submit_script", "bruteforce")
-        for s in _steps
-    ) or str(act.get("kind") or "") in ("tool", "script")
+    # 门禁（与 checker 路径第二道一致）：flag 必须来自真实工具/脚本产出（provenance 闸）。
     if not primary_blocked:
         m = re.search(pattern, str(output))
         if m:
@@ -507,9 +486,15 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
                 ctx._extract_failed = True
                 _mark_hallucination(ctx)
                 return None
-            if not _has_tool_call:
-                logger.info("[%s] 正则兜底 flag 无工具证据（疑似猜 flag，拒绝）: %s",
-                            getattr(ctx, "question", None) and ctx.question.id or "?", _f[:40])
+            # 反幻觉 provenance 闸（2026-09-22）：兜底路径同样要求 flag 来自真实工具产出。
+            from core.anti_hallucination import provenance_allows, is_print_leak
+            _ok, _reason = provenance_allows(_f, ctx, act)
+            if not _ok:
+                if is_print_leak(_f, act):
+                    _reason = "print-leak(script-hardcoded-flag)"
+                logger.info("[%s] 正则兜底反幻觉闸拒绝（%s）: %s",
+                            getattr(ctx, "question", None) and ctx.question.id or "?",
+                            _reason, _f[:40])
                 ctx._extract_failed = True
                 _mark_hallucination(ctx)
                 return None
@@ -522,7 +507,14 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
             continue  # 模板占位，跳过（疑似抄题面）
         mc = re.search(pattern, cand)
         if mc:
-            if not _has_tool_call:
+            from core.anti_hallucination import provenance_allows, is_print_leak
+            _ok, _reason = provenance_allows(mc.group(0), ctx, act)
+            if not _ok:
+                if is_print_leak(mc.group(0), act):
+                    _reason = "print-leak(script-hardcoded-flag)"
+                logger.info("[%s] 候选兜底反幻觉闸拒绝（%s）: %s",
+                            getattr(ctx, "question", None) and ctx.question.id or "?",
+                            _reason, mc.group(0)[:40])
                 ctx._extract_failed = True
                 _mark_hallucination(ctx)
                 return None

@@ -75,11 +75,12 @@ class TestExtractFlagArbitration(unittest.TestCase):
         self.assertEqual(getattr(ctx, "_hallucination_strike", 0), 1)
 
     def test_no_truth_unchanged(self):
-        # 无真值题面回归既有行为：工具证据齐备即放行
+        # 无真值题面：工具（keyboard skill）真实解出 flag → 工具产出即放行
+        # （2026-09-22 反幻觉闸：act 须带 kind=tool 表示此输出来自工具，而非 LLM 文本瞎猜）
         ctx = _ctx(flag_sha256=None)
         out = "keyboard decoded: flag{CLCKOUTHK}"
         self.assertEqual(
-            extract_flag(SimpleNamespace(checker=None), ctx, {"output": out}),
+            extract_flag(SimpleNamespace(checker=None), ctx, {"kind": "tool", "output": out}),
             "flag{CLCKOUTHK}")
         self.assertFalse(ctx._extract_failed)
 
