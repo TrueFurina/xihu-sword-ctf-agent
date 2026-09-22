@@ -14,6 +14,9 @@ Held-out 未见题自主解题基准（续评-20260917 P0）。
 从 data/questions_real/ 递归抓题，逐题判定：
   - 在 _antifraud.AUTHORIZED_KPI_SOLVES（14 个已训练/已写 bespoke solver）→ 排除（已见）
   - 附件含 flag.txt（读泄露答案型，非能力）→ 排除（数据集已知"答案密钥泄露"）
+  - 附件文件内容含真实明文 flag（sha256 命中题面 flag_sha256，如源码泄露题
+    gongye_web2：flag 明文写在 index.php / 前端 html 里）→ 排除（读源码即拿答案，
+    非自主推理；且题面 flag 字段只是 64-hex 占位，旧 leaked-attachment 只拦 flag.txt 漏掉它）
   - answer_disclosed=True（教学题自带明文 flag）→ 排除（load_questions 护栏一致）
   - provenance/source 含 self_authored_training（自产训练题）→ 排除（非真题）
   - WRITEUP 重建题（附件路径含 recovered_external/wp_text，或描述含 reconstruct/官方wp/
@@ -100,6 +103,61 @@ def _is_real_flag_string(s) -> bool:
     return (isinstance(s, str) and s.strip()
             and not re.fullmatch(r"[0-9a-fA-F]{64}", s.strip())
             and bool(_FLAG_RE.search(s)))
+
+
+# 源码/附件内明文 flag：题面 flag 字段是 64-hex 占位，但真 flag 明文写在附件文件内容里
+# （如 gongye_web2 的 index.php `// echo "flag{MBeGEaS67008RGb9}";`）。读源码即拿答案，
+# 非真·未见。旧 _is_leaked_attachment 只拦 flag.txt 路径、_has_plaintext_flag_in_question
+# 只查题面字段，都漏掉这类 → 这里按「附件内容 flag 串 sha256 == 题面 flag_sha256」确定性命中。
+_SRC_FLAG_FULL_RE = re.compile(
+    r"(?:flag|dasctf|ctf|xctf|d0g3|d0gz)\{[^{}]*\}", re.I)
+
+
+def _resolve_attachment(q: dict, qpath: Path, att: str) -> Path | None:
+    """把 attachments 里的相对路径解析成磁盘文件（多候选，容错）。"""
+    cand = [Path(att), qpath.parent / att, ROOT / att]
+    for c in cand:
+        try:
+            if c.exists() and c.is_file():
+                return c
+        except OSError:
+            continue
+    return None
+
+
+def _has_plaintext_flag_in_source(q: dict, qpath: Path) -> bool:
+    """附件文件内容含真实明文 flag（sha256 命中题面 flag_sha256）→ 源码泄露，排除。
+
+    确定性最强：只有「附件内容里某 flag 串的 sha256 恰好等于题面 flag_sha256」才判泄露，
+    杜绝把源码里示例/占位 flag 误判（那些 sha256 不会命中真值）。无 flag_sha256 时无法
+    确定性判定，返回 False（交给 require_sha256 处理，不靠内容猜）。
+
+    ⚠️ 类别闸（防误伤）：仅对 web / misc 生效。
+      - web/misc：flag 明文写在提供的源码/附件里（如 gongye_web2 的 index.php
+        `// echo "flag{...}"`）→ 读源码即拿答案，非自主推理，排除。
+      - reverse/crypto/pwn：flag 嵌在二进制/脚本里是**题目本身**（逆向/解密即解题），
+        不算泄露，必须保留，否则会错误腰斩这些类别。
+    全量扫描实锤：92 题里 39 道附件含 flag 串且 sha256 命中，但 reverse/crypto/pwn 占多数
+    （如 real_reverse_js 的 flag 在 JS 里），若不过滤类别会误剔 37 道合法题。
+    """
+    cat = (q.get("category") or "").lower()
+    if cat not in ("web", "misc"):
+        return False
+    sha = (q.get("flag_sha256") or "").strip().lower()
+    if not sha:
+        return False
+    for a in (q.get("attachments") or []):
+        p = _resolve_attachment(q, qpath, str(a))
+        if p is None:
+            continue
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except (OSError, UnicodeError):
+            continue
+        for m in _SRC_FLAG_FULL_RE.findall(text):
+            if hashlib.sha256(m.strip().encode("utf-8")).hexdigest().lower() == sha:
+                return True
+    return False
 
 
 def _neutralize(q: dict) -> dict:
@@ -189,6 +247,8 @@ def select_candidates(require_sha256: bool = True,
             continue
         seen_ids.add(qid)
         has_plain = _has_plaintext_flag_in_question(q)
+        # 源码/附件内容明文 flag（sha256 命中）：读源码即拿答案，非真·未见
+        source_leaked = _has_plaintext_flag_in_source(q, jf)
         # 脱敏模式下：明文 flag 可合成 sha256 校验锚 → 仍可校验
         validatable = bool(q.get("flag_sha256")) or (include_neutralized and has_plain)
         reason_excluded = None
@@ -204,6 +264,10 @@ def select_candidates(require_sha256: bool = True,
             reason_excluded = "leaked-attachment(flag.txt)"
         elif not include_neutralized and has_plain:
             reason_excluded = "plaintext-flag-in-question"
+        elif source_leaked:
+            # 源码泄露：两种模式都排除——脱敏只能 blank 题面字段，改不了源码文件内容，
+            # 否则会破坏题目本身；且读源码即拿答案，不算自主推理。
+            reason_excluded = "source-leaked-flag(sha256-in-attachment)"
         elif require_sha256 and not validatable:
             reason_excluded = "no-flag_sha256(unvalidatable)"
         rec = {
@@ -212,6 +276,7 @@ def select_candidates(require_sha256: bool = True,
             "category": q.get("category"),
             "has_flag_sha256": bool(q.get("flag_sha256")),
             "has_plaintext_flag": has_plain,
+            "source_leaked_flag": source_leaked,
             "leaked_attachment": _is_leaked_attachment(q),
             "excluded": reason_excluded,
         }
@@ -232,7 +297,8 @@ def write_manifest(cands: list[dict], all_recs: list[dict], require_sha256: bool
                     + ("；has flag_sha256 或可合成(validatable)" if require_sha256 else ""))
     else:
         criteria = ("unseen(NOT in AUTHORIZED_KPI_SOLVES) AND NOT leaked-attachment(flag.txt) "
-                    "AND NOT plaintext-flag-in-question AND NOT answer_disclosed "
+                    "AND NOT plaintext-flag-in-question AND NOT source-leaked-flag(sha256-in-attachment) "
+                    "AND NOT answer_disclosed "
                     "AND NOT self_authored_training AND NOT writeup-reconstructed(non-genuine)"
                     + (" AND has flag_sha256(validatable)" if require_sha256 else ""))
     payload = {
