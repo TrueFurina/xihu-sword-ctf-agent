@@ -62,6 +62,8 @@ def sha256_hex(s: str) -> str:
 def validate(q: dict) -> list[str]:
     """返回错误列表；空列表表示可入库。同时就地补全 flag_sha256 / provenance。"""
     errs: list[str] = []
+    # 红线①块会 pop 掉明文 flag，故此处**先捕获**明文原值，供红线③精确判据使用
+    real_flag_plain = q.get("flag")
     qid = q.get("id")
     if not qid or not isinstance(qid, str):
         errs.append("missing/empty id")
@@ -99,16 +101,34 @@ def validate(q: dict) -> list[str]:
     else:
         errs.append(f"{qid}: need flag_sha256 or flag(明文, 现场哈希)")
 
-    # 红线③：best-effort 预检 attachment 明文 flag
+    # 红线③：attachment 不得含**真答案**
+    # 精确判据（2026-09-22 修正）：附件字节含 `q["flag"]` 的字面值 → 拒绝
+    # （agent 可直接读到答案）。其余 flag 形态串（占位符 CTF{...}/正则 CTF{.*}/
+    # 诱饵串）**仅告警不拒**——Google CTF 的 crypto 脚本常含占位/正则（如
+    # MHK2.sage 的 `CTF{????}`、hard.py 的 `CTF{}`），旧「含任意 flag 形态串即拒」
+    # 的宽判据会误伤 5 道好题。抓取阶段已做字节级字面检查，此处再兜一层。
+    real_flag = real_flag_plain
     for a in (q.get("attachments") or []):
         p = ROOT / str(a)
-        if p.is_file():
-            try:
-                text = p.read_text(encoding="utf-8", errors="ignore")
-            except (OSError, UnicodeError):
-                continue
-            if _FLAG_RE.search(text):
+        if not p.is_file():
+            continue
+        try:
+            raw = p.read_bytes()
+        except OSError:
+            continue
+        if isinstance(real_flag, str) and real_flag.strip() and real_flag.encode("utf-8") in raw:
+            errs.append(f"{qid}: attachment {a} 含真答案字面值（红线③）")
+            continue
+        # 无明文 flag（只给 sha256）时退回宽判据，fail-closed
+        if not real_flag:
+            txt = raw[:200_000].decode("utf-8", "ignore")
+            if _FLAG_RE.search(txt):
                 errs.append(f"{qid}: attachment {a} 含明文 flag 串（红线③）")
+                continue
+        txt = raw[:200_000].decode("utf-8", "ignore")
+        for h in sorted(set(_FLAG_RE.findall(txt))):
+            print(f"[ingest][warn] {qid}: {p.name} 含 flag 形态串 {h!r}"
+                  f"（占位/正则/诱饵？非真答案，请人工核）", file=sys.stderr)
     return errs
 
 

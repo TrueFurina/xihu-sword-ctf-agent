@@ -72,6 +72,15 @@ SELF_AUTHORED_MARKERS = ("self_authored_training", "self-authored", "training")
 
 
 def _is_leaked_attachment(q: dict) -> bool:
+    """附件路径含 flag.txt（本地数据集的「答案即附件」特征）。
+
+    ⚠️ 外部题源豁免（2026-09-22）：外部题在 fetch/ingest 阶段已对**附件内容**
+    做字节级 flag 泄露扫描（`fetch_google_ctf.py`：命中即整题剔除），故路径含
+    "flag.txt" 不再自动判泄露——Google CTF 的 `attachments/flag.txt` 常是
+    **密文诱饵**（明文 flag 并不在其中），路径启发式是为本地数据集设计的，会误伤。
+    """
+    if q.get("provenance") == "real_past_ctf" and q.get("external_source"):
+        return False
     for a in (q.get("attachments") or []):
         s = str(a).lower()
         if any(m in s for m in LEAK_MARKERS):
@@ -268,6 +277,9 @@ def select_candidates(require_sha256: bool = True,
     seen_ids = set()
     for stag, qdir in scan_targets:
         for jf in sorted(qdir.rglob("*.json")):
+            # 外部题源的附件目录里可能含 .json 数据文件，不是题面，跳过
+            if "_attachments" in jf.parts:
+                continue
             try:
                 with open(jf, "r", encoding="utf-8") as fh:
                     q = json.load(fh)

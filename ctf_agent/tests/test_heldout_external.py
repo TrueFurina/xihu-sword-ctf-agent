@@ -149,3 +149,53 @@ def test_select_external_absent_is_noop(tmp_path, monkeypatch):
     cands, _ = bh.select_candidates(require_sha256=True, external_dir=real_dir / "nope")
     assert cands == [], "空 real 目录 + 不存在 external 应得空池"
     print("✓ test_select_external_absent_is_noop")
+
+
+# --------------------------------------------------------------------------
+# 2026-09-22 新增：外部题源特殊判据
+# --------------------------------------------------------------------------
+def test_leaked_attachment_exempt_for_external():
+    """外部题的 flag.txt 附件不再自动判泄露（Google CTF 的 flag.txt 常是密文诱饵）。"""
+    ext_q = {"id": "ext_x", "provenance": "real_past_ctf", "external_source": "google-ctf-2023",
+             "attachments": ["data/questions_external/crypto/ext_x/_attachments/flag.txt"]}
+    assert bh._is_leaked_attachment(ext_q) is False, "外部题 flag.txt 被误判泄露"
+    local_q = {"id": "loc", "attachments": ["data/questions_real/x/flag.txt"]}
+    assert bh._is_leaked_attachment(local_q) is True, "本地题 flag.txt 应仍判泄露"
+    print("✓ test_leaked_attachment_exempt_for_external")
+
+
+def test_ingest_literal_flag_rejected_but_placeholder_ok(tmp_path):
+    """红线③精确判据：附件含**真答案字面值**才拒；占位符/正则仅告警不拒。"""
+    flag = "CTF{the_real_answer_123}"
+    leak = tmp_path / "leak.txt"
+    leak.write_text(f"the answer is {flag}\n", encoding="utf-8")
+    q_leak = {"id": "ext_leak", "title": "t", "category": "crypto", "description": "brief",
+              "flag": flag, "external_source": "lab", "attachments": [str(leak)]}
+    assert any("真答案字面值" in e for e in ingest.validate(q_leak)), "含真答案却未拒（红线③失守）"
+
+    placeholder = tmp_path / "ph.txt"
+    placeholder.write_text("placeholder CTF{} / regex CTF{.*} / decoy\n", encoding="utf-8")
+    q_ok = {"id": "ext_ok2", "title": "t", "category": "crypto", "description": "brief",
+            "flag": flag, "external_source": "lab", "attachments": [str(placeholder)]}
+    assert ingest.validate(q_ok) == [], "占位符被误拒（应仅告警）"
+    print("✓ test_ingest_literal_flag_rejected_but_placeholder_ok")
+
+
+def test_select_ignores_attachment_json(tmp_path, monkeypatch):
+    """_attachments/ 下的 .json 数据文件不应被当作题面。"""
+    real_dir = tmp_path / "real"
+    real_dir.mkdir()
+    ext = tmp_path / "ext"
+    (ext / "crypto" / "ext_q" / "_attachments").mkdir(parents=True)
+    (ext / "crypto" / "ext_q.json").write_text(json.dumps(
+        {"id": "ext_q", "category": "crypto", "description": "brief",
+         "flag_sha256": hashlib.sha256(b"flag{q}").hexdigest(),
+         "provenance": "real_past_ctf", "external_source": "lab", "attachments": []},
+        ensure_ascii=False), encoding="utf-8")
+    (ext / "crypto" / "ext_q" / "_attachments" / "data.json").write_text(
+        '{"not": "a question"}', encoding="utf-8")
+    monkeypatch.setattr(bh, "QUESTIONS_REAL", real_dir)
+    cands, all_recs = bh.select_candidates(require_sha256=True, external_dir=ext)
+    ids = sorted(r["id"] for r in all_recs)
+    assert ids == ["ext_q"], f"_attachments 内 json 被误当题面: {ids}"
+    print("✓ test_select_ignores_attachment_json")
