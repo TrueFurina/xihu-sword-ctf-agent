@@ -50,8 +50,18 @@ ROOT = Path(__file__).resolve().parent.parent
 # 让 `python scripts/benchmark_heldout.py` 也能 import scripts 包下的模块
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+
+def _path_rel(p) -> str:
+    """相对 ROOT 显示；若不在 ROOT 下（外部题源可能在仓库外）则回退绝对路径。"""
+    p = Path(p)
+    try:
+        return str(p.relative_to(ROOT))
+    except ValueError:
+        return str(p)
 RESULTS = ROOT / "data" / "results"
 QUESTIONS_REAL = ROOT / "data" / "questions_real"
+QUESTIONS_EXTERNAL = ROOT / "data" / "questions_external"  # P0-① 开放 CTF 平台采源
 MANIFEST = RESULTS / "heldout_candidates.json"
 RUN_DIR = RESULTS / "heldout_run"
 OUT_DIR = RESULTS / "heldout"
@@ -208,7 +218,19 @@ def _is_writeup_reconstructed(q: dict) -> bool:
         官方题解 / official writeup / flag from official / writeup 等）
     3 道真·未见题（dnui_keyboard / real_reverse_js / gongye_web2）附件在
     data/questions_real/_attachments/，描述为真挑战文本，不会被误伤。
+
+    ⚠️ 外部题源豁免：外部题在 `ingest_external_ctf.py` 注入时已强制
+    `provenance=real_past_ctf` + `external_source` 且拒收
+    `source_reconstructed_from_writeup=true`，故其 description 里偶发的
+    "writeup" 字样（如"该题多见 writeup"）不应触发误剔。仅保留附件路径硬判定。
     """
+    # 外部题源豁免宽松关键词启发式，仅保留 wp_text 附件路径硬判定
+    if q.get("provenance") == "real_past_ctf" and q.get("external_source"):
+        for a in (q.get("attachments") or []):
+            s = str(a).lower()
+            if any(m in s for m in WP_ATTACHMENT_MARKERS):
+                return True
+        return False
     for a in (q.get("attachments") or []):
         s = str(a).lower()
         if any(m in s for m in WP_ATTACHMENT_MARKERS):
@@ -220,12 +242,16 @@ def _is_writeup_reconstructed(q: dict) -> bool:
 
 
 def select_candidates(require_sha256: bool = True,
-                      include_neutralized: bool = False) -> tuple[list[dict], list[dict]]:
+                      include_neutralized: bool = False,
+                      external_dir: "Path | None" = None) -> tuple[list[dict], list[dict]]:
     """返回 (候选池, 全部记录含排除原因)。
 
     include_neutralized=True 时：不再排除「答案泄露」题（flag.txt 附件 / 题面明文 flag），
     而是在建 run 目录时脱敏（隐藏答案），让 agent 无法「看答案」却被正常评测——
     对应指令「答案泄露可以不看答案」。trained/self_authored/answer_disclosed 仍排除。
+
+    external_dir：外部 CTF 平台采源目录（默认 QUESTIONS_EXTERNAL）。存在则并入候选池，
+    复用全部既有排除链（trained/writeup/leaked/source-leaked/sha256），零新诚实逻辑。
     """
     # 机器真值：14 个已训练题（KPI 口径）
     try:
@@ -234,62 +260,71 @@ def select_candidates(require_sha256: bool = True,
     except Exception:
         trained = frozenset()
 
+    scan_targets = [("real", QUESTIONS_REAL)]
+    if external_dir and Path(external_dir).exists():
+        scan_targets.append(("external", Path(external_dir).resolve()))
+
     all_recs: list[dict] = []
     seen_ids = set()
-    for jf in sorted(QUESTIONS_REAL.rglob("*.json")):
-        try:
-            with open(jf, "r", encoding="utf-8") as fh:
-                q = json.load(fh)
-        except (json.JSONDecodeError, OSError):
-            continue
-        qid = q.get("id") or jf.stem
-        if qid in seen_ids:
-            continue
-        seen_ids.add(qid)
-        has_plain = _has_plaintext_flag_in_question(q)
-        # 源码/附件内容明文 flag（sha256 命中）：读源码即拿答案，非真·未见
-        source_leaked = _has_plaintext_flag_in_source(q, jf)
-        # 脱敏模式下：明文 flag 可合成 sha256 校验锚 → 仍可校验
-        validatable = bool(q.get("flag_sha256")) or (include_neutralized and has_plain)
-        reason_excluded = None
-        if qid in trained:
-            reason_excluded = "trained(KPI)"
-        elif q.get("answer_disclosed"):
-            reason_excluded = "answer_disclosed"
-        elif _is_self_authored(q):
-            reason_excluded = "self_authored_training"
-        elif _is_writeup_reconstructed(q):
-            reason_excluded = "writeup-reconstructed(non-genuine)"
-        elif not include_neutralized and _is_leaked_attachment(q):
-            reason_excluded = "leaked-attachment(flag.txt)"
-        elif not include_neutralized and has_plain:
-            reason_excluded = "plaintext-flag-in-question"
-        elif source_leaked:
-            # 源码泄露：两种模式都排除——脱敏只能 blank 题面字段，改不了源码文件内容，
-            # 否则会破坏题目本身；且读源码即拿答案，不算自主推理。
-            reason_excluded = "source-leaked-flag(sha256-in-attachment)"
-        elif require_sha256 and not validatable:
-            reason_excluded = "no-flag_sha256(unvalidatable)"
-        rec = {
-            "id": qid,
-            "path": str(jf.relative_to(ROOT)),
-            "category": q.get("category"),
-            "has_flag_sha256": bool(q.get("flag_sha256")),
-            "has_plaintext_flag": has_plain,
-            "source_leaked_flag": source_leaked,
-            "leaked_attachment": _is_leaked_attachment(q),
-            "excluded": reason_excluded,
-        }
-        all_recs.append(rec)
+    for stag, qdir in scan_targets:
+        for jf in sorted(qdir.rglob("*.json")):
+            try:
+                with open(jf, "r", encoding="utf-8") as fh:
+                    q = json.load(fh)
+            except (json.JSONDecodeError, OSError):
+                continue
+            qid = q.get("id") or jf.stem
+            if qid in seen_ids:
+                continue
+            seen_ids.add(qid)
+            has_plain = _has_plaintext_flag_in_question(q)
+            # 源码/附件内容明文 flag（sha256 命中）：读源码即拿答案，非真·未见
+            source_leaked = _has_plaintext_flag_in_source(q, jf)
+            # 脱敏模式下：明文 flag 可合成 sha256 校验锚 → 仍可校验
+            validatable = bool(q.get("flag_sha256")) or (include_neutralized and has_plain)
+            reason_excluded = None
+            if qid in trained:
+                reason_excluded = "trained(KPI)"
+            elif q.get("answer_disclosed"):
+                reason_excluded = "answer_disclosed"
+            elif _is_self_authored(q):
+                reason_excluded = "self_authored_training"
+            elif _is_writeup_reconstructed(q):
+                reason_excluded = "writeup-reconstructed(non-genuine)"
+            elif not include_neutralized and _is_leaked_attachment(q):
+                reason_excluded = "leaked-attachment(flag.txt)"
+            elif not include_neutralized and has_plain:
+                reason_excluded = "plaintext-flag-in-question"
+            elif source_leaked:
+                # 源码泄露：两种模式都排除——脱敏只能 blank 题面字段，改不了源码文件内容，
+                # 否则会破坏题目本身；且读源码即拿答案，不算自主推理。
+                reason_excluded = "source-leaked-flag(sha256-in-attachment)"
+            elif require_sha256 and not validatable:
+                reason_excluded = "no-flag_sha256(unvalidatable)"
+            rec = {
+                "id": qid,
+                "path": _path_rel(jf),
+                "category": q.get("category"),
+                "source": stag,
+                "external_source": q.get("external_source") if stag == "external" else None,
+                "has_flag_sha256": bool(q.get("flag_sha256")),
+                "has_plaintext_flag": has_plain,
+                "source_leaked_flag": source_leaked,
+                "leaked_attachment": _is_leaked_attachment(q),
+                "excluded": reason_excluded,
+            }
+            all_recs.append(rec)
     cands = [r for r in all_recs if r["excluded"] is None]
     return cands, all_recs
 
 
 def write_manifest(cands: list[dict], all_recs: list[dict], require_sha256: bool,
-                   include_neutralized: bool = False) -> None:
+                   include_neutralized: bool = False,
+                   external_dir: "Path | None" = None) -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     from collections import Counter
     breakdown = Counter(r["excluded"] or "INCLUDED" for r in all_recs)
+    ext_cands = [c for c in cands if c.get("source") == "external"]
     if include_neutralized:
         criteria = ("unseen(NOT in AUTHORIZED_KPI_SOLVES) AND NOT answer_disclosed "
                     "AND NOT self_authored_training；泄露题纳入但**运行时脱敏**"
@@ -304,9 +339,11 @@ def write_manifest(cands: list[dict], all_recs: list[dict], require_sha256: bool
     payload = {
         "generated_by": "scripts/benchmark_heldout.py",
         "source_dir": str(QUESTIONS_REAL),
+        "external_dir": str(external_dir) if external_dir else None,
         "include_neutralized": include_neutralized,
         "criteria": criteria,
         "candidate_count": len(cands),
+        "external_candidate_count": len(ext_cands),
         "exclusion_breakdown": dict(breakdown),
         "candidates": cands,
     }
@@ -320,7 +357,9 @@ def build_run_dir(cands: list[dict], neutralize_leaks: bool = False) -> Path:
     ok = 0
     neutralized = 0
     for c in cands:
-        src = ROOT / c["path"]
+        src = Path(c["path"])
+        if not src.is_absolute():
+            src = ROOT / c["path"]
         if not src.exists():
             continue
         try:
@@ -429,11 +468,17 @@ def main() -> int:
     ap.add_argument("--include-neutralized", dest="include_neutralized", action="store_true",
                     help="纳入答案泄露题但脱敏（隐藏 flag.txt/明文答案，agent 看不到答案）——"
                          "对应『答案泄露可以不看答案』：扩样本量，量 agent 不看答案时的真实水位")
+    ap.add_argument("--external-dir", default=str(QUESTIONS_EXTERNAL),
+                    help=f"外部 CTF 平台题源目录（默认 {QUESTIONS_EXTERNAL}；"
+                         "存在则并入候选池，复用全部既有排除链，零新诚实逻辑）")
     args = ap.parse_args()
 
+    external_dir = Path(args.external_dir) if args.external_dir else None
     cands, all_recs = select_candidates(require_sha256=args.require_sha256,
-                                        include_neutralized=args.include_neutralized)
-    write_manifest(cands, all_recs, args.require_sha256, args.include_neutralized)
+                                        include_neutralized=args.include_neutralized,
+                                        external_dir=external_dir)
+    write_manifest(cands, all_recs, args.require_sha256, args.include_neutralized,
+                   external_dir=external_dir)
     print(f"[heldout] 候选池 = {len(cands)} 道（manifest: {MANIFEST}）")
     for c in cands:
         print(f"  - {c['id']} [{c['category']}] sha256={'Y' if c['has_flag_sha256'] else 'N'}")
