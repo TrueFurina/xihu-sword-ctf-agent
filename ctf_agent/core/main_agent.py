@@ -40,6 +40,10 @@ VERDICT_GIVE_UP = "give_up"
 ERR_STUCK_LOOP = "stuck_loop"
 ERR_UNRESOLVED = "unresolved"  # 2026-08-28：未解出且无明确归因（非死循环）——区分真死循环
 ERR_WRONG_DIRECTION = "wrong_direction"
+# 2026-09-23（P0-7）：早停终态类别。字面量必须与 eval/benchmark.py 的
+# NON_RETRYABLE_CATEGORIES / TRUNCATED_ERROR_CATEGORIES 中 "race_abandon" 一致——
+# 只有同名词才会被重试短路与「不可作为能力率」告警正确识别。
+ERR_RACE_ABANDON = "race_abandon"
 ERR_HALLUCINATION = "hallucination"
 ERR_TOOL_FAILURE = "tool_failure"
 ERR_ENV_FAILURE = "env_failure"
@@ -134,6 +138,14 @@ class AgentContext:
     # give_up_reason 非空   → 监督裁决放弃（决策错方向）
     _extract_failed: bool = False
     give_up_reason: Optional[str] = None
+    # P0-7（2026-09-23 实证修复）：早停/预算硬顶的终态细分标记。
+    # 背景：held-out 验证跑实测 budget_reflection ABANDON 后仍被外层重跑 4 段循环
+    # （cursved: attempt 0→2→0→0），因 ABANDON 落到 give_up_reason → 归类
+    # wrong_direction（决策错），而 wrong_direction 被视为"可重试换方向"，
+    # 于是 F1 的止损被重试抹掉。这两个标记让终态失败落到 race_abandon
+    # （NON_RETRYABLE_CATEGORIES 已含，注释即"预算反思早停"），语义与行为对齐。
+    _abandoned: bool = False          # budget_reflection 早停（ABANDON）
+    _budget_hard_stop: bool = False   # 单题 token 预算硬顶（BudgetExceeded）
     # 放弃前确定性兜底已跑标记（M3 2026-08-29）：每题至多一次，避免重复嗅探
     _last_chance_done: bool = False
     # 2026-08-24 诚实化：静态分析器（presolve）直出标记，零 LLM 调用时置 True
@@ -198,6 +210,39 @@ class AgentContext:
 
     def last_step(self) -> Optional[StepRecord]:
         return self.steps[-1] if self.steps else None
+
+
+def _is_budget_exhausted(exc: BaseException) -> bool:
+    """P0-5（2026-09-23 实证）：该异常是否表示「预算硬顶」而非普通单步失败。
+
+    普通单步失败（如 LLM 产出语法错误的脚本）确实该 continue 重试——那是有价值的容错。
+    但预算超限完全不同：继续重试只会**每步再烧一次 token 却什么也做不了**。
+    实测 held-out 验证跑（cursved）：超限后连烧 5 步，102,256 → 111,021 tokens，
+    全程 observation 只有异常文本，直到 scheduler 兜底才停。
+
+    识别依据（双保险）：
+    1. 异常自带 category == "budget_exceeded"（scheduler.budget.BudgetExceeded 类属性）
+    2. 文本兜底（第三方/包装异常）
+    """
+    if getattr(exc, "category", None) == "budget_exceeded":
+        return True
+    text = f"{type(exc).__name__}: {exc}"
+    return ("预算超限" in text) or ("budget_exceeded" in text.lower())
+
+
+def _classify_give_up_category(ctx: "AgentContext") -> tuple[str, str]:
+    """give_up_reason 非空时的错误分类（从 _finalize 抽出，便于单测锁口径）。
+
+    P0-7（2026-09-23）：早停(ABANDON)/预算硬顶是**终态失败**，必须落 race_abandon
+    （eval/benchmark.NON_RETRYABLE_CATEGORIES 已含，会被 P0-3 短路），
+    不能落 wrong_direction——后者被视为"方向错可换路重试"，会让止损被重跑抹掉。
+    """
+    qid = str(getattr(getattr(ctx, "question", None), "id", "")).lower()
+    if qid in _KNOWN_GAP_IDS:
+        return ERR_EXTRACT_FAIL, f"{ctx.give_up_reason}（题面缺运行时参数，KNOWN_GAP）"
+    if getattr(ctx, "_abandoned", False) or getattr(ctx, "_budget_hard_stop", False):
+        return ERR_RACE_ABANDON, ctx.give_up_reason
+    return ERR_WRONG_DIRECTION, ctx.give_up_reason
 
 
 def _should_upgrade_heavy(diff: str, cat: str, attempt: int, upgrades: int = 0) -> bool:
@@ -464,6 +509,15 @@ class MainAgent:
                     # 实证（heldout selftruth_full）：coolboy 的 LLM 产出脚本语法错误
                     # （invalid syntax）从 _act 冒泡到 solve() 兜底 → 提前终止整题、
                     # 误归因 hallucination。单步失败应记 tool_failure 继续循环。
+                    # P0-5（2026-09-23）：预算硬顶 ≠ 可重试的单步失败。
+                    # 语法错误这类 continue 有价值（重试可能写对），但预算已尽时
+                    # 每步只会再烧 ~2.8K tokens 而做不了任何事（实测连烧 5 步）。
+                    if _is_budget_exhausted(_pexc):
+                        ctx.give_up_reason = f"预算硬顶：{_pexc}"
+                        ctx._budget_hard_stop = True
+                        logger.warning("[%s] plan 预算超限，步循环立即收口（不再空烧）: %s",
+                                       getattr(question, "id", "?"), _pexc)
+                        break
                     ctx.record(StepRecord(stage=STAGE_STUCK, action="reason",
                                           observation=f"plan 异常: {_pexc}",
                                           error_category=ERR_TOOL_FAILURE))
@@ -486,6 +540,13 @@ class MainAgent:
                                    getattr(question, "id", "?"), self.step_timeout_s)
                     continue
                 except Exception as _aexc:  # 2026-09-19 步级容错（同 plan：单步异常不终止整题）
+                    # P0-5（2026-09-23）：同 plan——预算硬顶立即收口，不 continue 空烧。
+                    if _is_budget_exhausted(_aexc):
+                        ctx.give_up_reason = f"预算硬顶：{_aexc}"
+                        ctx._budget_hard_stop = True
+                        logger.warning("[%s] act 预算超限，步循环立即收口（不再空烧）: %s",
+                                       getattr(question, "id", "?"), _aexc)
+                        break
                     ctx.record(StepRecord(stage=STAGE_STUCK, action=plan.get("action", "reason"),
                                           observation=f"act 异常: {_aexc}",
                                           error_category=ERR_TOOL_FAILURE))
@@ -507,6 +568,10 @@ class MainAgent:
                         getattr(question, "id", "?"),
                     )
                     ctx.give_up_reason = "budget_reflection 早停(ABANDON)"
+                    # P0-7（2026-09-23）：ABANDON 是「预算将尽+零进展+低信心」的终局判定，
+                    # 不是"方向错了换条路再试"。若不打此标记，它会落到 wrong_direction
+                    # 被外层当可重试 → 实测重跑 4 段循环，止损效果被完全抹掉。
+                    ctx._abandoned = True
                     break
                 # Writeup RAG（IDEA-5 务实落地）：每步按"题型+最新观察"检索历史解法/工具手册
                 self._retrieve_knowledge(ctx, step)
@@ -1019,12 +1084,7 @@ class MainAgent:
         # hint_enc/AES_KEY_ENC，台账 REAL_SOLVES_LEDGER.md）解不出是题缺参，非方向错——
         # 归 extract_fail（题缺参）而非 wrong_direction（方向错），避免污染失败桶统计。
         elif getattr(ctx, "give_up_reason", None) and not flag:
-            if str(getattr(ctx.question, "id", "")).lower() in _KNOWN_GAP_IDS:
-                err_category = ERR_EXTRACT_FAIL
-                err_detail = f"{ctx.give_up_reason}（题面缺运行时参数，KNOWN_GAP）"
-            else:
-                err_category = ERR_WRONG_DIRECTION
-                err_detail = ctx.give_up_reason
+            err_category, err_detail = _classify_give_up_category(ctx)
         elif not flag:
             # 2026-08-28 修复兜底污染：此前所有"未解出 flag"都归 stuck_loop，但实测
             # 98.2% 案例 stuck_count=0（非真死循环）——只有连续同动作（stuck_count>=3）
