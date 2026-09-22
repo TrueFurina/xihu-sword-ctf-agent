@@ -22,6 +22,10 @@ from verify.error_classifier import ErrorClassifier
 from verify.flag_checker import FlagChecker
 from verify.step_checker import StepChecker
 
+# P0-8（2026-09-23）：终态失败口径**单一真值**——本层是最内层重试循环，
+# 必须与 benchmark 层同源，不得各自复刻字面量。
+from core.error_taxonomy import NON_RETRYABLE_CATEGORIES
+
 
 class FeedbackLoop:
     """校验-反馈循环：失败时分类错误并生成定向修正。
@@ -132,7 +136,23 @@ class FeedbackLoop:
                 last_output["validated"] = True
                 return last_output
 
-            # 2. 失败 → race-intelligence 换题决策（2026-08-29 换题决策完整化）：
+            # 2. 终态失败短路（P0-8，2026-09-23 实证）：与 benchmark 层共用同一口径。
+            #    本层是**最内层**重试循环（每次循环都会重新进入主 Agent 的整个步循环），
+            #    此前完全不看 error.category → 实测 `ext_gctf2023_cursved` 在此被重跑 3 轮
+            #    （每轮 8-9 步、每轮都以 ABANDON 结束），单题烧 111K tokens 却零候选。
+            #    终态类别立即返回，不再把整段预算/墙钟重烧一遍。
+            _err = last_output.get("error")
+            _err_cat = _err.get("category") if isinstance(_err, dict) else None
+            if _err_cat in NON_RETRYABLE_CATEGORIES:
+                logger.info(
+                    "[%s] 第 %d 次迭代终态失败(%s)，FeedbackLoop 短路（不再重跑整题）",
+                    getattr(question, "id", "?"), attempt + 1, _err_cat,
+                )
+                last_output["retries"] = attempt
+                last_output["validated"] = False
+                return last_output
+
+            # 3. race-intelligence 换题决策（2026-08-29 换题决策完整化）：
             #    沉溺保护——信心低于阈值且已重试 → 提前换题（不再等墙钟/死循环）；
             #    ABANDON（预算反思）同样提前终止。live 链路与 benchmark 共用本循环。
             if self.race_controller is not None:
@@ -147,7 +167,7 @@ class FeedbackLoop:
                     last_output["validated"] = False
                     return last_output
 
-            # 3. 生成结构化修正指令（错误归因）
+            # 4. 生成结构化修正指令（错误归因）
             last_output["_question"] = question
             correction = self._build_correction(last_output, attempt)
 

@@ -33,35 +33,14 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 logger = logging.getLogger(__name__)
 
 
-# 2026-09-23 诚实化：「被外部条件掐断」的错误分类——这些题虽被计入分母，
-# 但并未走完正常求解流程，因此 solve_rate 对它们不构成能力度量。
-# 注意：**不含** "no_output"（solver 正常跑完但没解出，是正常判负，不是错误）
-# 也不含 None（解出）。混入它们会让告警天天响、沦为噪音。
-TRUNCATED_ERROR_CATEGORIES = frozenset({
-    "budget_exceeded",      # 预算耗尽（token/步数）——2026-09-22 held-out 17 池的主因
-    "wallclock_timeout",    # 墙钟先到，确定性工具链没机会跑完
-    "race_abandon",         # 预算反思早停
-    "solver_exception",     # solver 抛异常
-    "not_attempted",        # 显式未尝试
-    "rate_limited",         # 限流
-    "provider_error",       # provider 侧错误
-    "infra_error",
-    "INFRA_NO_CREDENTIAL",  # 无凭证（按项目铁律：不算推理失败）
-})
-
-
-# P0-3 修复（2026-09-23）：终态失败——本次 benchmark 运行内**不可通过"立即重跑同一题"恢复**，
-# 重试只会把整段预算/墙钟再烧一遍（实证：held-out 17 池 3 题各烧 19-22 万 token、第 4 题一步没走，
-# 缘于 benchmark 层 `for attempt in range(3)` 无条件重试，跨轮零记忆）。遇到这些类别直接短路跳过重试。
-# 注意：**不含** rate_limited / provider_error / infra_error / INFRA_NO_CREDENTIAL ——
-# 属瞬时外部故障，保留原有重试行为（尽管无退避，改动最小化原则）。
-NON_RETRYABLE_CATEGORIES = frozenset({
-    "budget_exceeded",      # 预算已烧穿，再跑还是 budget_exceeded
-    "wallclock_timeout",    # 墙钟已耗尽，确定性工具链都没机会跑完
-    "race_abandon",         # 已主动早停
-    "solver_exception",     # solver 已抛异常
-    "not_attempted",        # 显式未尝试
-})
+# 2026-09-23：两个错误口径常量已提升为**单一真值** core/error_taxonomy.py——
+# 因为它们在多层重试循环（benchmark 层 + FeedbackLoop 层）被共同消费，
+# 散落复刻字面量已致实证事故（见 core/error_taxonomy.py 模块 docstring）。
+# 此处保留同名 re-export，向后兼容既有 import（tests 等）。
+from core.error_taxonomy import (  # noqa: E402
+    NON_RETRYABLE_CATEGORIES,
+    TRUNCATED_ERROR_CATEGORIES,
+)
 
 
 class BenchmarkResult:
