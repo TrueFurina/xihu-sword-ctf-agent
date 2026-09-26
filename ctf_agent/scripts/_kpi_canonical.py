@@ -136,6 +136,29 @@ def count_heldout_candidates() -> int:
         return -1
 
 
+def count_heldout_runnable_pool() -> int:
+    """可选跑池大小（= 自有 2 + 外部采源 15，实测 17）。
+
+    ⚠️ 与 `heldout_candidates` 是两个不同口径，**绝不可互换、更不可合并成一个率**：
+      - `heldout_candidates`（=2）：**能力分母**。unseen 非平凡、已排除 WRITEUP 重建/
+        附件泄露/源码泄露/已训练，是「LLM 真·自主推理」唯一合法分母。
+      - `heldout_runnable_pool`（=17）：**可选跑池**。在前者基础上并入外部采源
+        （Google CTF，难度显著更高，实测单题成本 ~50×）。用于「能跑哪些题」，
+        **不用于**报告能力率——把 0/17 或 1/17 当能力率，等于把「题更难」说成
+        「能力更低」，属欺骗性比率。
+
+    2026-09-26 新增：此前两个口径在文档/对话中混称，已造成一次混淆。
+    """
+    try:
+        from scripts.benchmark_heldout import select_candidates, QUESTIONS_EXTERNAL
+        # 必须显式传 external_dir：select_candidates 的默认值为 None（不并入外部题）。
+        cands, _ = select_candidates(external_dir=QUESTIONS_EXTERNAL)
+        return len(cands)
+    except Exception as exc:  # pragma: no cover - 兜底不致命
+        sys.stderr.write(f"[kpi_canonical] select_candidates(external) 调用失败：{exc}\n")
+        return -1
+
+
 def _first_existing(paths) -> "Path | None":
     """返回候选路径中第一个存在的文件（按给定优先级）；都不存在返回 None。"""
     for p in paths:
@@ -263,6 +286,7 @@ def canonical_kpi() -> dict:
     ov = count_offline_verified()
     corpus = count_real_corpus()
     heldout = count_heldout_candidates()
+    runnable = count_heldout_runnable_pool()
     skills = count_skills()
     regression = count_regression_checks()
     coverage_all = (ov / corpus) if corpus else 0.0
@@ -277,7 +301,8 @@ def canonical_kpi() -> dict:
         "as_of": __import__("time").strftime("%Y-%m-%dT%H:%M:%SZ", __import__("time").gmtime()),
         "offline_verified": ov,                 # 绝对计数（KPI 真值上限）
         "real_corpus": corpus,                 # 真题全集分母（=92）
-        "heldout_candidates": heldout,         # unseen 非平凡题池（自主推理分母）
+        "heldout_candidates": heldout,         # unseen 非平凡题池（自主推理分母）【能力分母】
+        "heldout_runnable_pool": runnable,     # 可选跑池（含外部采源）【非能力分母，禁混用】
         "skills": skills,                      # 确定性 skill 数（skills/*.py 顶层 run 入口）
         "regression_checks": regression,       # merge-gate 回归集条数
         "coverage_of_corpus": round(coverage_all, 4),     # 14/92
@@ -289,6 +314,8 @@ def canonical_kpi() -> dict:
             f"offline_verified={ov}（绝对计数，非率） / real_corpus={corpus} "
             f"→ 全集覆盖率 {coverage_all:.1%}；"
             f"held-out 自主推理分母 = {heldout} 题（unseen 非平凡，与 14 题不相交），"
+            f"可选跑池 = {runnable} 题（含外部采源，难度更高；"
+            f"⚠️ {heldout} 是能力分母、{runnable} 只是可跑范围，二者不可互换、不可合并成一个率），"
             + _heldout_clause(hs, abl) +
             f"15 题子集/86.7% 口径已作废。goal_log.jsonl 解出数恒 0，与 KPI 非同源。"
             f"⚠️ ledger-vs-corpus 1 项漂移：AUTHORIZED_KPI_SOLVES=14，但其中 10733 在"
@@ -308,6 +335,8 @@ def render_md(k: dict) -> str:
         f"- **offline_verified = {k['offline_verified']}**（绝对计数，非率；KPI 真值上限）",
         f"- **real_corpus = {k['real_corpus']}**（真题全集分母，data/questions_real/**/*.json 递归）",
         f"- **heldout_candidates = {k['heldout_candidates']}**（unseen 非平凡题池 = LLM 真·自主推理唯一合法分母）",
+        f"- **heldout_runnable_pool = {k['heldout_runnable_pool']}**（可选跑池 = 自有 + 外部采源；"
+        f"**非能力分母**，禁与 heldout_candidates 互换或合并成一个率）",
         f"- **skills = {k['skills']}**（确定性解题 skill 数：skills/*.py 顶层暴露 run() 入口者）",
         f"- **regression_checks = {k['regression_checks']}**（merge-gate 可机器复现回归集条数）",
         f"- 全集覆盖率：{k['offline_verified']}/{k['real_corpus']} = {k['coverage_of_corpus']:.1%}",

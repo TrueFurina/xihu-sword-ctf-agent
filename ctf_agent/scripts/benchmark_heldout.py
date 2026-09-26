@@ -259,8 +259,15 @@ def select_candidates(require_sha256: bool = True,
     而是在建 run 目录时脱敏（隐藏答案），让 agent 无法「看答案」却被正常评测——
     对应指令「答案泄露可以不看答案」。trained/self_authored/answer_disclosed 仍排除。
 
-    external_dir：外部 CTF 平台采源目录（默认 QUESTIONS_EXTERNAL）。存在则并入候选池，
-    复用全部既有排除链（trained/writeup/leaked/source-leaked/sha256），零新诚实逻辑。
+    external_dir：外部 CTF 平台采源目录（**默认 None = 不并入**）。
+    传入 QUESTIONS_EXTERNAL 才并入候选池，复用全部既有排除链
+    （trained/writeup/leaked/source-leaked/sha256），零新诚实逻辑。
+
+    ⚠️ 2026-09-26 修正：原 docstring 写「默认 QUESTIONS_EXTERNAL」与签名 `None` 不符，
+    导致误以为默认就含外部题——实测 `select_candidates()` = 2 题、
+    `select_candidates(external_dir=QUESTIONS_EXTERNAL)` = 17 题，差 15 道。
+    该差异正是 _kpi_canonical 中 heldout_candidates(能力分母) 与
+    heldout_runnable_pool(可选跑池) 的区分来源。
     """
     # 机器真值：14 个已训练题（KPI 口径）
     try:
