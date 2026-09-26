@@ -15,7 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts._kpi_canonical import (  # noqa: E402
     canonical_kpi, count_offline_verified, count_real_corpus,
-    count_heldout_candidates, count_skills, count_regression_checks,
+    count_heldout_candidates, count_heldout_runnable_pool,
+    count_skills, count_regression_checks,
     check_readme_counts, _DEPRECATED_SUBSET,
 )
 
@@ -44,6 +45,41 @@ def test_no_deceptive_heldout_ratio():
         "held-out 覆盖率不得输出数值——14 属已训练题，与 unseen 池不相交，任何比率都是误导"
     assert k["heldout_candidates"] >= 0
     print("✓ test_no_deceptive_heldout_ratio")
+
+
+def test_runnable_pool_is_distinct_from_capability_denominator():
+    """2026-09-26：heldout_candidates(能力分母) 与 heldout_runnable_pool(可选跑池)
+    必须**同时存在且可区分**。
+
+    起因：二者此前在文档/对话中混称（都叫「held-out 池」），已造成一次混淆；
+    且 select_candidates 的 docstring 曾误称「默认并入外部题」（签名实为 None），
+    实测 select_candidates() = 2 题 vs 带 external = 17 题。
+    把 0/17 或 1/17 当能力率，等于把「题更难」说成「能力更低」——是欺骗性比率。
+    """
+    k = canonical_kpi()
+    assert "heldout_runnable_pool" in k, "canonical 必须暴露可选跑池字段（否则二者必然混称）"
+    denom, pool = k["heldout_candidates"], k["heldout_runnable_pool"]
+    assert denom > 0 and pool >= denom, \
+        f"可选跑池({pool}) 不应小于能力分母({denom})"
+    # 能力分母不得被悄悄改成跑池（那会静默改变 KPI 口径）
+    assert denom == count_heldout_candidates(), "heldout_candidates 与机器真值脱钩"
+    assert pool == count_heldout_runnable_pool(), "heldout_runnable_pool 与机器真值脱钩"
+    print(f"✓ test_runnable_pool_is_distinct_from_capability_denominator "
+          f"(能力分母={denom}, 可选跑池={pool})")
+
+
+def test_runnable_pool_includes_external_questions():
+    """可选跑池必须真的含外部采源：显式传 external_dir 才并入（默认 None 不并入）。"""
+    from scripts.benchmark_heldout import select_candidates, QUESTIONS_EXTERNAL
+    without_ext, _ = select_candidates()
+    with_ext, _ = select_candidates(external_dir=QUESTIONS_EXTERNAL)
+    pool = count_heldout_runnable_pool()
+    assert len(without_ext) == count_heldout_candidates(), \
+        "能力分母应等于「不并入外部题」的选池结果"
+    assert pool == len(with_ext), "可选跑池应等于「并入外部题」的选池结果"
+    assert len(with_ext) >= len(without_ext), "并入外部题后跑池不应变小"
+    print(f"✓ test_runnable_pool_includes_external_questions "
+          f"({len(without_ext)} → {len(with_ext)})")
 
 
 def test_kpi_and_heldout_sets_disjoint():
