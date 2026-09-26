@@ -1,5 +1,20 @@
 # Held-out 重测报告 · 首次真实 LLM 实测 + P0 验证器修复（2026-09-19）
 
+> ⚠️ **2026-09-26 口径更正：本文的能力数字已作废，请勿单独引用**
+>
+> 本文基于 **10 题** held-out 池。该池后被确认**受污染**：7 道 WRITEUP 重建题（flag 明文在附件）
+> + 1 道源码泄露 web 题（`real_web_gongye_web2`，flag 就在其提供的 `index.php` 内）。
+> 2026-09-21/22 清洗后，**合法能力分母收敛为 2 题**，本文的 `1/10`、`4/10`
+> 以及 566,570 / 696,506 tokens 均**不再作为能力率引用**。
+>
+> **当前口径（唯一真值＝`scripts/_kpi_canonical.py`）**：
+> - `heldout_candidates = 2` —— **能力分母**。LLM 自主推理 **1/2**（`real_crypto_dnui_keyboard`，sha256 闭环），另一题 `real_reverse_js` 由确定性 presolve 解出。
+> - `heldout_runnable_pool = 17` —— **可选跑池**（2 自有 + 15 道外部 Google CTF 采源）。难度显著更高（单题 token 成本约为干净池的 ~50×），抽样跑过的题全部未解出，报告被机器标记 `integrity.interpretable=false`，**不是能力分母**。
+> - 两者**不可互换、不可合并成一个率**。
+>
+> 本文保留作为**历史过程记录**（当时确属真实实测、非编造），不代表当前结论。
+> 口径演进与复核见 `deliverables/锐评质检/heldout_P0修复验证复核_20260926.md`。
+
 > **事件**：9-17 provider 全灭导致 held-out 无法真实测量；9-19 凌晨网络恢复 + deepseek 充值生效（探测 5 源可用：deepseek/ark/tokenhub/xfyun/moonshot），第一时间按同协议重测；随后在幻觉攻坚中挖出 **P0 级验证器 bug 并修复，held-out 从 1/10 修正为 4/10**。
 > **口径**：`real_main_agent` 全链路，`--presolve-skip` 强制主 Agent，冷黑板（备份→清空→恢复，杜绝跨会话 flag 缓存），E3 附件证据注入 ON，wallclock 300s/题，provider=deepseek，单题 token 预算 160K（2x 对照确认预算非瓶颈后沿用）。
 > **隔离合规**：跑经 `_heldout_rerun_wrapper.py`，MANIFEST/RUN_DIR/OUT_DIR 全部重定向到唯一目录，共享 `heldout/` 9-17 真值报告零触碰（并发写入红线执行案例）。
