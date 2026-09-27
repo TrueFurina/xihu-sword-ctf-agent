@@ -93,6 +93,24 @@ The single machine-enforced KPI is **`offline_verified`** — the number of *his
 
 Interpretation: **capability = static-analyzer coverage**, not LLM reasoning. To solve more problem types, write more deterministic skills. We say this plainly because over-claiming is the easiest way to embarrass an open-source security tool.
 
+## Known limitations
+
+We publish these because they are **structural**, not because they are modest.
+
+1. **This measures static-analysis coverage, not reasoning.** Every solve in the strict KPI (`offline_verified`) comes from the deterministic pre-solve layer. The KPI contains **no web solve and no pwn solve** — those categories usually require live target interaction or dynamic debugging, which an offline deterministic analyzer does not do. That is a design boundary, not a backlog item.
+
+2. **The corpus and the capability point in different directions.** `misc` is the single largest category in the corpus, but verified deterministic coverage concentrates in `crypto` and `reverse`. We do not write one solver per problem, so this gap cannot be closed by tuning — it closes only by adding deterministic skills.
+
+3. **The held-out measurement is real, but far too small to extrapolate.** The held-out ability denominator is currently **2 problems**. In that run the pool scored 2/2 — one solve from the deterministic pre-solve layer and **one** from LLM autonomous reasoning. We report the LLM number because it is what happened, and we refuse to inflate it: **1 of 2 is not a capability claim.** Our own sample ladder requires 8 → 12 → 20 → 30 → 60 before a result may be extrapolated; at 2 samples this is a data point, not a conclusion. It is also a **single run that we have not repeated** — an earlier run of the same problem did not solve it — so we do not claim it reproduces.
+
+4. **Two held-out numbers exist; do not divide one by the other.** `2` is the ability denominator. `17` is the *runnable* pool (wider sourcing, harder problems) and is a candidate pool for expansion, **not** a denominator. Our tooling emits `coverage_of_heldout = None` rather than produce a ratio between two non-comparable sets.
+
+5. **Everything here is offline.** All "solved" figures describe offline deterministic analysis of historical problems, never a live-contest score — our real contest result was **0 accepted flags**.
+
+> Sources (reproduce yourself): `python scripts/_kpi_canonical.py` (offline_verified / real_corpus / heldout_candidates / heldout_runnable_pool); `scripts/_antifraud.py` (`BASE_AUTHORIZED_KPI_SOLVES` ∪ `PROMOTION_EVIDENCE` = the strict-KPI whitelist); `ctf_agent/heldout_evidence/benchmark_report_clean2_20260922_deepseek.json` (`mode=real_main_agent`).
+
+> **Full post-mortem (Chinese, unabridged):** the [14 original retrospective documents](deliverables/复盘赛报/) — root-cause timeline, fix evidence, and the failures we have **not** fixed — are published in this repo as-is.
+
 ## Security & compliance
 
 This repo publishes the **engineering skeleton and methodology only**. Red lines:
