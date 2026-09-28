@@ -181,11 +181,39 @@ class ExecutorAgent:
 
 
 # ── Reflect ─────────────────────────────────────────────────
+# ── 占位符假阳性防御 ────────────────────────────────────────
+# 实测教训（2026-09-28 真机真题批次1）：LLM 会 `echo "flag{...}"` 打印**字面占位符**，
+# 而"输出命中 flag 正则 = SUCCESS"会把它当真解出 → 伪造能力数字。
+# 本守卫把"明显是占位符而非真实 flag"的命中剔除；真正的解出仍以
+# **本地 sha256 比对**（题面元数据 flag_sha256）为唯一可采信闸门。
+_PLACEHOLDER_WORDS = {
+    "", "flag", "yourflag", "your_flag", "placeholder", "redacted",
+    "here", "todo", "xxx", "tbd", "insertflag", "insert_flag", "unknown",
+}
+_PLACEHOLDER_PUNCT_RE = re.compile(r"^[\s.\-_*xX?]+$")
+
+
+def looks_like_placeholder(flag: str) -> bool:
+    """flag 命中是否明显是占位符（非真实解出）。只做保守剔除，不猜 flag。"""
+    if not flag:
+        return True
+    m = re.search(r"\{(.*)\}", flag, re.DOTALL)
+    if not m:
+        # 无花括号的匹配（如裸 flag 前缀）保守视为非占位符，交给上层判定
+        return False
+    raw_inner = m.group(1)
+    if _PLACEHOLDER_PUNCT_RE.match(raw_inner):
+        return True
+    alnum = re.sub(r"[^A-Za-z0-9]", "", raw_inner).lower()
+    return alnum in _PLACEHOLDER_WORDS
+
+
 class ReflectAgent:
     """判定当前轮是否解出 / 需重规划 / 卡死。
 
     判定优先级（确定性优先）：
-    1. 会话输出已命中 flag → SUCCESS（不看 LLM，避免伪造）。
+    1. 会话输出已命中 flag **且非占位符** → SUCCESS（不看 LLM，避免伪造）。
+       占位符由 `looks_like_placeholder` 剔除（防 `echo "flag{...}"` 假成功）。
     2. 若注入了 LLM，可叠加语义判定（可选，不强制）。
     3. 默认启发式：轮次用尽 → STUCK；否则 FAIL_REPLAN（带反馈）。
     """
@@ -195,13 +223,34 @@ class ReflectAgent:
         self.llm = llm
         self.flag_pattern = flag_pattern
 
+    def flag_hit(self, session: Optional[Session]) -> Optional[str]:
+        """会话输出里的**首个非占位符** flag 命中（没有则 None）。
+
+        优先遍历 ``session.history``（可跳过占位符继续往后找真 flag）；
+        会话对象没有 history（如单测里的轻量替身）时，回退到
+        ``grep_output`` 并对结果做同样的占位符检查——保证判定口径一致。
+        """
+        if not session:
+            return None
+        history = getattr(session, "history", None)
+        if history is None:
+            hit = session.grep_output(self.flag_pattern)
+            return None if (hit and looks_like_placeholder(hit)) else hit
+        rx = re.compile(self.flag_pattern)
+        for r in history:
+            m = rx.search((r.stdout or "") + (r.stderr or ""))
+            if m and not looks_like_placeholder(m.group(0)):
+                return m.group(0)
+        return None
+
     def reflect(self, plan: Plan, session: Session,
                 results: list[StepResult], round_no: int,
                 max_rounds: int) -> Reflection:
-        # 1) 确定性：flag 已在会话输出里出现
-        if session and session.grep_output(self.flag_pattern):
+        # 1) 确定性：flag 已在会话输出里出现，且非占位符（防 echo "flag{...}" 假成功）
+        hit = self.flag_hit(session)
+        if hit:
             return Reflection(Verdict.SUCCESS, "",
-                              "flag 已在会话输出中命中（确定性判定）")
+                              f"flag 已在会话输出中命中（确定性判定，非占位符）: {hit}")
 
         # 2) 可选 LLM 语义判定（注入时才用）
         if self.llm is not None:
@@ -286,4 +335,5 @@ class AgentLoop:
 __all__ = [
     "SubtaskKind", "Subtask", "Plan", "StepResult", "Verdict", "Reflection",
     "LoopOutcome", "PlannerAgent", "ExecutorAgent", "ReflectAgent", "AgentLoop",
+    "looks_like_placeholder",
 ]
