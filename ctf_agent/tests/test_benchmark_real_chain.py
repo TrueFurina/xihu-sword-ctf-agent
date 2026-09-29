@@ -105,13 +105,20 @@ def _mk_result(qid, category, *, solved=False, error=None, duration_ms=1000, ret
     return BenchmarkResult(q, output, duration_ms, retries)
 
 
-def test_summarize_flags_uninterpretable_report_when_not_attempted():
-    """有零执行题 + 被预算掐断 → interpretable=False，且两者分别点名。"""
+def test_summarize_flags_uninterpretable_report_when_zero_work():
+    """零执行题（duration_ms=0）+ 机制终结题 → interpretable=False，且分别点名。
+
+    2026-09-29 修复前：budget_exceeded 被算进「被外部掐断」，导致所有含预算烧穿的
+    held-out 报告都被误标 interpretable:False。修复后 budget_exceeded 归机制终结，
+    不再污染 interpretable；只有「真零执行」或「真·外部故障」才让它为 False。
+    """
     from eval.benchmark import summarize
 
     results = [
+        # 机制终结：题真跑过（duration_ms=80930），因预算烧穿终态失败——属正常判负
         _mk_result("burned", "crypto", error="budget_exceeded", duration_ms=80930, retries=3),
-        _mk_result("never_ran", "misc", error="budget_exceeded", duration_ms=0, retries=3),
+        # 真零执行：一步没走
+        _mk_result("never_ran", "misc", duration_ms=0, retries=3),
     ]
     s = summarize(results)
     ig = s["integrity"]
@@ -119,11 +126,38 @@ def test_summarize_flags_uninterpretable_report_when_not_attempted():
     assert ig["attempted"] == 1, "零执行的题不应计入 attempted"
     assert ig["zero_work_not_attempted"] == 1
     assert ig["not_attempted_ids"] == ["never_ran"]
-    assert ig["truncated"] == 2
-    assert ig["interpretable"] is False
-    assert s["by_error"] == {"budget_exceeded": 2}
+    # 机制终结与真故障已分拆：budget_exceeded 不再算 truncated
+    assert ig["mechanism_terminated"] == 1
+    assert ig["mechanism_terminated_ids"] == ["burned"]
+    assert ig["truncated"] == 0
+    assert ig["interpretable"] is False, "存在零执行题 → 仍不可解释"
+    assert s["by_error"] == {"budget_exceeded": 1, "no_output": 1}
     # 关键：solve_rate 仍是 0.0，但 integrity 明确标注不可作为能力率引用
     assert s["solve_rate"] == 0.0
+
+
+def test_summarize_mechanism_terminated_not_flagged_uninterpretable():
+    """回归锁（2026-09-29）：全机制终结（早停/预算烧穿，题已跑过）不得误标 interpretable:False。
+
+    原 bug：race_abandon/budget_exceeded 被算进「被外部掐断」→ held-out 17 池 / M2
+    对照报告全部被标不可解释（实际 8 题全真跑过）。修复后这类只归 mechanism_terminated，
+    interpretable 应为 True。
+    """
+    from eval.benchmark import summarize
+
+    cats = ["crypto", "misc", "reverse", "web", "pwn", "crypto", "misc", "crypto"]
+    errs = ["race_abandon", "race_abandon", "budget_exceeded", "race_abandon",
+            "budget_exceeded", "race_abandon", "race_abandon", "budget_exceeded"]
+    results = [
+        _mk_result(f"q{i}", c, error=e, duration_ms=1000 + i * 100, retries=2)
+        for i, (c, e) in enumerate(zip(cats, errs))
+    ]
+    s = summarize(results)
+    ig = s["integrity"]
+    assert ig["mechanism_terminated"] == 8
+    assert ig["truncated"] == 0
+    assert ig["zero_work_not_attempted"] == 0
+    assert ig["interpretable"] is True, "机制终结（题已跑过）不得误标不可解释"
 
 
 def test_summarize_interpretable_when_all_attempted_and_clean():
