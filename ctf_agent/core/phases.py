@@ -123,6 +123,10 @@ async def plan_step(agent, ctx: AgentContext, attempt: int) -> dict:
         "模板判断题型并输出可复现 payload，禁止纯推理空转（复盘修复：本地 web 0/6 空转）。"
         "若常规推理/工具均失败、连续 stuck_loop 或附件编码不明，必须调用 tool:deterministic_decode "
         "自动尝试多策略解码（base64/hex/morse/ROT13/zip链/DNS隧道/RAID0）；"
+        "【持久工作区】你可输出 {\"action\": \"command\", \"command\": \"<shell 命令>\", "
+        "\"detail\": \"...\", \"stage\": \"exploit\", \"done\": false} 在持久工作区执行 shell 命令"
+        "（file/strings/gdb/管道交互/多命令组合等），工作目录跨步保留、产物自动索引；"
+        "严禁用 command 执行 echo/print 直接打印 flag 字面量冒充答案（此类输出会被 sha256 闸拒绝）。"
         "【重要】只输出一个 JSON 对象，禁止输出 JSON 以外的任何文字、"
         "前言、解释、代码围栏或 Markdown 标记，严格以 { 开头以 } 结尾。"
     )
@@ -224,6 +228,41 @@ async def act_step(agent, ctx: AgentContext, plan: dict, attempt: int) -> dict:
             res.setdefault("source", plan.get("detail", "") or "")
         return res
 
+    # ── G1 持久会话 command 动作（2026-09-29 接入运行时）──
+    # LLM 直接下发 shell 命令，在每题持久工作区执行（cwd 跨步保留 + 产物索引 +
+    # 会话历史）。命令本身作为 source 带出 → 既有 print-leak 闸可拦截
+    # `echo "flag{...}"` 式硬编码；sha256 仲裁 / provenance 闸照常生效。
+    # kind 返回 "script" 以复用 provenance 闸的 in_cur_output 证据语义。
+    if action == "command":
+        _cmd = str(plan.get("command", "") or detail).strip()
+        _gsess = getattr(ctx, "g_session", None)
+        if not _cmd:
+            return {"kind": "reason", "output": "command 动作为空，请给出具体 shell 命令"}
+        if _gsess is None:
+            # 会话未启用：退回沙盒执行（无跨步状态，但命令仍可跑）
+            if agent.sandbox is not None:
+                _res = await agent.sandbox.run(_cmd)
+                _out = str(getattr(_res, "stdout", "")) + str(getattr(_res, "stderr", ""))
+                return {"kind": "script", "output": _out,
+                        "error": str(getattr(_res, "stderr", "")) if getattr(_res, "returncode", 0) not in (0, None) else "",
+                        "command": _cmd, "source": _cmd}
+            return {"kind": "reason", "output": "command 不可用（无持久会话且无沙箱）"}
+        _timeout = int(plan.get("timeout", 60) or 60)
+        import asyncio as _aio
+        _rec = await _aio.to_thread(_gsess.run, _cmd, _timeout, str(plan.get("detail", "")))
+        # G5：命令记录入会话记忆（规则式事实抽取，零 token）
+        _gmem = getattr(ctx, "g_memory", None)
+        if _gmem is not None:
+            try:
+                _gmem.add(_rec)
+            except Exception as _mexc:  # noqa: BLE001 - 记忆失败不阻塞执行
+                logger.warning("[%s] G5 记忆写入异常: %s", getattr(ctx.question, "id", "?"), _mexc)
+        _out = (f"[rc={_rec.returncode}]\n" + (_rec.stdout or "") + (_rec.stderr or ""))
+        # rc>0（如 grep 无匹配）是常见正常信号，不算工具失败；仅超时/执行异常算
+        _err = (_rec.stderr or "") if _rec.returncode < 0 else ""
+        return {"kind": "script", "output": _out, "error": _err,
+                "command": _cmd, "source": _cmd}
+
     if (
         action not in ("tool", "script")
         and getattr(ctx.question, "attachments", None)
@@ -298,9 +337,11 @@ def observe_step(agent, ctx: AgentContext, plan: dict, act: dict) -> StepRecord:
         )
     if kind == "script":
         _obs = _truncate_preserve_tail(str(output), 3000) if output else ""
+        # G1 command 动作在 act 结果里带 command 字段 → 观察记录打 command 标（可审计）
+        _action = "command" if act.get("command") else "script"
         return StepRecord(
             stage=plan.get("stage", STAGE_EXPLOIT),
-            action="script",
+            action=_action,
             observation=_obs,
             error_category=ERR_TOOL_FAILURE if act.get("error") else None,
         )

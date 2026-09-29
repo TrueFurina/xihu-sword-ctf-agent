@@ -169,6 +169,10 @@ class AgentContext:
     knowledge_hits: Optional[list] = None
     # budget-reflection（race-intelligence 第二层，2026-08-27）：预算反思决策快照（只读日志写入）
     last_reflection: Optional[dict] = None
+    # G1/G5（2026-09-29 接入运行时）：持久会话 + 会话记忆。
+    # solve() 按 g_session 开关创建；None = 未启用（行为与旧版完全一致）。
+    g_session: Optional[Any] = None   # core.session.Session（跨步 shell 工作区）
+    g_memory: Optional[Any] = None    # core.memory.SessionMemory（规则式事实抽取，零 token）
 
     def is_stuck(self) -> bool:
         return self.stuck_count >= 3
@@ -313,6 +317,7 @@ class MainAgent:
         llm_call_budget: Optional[int] = None,         # E2 每题 LLM 调用上限（None→env/默认12）
         few_shot: Optional[bool] = None,               # E6 few-shot 方向范例注入（None→env/默认关）
         e3_enabled: Optional[bool] = None,             # E3 附件证据注入开关（None→env/默认关）
+        g_session: Optional[bool] = None,              # G1/G5 持久会话开关（None→env/默认开）
     ):
         self.llm_client = llm_client
         self.registry = registry
@@ -361,6 +366,11 @@ class MainAgent:
         # 使"证据不进脑"可被 error_struct.evidence_injected 真实度量（见 _chain_stats）。
         self.e3_enabled = bool(e3_enabled) if e3_enabled is not None \
             else bool(os.getenv("CTF_AGENT_E3", ""))
+        # G1/G5（2026-09-29 接入运行时）：持久会话 + 会话记忆，默认开（用户已批准接入）。
+        # CTF_AGENT_G_SESSION=0 可关（A/B 对照旧基线）。仅影响 LLM 步（新增 command 动作
+        # 与会话记录注入）；presolve / 预算 / 墙钟 / 反幻觉闸等护栏全部不变。
+        self.g_session = bool(g_session) if g_session is not None \
+            else os.getenv("CTF_AGENT_G_SESSION", "1") not in ("", "0", "false")
 
     # ── 放弃前确定性兜底（M3 2026-08-29）────────────────
 
@@ -430,6 +440,25 @@ class MainAgent:
             logger.warning("[%s] 确定性预扫异常: %s", getattr(question, "id", "?"), _exc)
         # 墙钟硬止损起点（2026-08-20 锐评 P0-2）：solve() 入口记 monotonic 时间，
         # 每步检查 elapsed，超 per_question_wallclock 即 break + 标记 wallclock_timeout。
+        # G1/G5（2026-09-29 接入运行时）：为每题建持久 shell 工作区（cwd 跨步保留 +
+        # 命令历史 + 产物索引）和会话记忆（规则式事实抽取，零 token）。时间戳子目录
+        # 防并发/重跑互踩；创建失败绝不阻塞主流程（退化为无会话旧行为）。
+        if self.g_session:
+            try:
+                from core.session import Session as _Session
+                from core.memory import SessionMemory as _SessionMemory
+                _qid = str(getattr(question, "id", "unknown")) or "unknown"
+                _base = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "data", "results", "g_sessions")
+                _ws = os.path.join(_base, f"{_qid}_{int(time.time()*1000)}")
+                os.makedirs(_ws, exist_ok=True)
+                ctx.g_session = _Session(_ws, session_id=_qid)
+                ctx.g_memory = _SessionMemory(_qid)
+                logger.info("[%s] G1 持久会话已建立: %s", _qid, _ws)
+            except Exception as _gexc:  # noqa: BLE001 - 会话失败不阻塞解题
+                logger.warning("[%s] G1 会话创建失败（退化为无会话）: %s",
+                               getattr(question, "id", "?"), _gexc)
         ctx._start_monotonic = time.monotonic()
         # 高难题首步上重型深推理（2026-08-21 锐评高难题攻坚）：
         # HARD/VERY_HARD 题第一步就升级到重型模型（attempt>=2 触发 heavy_model），

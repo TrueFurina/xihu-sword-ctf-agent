@@ -94,6 +94,23 @@ def build_plan_prompt(ctx, attempt: int) -> str:
     if ctx.steps:
         recent = [f"{s.stage} | {s.action} | {s.observation[:1200]}" for s in ctx.steps[-3:]]
         parts.append("已执行步骤:\n" + "\n".join(recent))
+    # G1/G5（2026-09-29 接入运行时）：持久工作区会话记录注入 plan prompt。
+    # 这是"LLM 贡献 0/14"根因（证据不进脑）的会话层修复：下一步能看到上一步
+    # 真实命令与完整输出（而非仅近 3 步 1200 字摘要）。优先用 G5 压缩记忆
+    # （关键事实保序 + 最近历史完整），回退 Session.transcript。超限截断保尾。
+    _gsess = getattr(ctx, "g_session", None)
+    if _gsess is not None and getattr(_gsess, "history", None):
+        _gmem = getattr(ctx, "g_memory", None)
+        try:
+            _summary = _gmem.compact(keep_recent=5) if _gmem is not None else _gsess.transcript()
+        except Exception:  # noqa: BLE001 - 记忆压缩失败回退原始 transcript
+            _summary = _gsess.transcript()
+        if len(_summary) > 4000:
+            _summary = _summary[:1600] + "\n...[截断]...\n" + _summary[-2000:]
+        parts.append(
+            "【持久工作区会话记录】（以下为真实执行的命令与输出，工作目录跨步保留；"
+            "继续解题可输出 action=command 在同一工作区执行下一条命令）:\n" + _summary
+        )
     # presolve web 源码审计报告注入 LLM：presolve 写入 question.extra 的审计线索
     # 必须被 plan/reason prompt 消费，否则 LLM 在 web 题上从零空转。
     _extra = getattr(q, "extra", None) or {}
