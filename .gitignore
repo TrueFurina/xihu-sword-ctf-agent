@@ -168,3 +168,18 @@ ctf_agent/data/questions_real/_attachments/
 
 # ---------- 16. pytest 临时运行目录（测试产物，绝不入库） ----------
 ctf_agent/.pytest_tmp*
+
+# ---------- 17. 竞赛时代遗留材料（2026-09-29「不打比赛」终局指令后作废） ----------
+# 背景：2027-prep/ 下含 6847 个文件（cybench/ 是完整 vendored 第三方基准仓，
+# 含其 LICENSE / Dockerfile / 评分脚本）。实测 `git add -An` 会因该目录一次纳入
+# 6854 个文件 —— 本仓库严禁使用 `git add -A` / `git add .`。
+# 处置：此处做「不删改、不移动、只屏蔽」的非破坏性收口；是否整体归档到 _archive/
+# 待项目负责人决定（归档须另做数量与哈希核对，且其中 M2_E3对照 是 E3 定调的引用源，
+# 有持续价值，不得随目录整体掩埋）。
+# ⚠️ gitignore 不会取消已有跟踪。以下 4 份仍为已跟踪状态，不受本规则影响：
+#    2027-prep/差异分析-SOTA对比-20260928.md
+#    ctf_agent/2027-prep/M1_分辨率_20260929.md
+#    ctf_agent/2027-prep/M2_E3对照_20260929.md
+#    ctf_agent/2027-prep/作战规划_2027.md
+/2027-prep/
+ctf_agent/2027-prep/
