@@ -337,9 +337,11 @@ def main() -> None:
     parser.add_argument("--questions-dir", default="data/questions")
     parser.add_argument("--results-dir", default="data/results")
     parser.add_argument("--mock", action="store_true", help="使用 Mock 求解器（数字禁止引用，仅回归）")
-    parser.add_argument("--provider", default="baidu",
-                        help="真实模式 LLM provider；支持逗号分隔多 provider（如 baidu,qwen）顺序跑，"
-                             "报告含 per_provider 与各 provider 均解出(robust 交集)，避免单 provider 熔断致 KPI 不可复现")
+    parser.add_argument("--provider", default="deepseek",
+                        help="真实模式 LLM provider；支持逗号分隔多 provider（如 deepseek）顺序跑，"
+                             "报告含 per_provider 与各 provider 均解出(robust 交集)，避免单 provider 熔断致 KPI 不可复现。"
+                             "注意：原默认值 baidu 已欠费（403 account_overdue，实测不可达），真跑一律 deepseek；"
+                             "不要因本默认值而省略 --provider 以外的省钱约束（真实跑批仍须先估 token 与金额并获授权）。")
     parser.add_argument("--max-retries", type=int, default=3)
     parser.add_argument("--limit", type=int, default=0, help="只跑前 N 题（真实模式省钱调试，0=全部）")
     parser.add_argument("--wallclock", type=float, default=300.0,
