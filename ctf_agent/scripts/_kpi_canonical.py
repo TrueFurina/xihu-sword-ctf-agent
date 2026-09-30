@@ -66,6 +66,11 @@ HELDOUT_EVIDENCE = ROOT / "heldout_evidence"
 # 2026-09-22 清洗后「干净未见题」实测：P0-a 排除 43 道 WRITEUP 重建题 + 源码泄露闸
 # 排除 gongye_web2（flag 明文在提供的 index.php），分母 10→2。deepseek + E3 证据注入，
 # 2/2 解出（LLM 自主推理 1/2：dnui_keyboard；确定性 presolve 1/2：real_reverse_js），sha256 真值闭环。
+# 🔴 2026-10-01 口径更正：上述「LLM 自主推理 1」已由两次独立实测推翻——
+#    real_crypto_dnui_keyboard 在 2026-09-29（全 17 题池）与 2026-10-01（NYU 分层 5 题，
+#    冷黑板 + E3 ON + deepseek）中均判定为 solved_by=presolve（78ms、tokens≈0）。
+#    该报告仍作为「当时真实的历史过程记录」保留（不删改、不更名），但其中的
+#    LLM 自主推理数不得再作为当前真值引用；输出层已改为带更正说明的措辞。
 _HELDOUT_CLEAN_REPORT = HELDOUT_EVIDENCE / "benchmark_report_clean2_20260922_deepseek.json"
 # 旧 1×/2× 预算对照报告已更名 .SUPERSEDED_contaminated_pool_*（10 题污染池 + bug2 坏验证器），
 # 其「瓶颈是能力不是预算」结论基于坏数据，作废不再引用；clean-2 池太小不做对照。
@@ -277,8 +282,14 @@ def _heldout_clause(hs: dict, abl: dict) -> str:
     # 已作废；clean-2 池（n=2）太小不做对照，故此处不再追加任何预算结论。
     return (
         f"该池已实测（{hs['report']}）：池内 {hs['solved_total']}/{hs['pool_total']}"
-        f"（确定性 presolve {hs['solved_by_presolve']} + LLM 自主推理 {hs['solved_by_llm']}）/ "
-        f"LLM 自主推理 {hs['solved_by_llm']}/{hs['pool_total']}；"
+        f"（确定性 presolve {hs['solved_by_presolve']} + 报告记为 LLM 自主推理 {hs['solved_by_llm']}）。"
+        f"⚠️ 口径更正（2026-10-01）：该报告所记「LLM 自主推理 {hs['solved_by_llm']}」对应的题目 "
+        f"real_crypto_dnui_keyboard，已在 2026-09-29（全 17 题池）与 2026-10-01"
+        f"（NYU 分层抽样 5 题，冷黑板 + E3 ON + deepseek）两次独立实测中均被判定为 "
+        f"solved_by=presolve（78ms、tokens≈0）→ 该数值不成立，应作废；"
+        f"当前可验证的大模型自主解出数为 0。"
+        f"注：{hs['pool_total']} 是能力分母 heldout_candidates，与可选跑池 "
+        f"heldout_runnable_pool 不得混算为同一比率（coverage_of_heldout 恒为 None）。"
     )
 
 

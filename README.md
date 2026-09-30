@@ -4,6 +4,8 @@
 
 > ⚠️ **Honesty disclaimer (read first)**: This project's real-world competition result on the live platform was **0 accepted flags**. All "solved / pass-rate" figures in this repo refer to **offline deterministic analysis** of historical CTF problems (the `data/questions_real/` corpus), not any live contest score. We do not claim LLM autonomous reasoning capability — the real capability here is a **deterministic static analyzer (presolve)** covering common CTF categories. See [Honest KPI](#honest-kpi) below.
 
+> 🔴 **口径更正 / Figure correction (2026-10-01)**: the "**LLM autonomous reasoning 1 / 2**" figure quoted in this README (from the 2026-09-22 clean-2 report) is **superseded and must not be cited as current truth**. The single problem behind that "1" — `real_crypto_dnui_keyboard` — was judged `solved_by=presolve` (78 ms, ≈0 tokens) in **two independent runs**: the 2026-09-29 full 17-problem pool, and the 2026-10-01 NYU stratified 5-problem trial (cold blackboard, E3 ON, deepseek). **The current verified count of LLM autonomous solves is 0.** Per project policy the original wording below is retained verbatim as a historical record of what was true at the time; this notice is what overrides it. Reminder: `2` is the *capability denominator*, `17` is only the *runnable pool* — never divide one by the other, and do not present `0/17` or `0/5` as a capability percentage.
+
 An open-source **AI agent framework for CTF (Capture The Flag)** competitions. The agent polls a DASCTF-style platform, triages challenges, runs deterministic solvers first, and only escalates to an LLM when static analysis misses. Built and battle-tested against the *West Lake Sword Tournament (西湖论剑)* AI CTF track.
 
 ---
