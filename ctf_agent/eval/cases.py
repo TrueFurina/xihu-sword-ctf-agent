@@ -136,6 +136,13 @@ def load_questions(questions_dir: str = "data/questions",
     questions: list[Question] = []
     skipped_disclosed = 0
     for json_file in sorted(base.rglob("*.json")):
+        # 2026-09-30 修复：跳过附件目录——附件里可能存在 .json 输入文件
+        # （如 collusion 题的 bobs-key.json/carols-key.json/message.json），
+        # 会被 rglob 误当题目 JSON 解析，污染题库（misc 虚增 2→5）。
+        # 只扫题目 JSON，附件只由题目 JSON 的 attachments 字段显式引用。
+        _rel_parts = {p.lower() for p in json_file.relative_to(base).parts[:-1]}
+        if _rel_parts & {"_attachments", "answers", "_answers", "_keys", "_solutions"}:
+            continue
         try:
             with open(json_file, "r", encoding="utf-8") as fh:
                 data = json.load(fh)

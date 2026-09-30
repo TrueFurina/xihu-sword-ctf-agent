@@ -150,6 +150,13 @@ ctf_agent/data/questions_real/_attachments/
 **/flag.png
 **/*.flag
 
+# ---------- 14c. 开源基准适配题池（刻意不入库，勿加否定规则） ----------
+# data/questions_ext/ 由 scripts/_bench_adapter.py 从 NYU CTF Bench（GPL-2.0 传染性许可）
+# 等开源基准适配而来，属第三方衍生数据：本地可跑，但不得随本仓分发。
+# 现状：靠 ctf_agent/.gitignore 的 `/data/*` 整体忽略，与 data/questions_external/ 一致。
+# 🔴 请勿比照 questions_real 添加 `!data/questions_ext/` 否定规则 —— 那会把 GPL 数据带进 git。
+# 题目 JSON 里的附件一律只指向 data/questions_ext/_attachments/（gitignore 内），答案只存 sha256。
+
 # ---------- 15. 反注水违规账（必须入库，不可忽略——注水行为的永久惩罚记录） ----------
 # violations.jsonl 是写死法令的"严厉惩罚"落点，必须纳入版本控制、可被审计追责，
 # 绝不允许被任何忽略规则吞掉。若上方规则意外命中，以下否定优先。
