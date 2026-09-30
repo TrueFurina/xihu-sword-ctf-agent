@@ -32,6 +32,10 @@ import urllib.parse
 from pathlib import Path
 from urllib.request import ProxyHandler, build_opener
 
+# 能力信封分档（同目录零依赖模块）：落盘时给每题打 A/B/C/D1/D2
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _envelope_band  # noqa: E402
+
 # ---------------------------------------------------------------- 常量
 
 RAW = "https://raw.githubusercontent.com/{repo}/{branch}/{path}"
@@ -277,6 +281,15 @@ def build_one(op, src: dict, tree: dict, rec: dict, out_dir: Path,
     # 4) 写本项目 Question JSON
     rel_atts = [str((att_root / cat / tid / Path(p).name)).replace("\\", "/")
                 for p in saved]
+
+    # 能力信封分档（零 LLM 成本）：落盘即自带 band，免得每次人肉诊断。
+    # 2026-10-01：首测「0/5」里 4/5 题在信封外（pcap/视觉/qemu/ELF），
+    # 把「框架边界」误读成了「解题能力」。固化后任何批次都能自动分层汇报。
+    try:
+        band, band_reason = _envelope_band.classify(
+            rel_atts, result.get("description", ""), cat, base=Path.cwd())
+    except Exception as exc:                       # 分档失败不阻断落盘
+        band, band_reason = "?", f"分档异常 {type(exc).__name__}"
     doc = {
         "id": f"ext_{src['repo'].split('/')[-1].lower()}_{tid.replace('-', '_')}",
         "provenance": "real_past_ctf",
@@ -292,6 +305,8 @@ def build_one(op, src: dict, tree: dict, rec: dict, out_dir: Path,
             "upstream": src["repo"], "upstream_path": tpath,
             "upstream_license": src["license"],
             "event": rec.get("event"), "year": rec.get("year"),
+            "envelope_band": band,          # A/B/C/D1/D2，见 scripts/_envelope_band.py
+            "envelope_reason": band_reason,
         },
     }
     out_file = out_dir / cat / f"{doc['id']}.json"
@@ -299,6 +314,7 @@ def build_one(op, src: dict, tree: dict, rec: dict, out_dir: Path,
     out_file.write_text(json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8")
 
     result["status"] = "OK"
+    result["envelope_band"] = band
     result["n_saved"] = len(saved)
     result["bytes"] = task_bytes
     result["json"] = str(out_file)
@@ -369,6 +385,10 @@ def main() -> int:
     print(f"可测题: {len(ok)}/{len(results)} | 落盘 {budget['used']/1048576:.2f}MB | "
           f"耗时 {time.time()-t0:.1f}s")
     print("按类别:", dict(Counter(r["category"] for r in ok)))
+    bands = Counter(r.get("envelope_band", "?") for r in ok)
+    print("按能力信封:", dict(sorted(bands.items())))
+    print(f"  -> A 档（纯静态，唯一可解释的能力分母）= {bands.get('A', 0)}；"
+          f"信封外 = {sum(v for k, v in bands.items() if k != 'A')}")
 
     report = Path("../logs")
     report.mkdir(exist_ok=True)

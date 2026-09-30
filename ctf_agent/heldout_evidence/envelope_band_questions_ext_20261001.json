@@ -1,0 +1,142 @@
+{
+  "summary": {
+    "total": 34,
+    "by_band": {
+      "D2": 1,
+      "D1": 17,
+      "B": 1,
+      "C": 3,
+      "A": 12
+    },
+    "static_envelope": 12,
+    "by_category": {
+      "crypto": {
+        "A": 8
+      },
+      "forensics": {
+        "D1": 4,
+        "B": 1,
+        "C": 1,
+        "A": 3
+      },
+      "misc": {
+        "C": 2
+      },
+      "rev": {
+        "D1": 13,
+        "D2": 1,
+        "A": 1
+      }
+    }
+  },
+  "rows": [
+    {
+      "id": "ext_nyu_ctf_bench_2017f_cry_ecxor",
+      "category": "crypto",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Finals 2017 ECXOR",
+      "n_att": 3,
+      "json": "data\\questions_ext\\crypto\\ext_nyu_ctf_bench_2017f_cry_ecxor.json"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017q_cry_almost_xor",
+      "category": "crypto",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Quals 2017 almost_xor",
+      "n_att": 2,
+      "json": "data\\questions_ext\\crypto\\ext_nyu_ctf_bench_2017q_cry_almost_xor.json"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017q_cry_another_xor",
+      "category": "crypto",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Quals 2017 another_xor",
+      "n_att": 1,
+      "json": "data\\questions_ext\\crypto\\ext_nyu_ctf_bench_2017q_cry_another_xor.json"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_cry_babycrypto",
+      "category": "crypto",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Quals 2018 babycrypto",
+      "n_att": 1,
+      "json": "data\\questions_ext\\crypto\\ext_nyu_ctf_bench_2018q_cry_babycrypto.json"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_cry_collusion",
+      "category": "crypto",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Quals 2018 collusion",
+      "n_att": 4,
+      "json": "data\\questions_ext\\crypto\\ext_nyu_ctf_bench_2018q_cry_collusion.json"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_cry_lowe",
+      "category": "crypto",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Quals 2018 lowe",
+      "n_att": 3,
+      "json": "data\\questions_ext\\crypto\\ext_nyu_ctf_bench_2018q_cry_lowe.json"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2019q_cry_des2bites",
+      "category": "crypto",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Quals 2019 DES 2 Bites",
+      "n_att": 2,
+      "json": "data\\questions_ext\\crypto\\ext_nyu_ctf_bench_2019q_cry_des2bites.json"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2022f_cry_m_ster_0f_prn9",
+      "category": "crypto",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Finals 2022 M@sTEr 0F PrN9",
+      "n_att": 1,
+      "json": "data\\questions_ext\\crypto\\ext_nyu_ctf_bench_2022f_cry_m_ster_0f_prn9.json"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023f_for_hypokrinesthai",
+      "category": "forensics",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Finals 2023 Hypokrinesthai",
+      "n_att": 1,
+      "json": "data\\questions_ext\\forensics\\ext_nyu_ctf_bench_2023f_for_hypokrinesthai.json"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023q_for_1black0white",
+      "category": "forensics",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Quals 2023 1black0white",
+      "n_att": 1,
+      "json": "data\\questions_ext\\forensics\\ext_nyu_ctf_bench_2023q_for_1black0white.json"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023q_for_br3akth3vau1t",
+      "category": "forensics",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Quals 2023 Br3akTh3V@u1t",
+      "n_att": 3,
+      "json": "data\\questions_ext\\forensics\\ext_nyu_ctf_bench_2023q_for_br3akth3vau1t.json"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018f_rev_free_as_in_freedom",
+      "category": "rev",
+      "band": "A",
+      "reason": "全部附件为文本/数据，纯静态可分析",
+      "title": "CSAW-Finals 2018 FREE as in FREEdom",
+      "n_att": 1,
+      "json": "data\\questions_ext\\rev\\ext_nyu_ctf_bench_2018f_rev_free_as_in_freedom.json"
+    }
+  ]
+}
