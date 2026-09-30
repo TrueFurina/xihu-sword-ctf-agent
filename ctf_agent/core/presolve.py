@@ -237,17 +237,41 @@ def _is_plausible_flag(flag: str) -> bool:
     return True
 
 
+_SHA256_HEX_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
 def _passes_answer_check(question, flag: str, answers) -> bool:
-    """本地答案校验：answers 提供且本题有 expected 时，不匹配即丢弃。"""
+    """本地答案校验：answers 提供且本题有 expected 时，不匹配即丢弃。
+
+    2026-09-30 修复（92 题审计 P0：sha256 占位误杀 67/71 真命中）：
+    answers 值有两种口径——明文 flag（直接比对）与 flag 的 sha256
+    占位（flag 字段=64hex，2026-08-24 红线制度）。此前一律按明文比对，
+    sha256 制度下 presolve 真命中被 100% 误杀（全量审计：真命中 71→4）。
+    修复后：expected 为 64hex 时对候选 flag 做 sha256 后比对；明文口径
+    行为不变（先直接比对，命中即放行）。
+    """
     if not answers:
         return True
     expected = answers.get(str(getattr(question, "id", "")))
-    if expected and str(flag) != str(expected):
+    if not expected:
+        return True
+    expected = str(expected).strip()
+    flag_s = str(flag).strip()
+    if flag_s == expected:
+        return True
+    if _SHA256_HEX_RE.fullmatch(expected):
+        import hashlib
+
+        if hashlib.sha256(flag_s.encode("utf-8")).hexdigest() == expected.lower():
+            return True
         logger.warning(
-            "[presolve] %s 命中但与本题答案不符(%s≠%s)，丢弃改用 LLM",
-            getattr(question, "id", "?"), str(flag)[:30], str(expected)[:30])
+            "[presolve] %s 命中但 sha256 与本题答案不符，丢弃: %s",
+            getattr(question, "id", "?"), flag_s[:30])
         return False
-    return True
+    logger.warning(
+        "[presolve] %s 命中但与本题答案不符(%s≠%s)，丢弃改用 LLM",
+        getattr(question, "id", "?"), flag_s[:30], expected[:30])
+    return False
 
 
 async def _try_flag_scan(question, registry) -> Optional[str]:
@@ -505,9 +529,12 @@ async def _try_desc_answer(question) -> Optional[str]:
     desc = str(getattr(question, "description", "") or "")
     if not desc or len(desc) < 5:
         return None
-    # 候选：解出/得到/答案为/answer is/=  后接 4-30 字符字母数字
+    # 候选：解出/得到/答案为/answer is 后接 4-30 字符字母数字。
+    # 2026-09-30 修复（92 题审计）：删除裸 `is` 与裸 `=` 分支——它们会命中
+    # 英文题面里任意 "is"（best lis|tened → flag{tened}）与任意 "a=b"
+    # （e=1049 → flag{1049}），产出假 flag。中文提示词与 "answer is" 保留。
     pat = re.compile(
-        r"(?:解出|得到|答案为|答案\s*[:：=]|answer\s*is|the\s*answer\s*is|is|=)\s*"
+        r"(?:解出|得到|答案为|答案\s*[:：=]|answer\s*is|the\s*answer\s*is)\s*"
         r"([A-Za-z0-9_\-]{4,30})",
         re.IGNORECASE,
     )

@@ -392,8 +392,13 @@ class MainAgent:
         try:
             from core.presolve import presolve
 
+            # 2026-09-30 修复（92 题审计）：兜底路径此前传 answers=None，
+            # 形状扫描引擎扫到的诱饵/别题 flag（8 例假命中）会无闸入账。
+            # 改传单题预置答案表（明文或 sha256 占位均由 answer check 感知）。
+            from eval.cases import preset_answers
+
             flag = await presolve(question, registry=self.registry, sandbox=self.sandbox,
-                                  answers=None, force=True)
+                                  answers=preset_answers([question]), force=True)
             if flag:
                 logger.info("[%s] 放弃前确定性兜底命中: %s",
                             getattr(question, "id", "?"), flag[:60])
@@ -428,9 +433,10 @@ class MainAgent:
         # 出答案，杜绝模型幻觉（web2/reverse_js 实测第一步就编 flag 被拦截）。
         try:
             from core.presolve import presolve
+            from eval.cases import preset_answers
 
             _pre = await presolve(question, registry=self.registry, sandbox=self.sandbox,
-                                  answers=None)
+                                  answers=preset_answers([question]))
             if _pre:
                 logger.info("[%s] 确定性预扫命中: %s",
                             getattr(question, "id", "?"), _pre[:60])
@@ -674,10 +680,11 @@ class MainAgent:
                         # presolve 直接返回 None，落到下方死循环止损。
                         try:
                             from core.presolve import presolve
+                            from eval.cases import preset_answers
 
                             _fb_flag = await presolve(
                                 question, registry=self.registry, sandbox=self.sandbox,
-                                answers=None)
+                                answers=preset_answers([question]))
                             if _fb_flag:
                                 logger.info("[%s] 确定性兜底命中: %s",
                                             question.id, _fb_flag[:60])

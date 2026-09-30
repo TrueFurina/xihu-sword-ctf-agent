@@ -176,6 +176,8 @@ def preset_answers(questions: list[Question]) -> dict[str, str]:
     """
     out = {}
     for q in questions:
-        if q.flag:
+        # 2026-09-30 防御：mock/轻量 Question 可能无 flag 属性，getattr 兜底
+        # （run.py:477 等调用点现在对任意 question 对象传 preset_answers([q])）。
+        if getattr(q, "flag", None):
             out[q.id] = q.flag
     return out

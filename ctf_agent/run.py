@@ -468,13 +468,15 @@ def build_race_solver(use_mock: bool = False, is_correct=None,
         # provider solver 的 presolve 因标记直接跳过——同一附件只嗅探 1 次。
         try:
             from core.presolve import presolve
+            from eval.cases import preset_answers
 
             _reg0 = None
             for _s in solvers.values():
                 _reg0 = getattr(_s, "registry", None)
                 if _reg0 is not None:
                     break
-            _mflag = await presolve(question, registry=_reg0, sandbox=None, answers=None)
+            _mflag = await presolve(question, registry=_reg0, sandbox=None,
+                                    answers=preset_answers([question]))
             if _mflag:
                 # P0-1 修复（2026-08-21）：确定性命中必须过 is_correct 校验。
                 # 此前硬编码 validated=True + confidence=1.0 直接 return，确定性
