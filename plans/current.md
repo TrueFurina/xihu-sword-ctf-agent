@@ -38,6 +38,28 @@
 - **冲突**：09-29 全 17 题实测推翻该题归因——`real_crypto_dnui_keyboard` 实为 `solved_by=presolve`（tokens=0、dur=78ms），整池 `main_agent_llm`＝**0/17**。
 - **严重性**：治理体系建立在"数字只有一个来源"上，而**这个来源输出的是被自己后续实证推翻的旧数**。
 - **处置**：口径收口——canonical 的"LLM 自主数"改为读取 09-29 全 17 题证据，或显式标注该数为「已作废、勿引用」。**需你确认以哪份证据为终值。**
+- **🔴 2026-10-01 已由新跑批独立复现坐实**（不再是"疑似"）：首批 NYU 5 题试跑在**冷黑板 + E3 ON + deepseek** 下，`real_crypto_dnui_keyboard` **再次**被判 `solved_by=presolve`（78ms、tokens≈0）。即 canonical 那句「LLM 自主推理 1/2」是错的，可放心按"作废"处理。
+
+---
+
+## 二之二、首批 NYU 5 题实测结果（2026-10-01 已执行，已授权）
+
+**预算**：单题 80K / 全局 450K token、只 deepseek、并发 1、墙钟 180s、E3 ON、冷黑板。
+**实耗 161,604 token**（约 ¥0.6–1.3，上界 ¥1.3，**未突破 ¥2**，远低于"突然没 3–4 块"的红线）。
+
+| 口径 | 结果 | 说明 |
+|---|---|---|
+| `main_agent_llm`（大模型主链路） | **0 / 5** | NYU 5 题全 `race_abandon`，耗时 8.3–32.6s，题均实际执行 |
+| `presolve`（确定性预扫） | **2 / 2** | `real_crypto_dnui_keyboard` 78ms、`real_reverse_js` 18ms |
+| 完整性 | `interpretable=true`、`truncated=0` | 结果可解释、无截断，可判读 |
+
+**抽样方式**：按比例分层 crypto1 / forensics1 / misc1 / rev2（避开预扫可秒解的 `baby_s_third` 与输入有缺陷的 `des2bites`），避免"只挑 crypto 这种最强类别"造成的高估。
+
+**诚实限定**：样本 n=5，远低于样本阶梯（8→12→20→30→60），**0/5 不可表述为"能力 0%"**；本轮单题 80K 低于 ceiling8 的 200K，故本轮本身不足以排除预算因素（真正排除预算的是 09-29 那次 200K×2.5 的重测）。NYU 存在记忆污染，**分数不得对外当能力引用**。
+
+**证据**：`heldout_evidence/benchmark_report_nyu_trial5_20261001_deepseek.json`（已核验与原始报告一致，原有证据未被覆盖）。
+
+---
 
 ### 雷 1 ✅ 已修（提交 `834bffd`，2026-10-01）门禁脚本没入库 → 新环境拦死所有提交（P0-2）
 - **证据**：`git ls-files --error-unmatch ctf_agent/scripts/test_file_guard.py` 报错（未跟踪）；`pre-commit:172` = `"$PY" scripts/test_file_guard.py --staged || exit 1`（`PY` 定义在 `:29`，回退 `python`）。
