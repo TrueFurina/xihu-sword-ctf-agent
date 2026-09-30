@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import os
 import pathlib
 
 from core.agent_loop import (
@@ -33,6 +34,17 @@ from core.session import Session
 
 # ── 挑战脚手架（真实静态题，可离线解）──────────────────────
 FLAG = "flag{STATIC_DEMO_OK}"
+
+# ── 平台感知的等价命令 ──────────────────────────────────────
+# 同一套"探查 → 读取"两步语义，在两个平台上都是**真实 subprocess**：
+#   Windows: cmd.exe 内建 type/dir（原实现）
+#   POSIX  : /bin/sh 的 cat/ls（CI 跑 ubuntu-latest，cmd 内建不存在）
+# 保留真实命令而非 mock，是为了仍然验证"跨步记忆把两步串起来"这件事本身。
+_IS_WINDOWS = os.name == "nt"
+CMD_READ_HINT = "type README.txt" if _IS_WINDOWS else "cat README.txt"
+CMD_LIST_ALL = "dir /s /b" if _IS_WINDOWS else "ls -R"
+CMD_READ_FLAG = ("type hidden\\answer.flag" if _IS_WINDOWS
+                 else "cat hidden/answer.flag")
 
 
 def _build_challenge(root: pathlib.Path) -> pathlib.Path:
@@ -72,9 +84,9 @@ def _make_memory_llm():
             return "reason: 已在先前步骤获得 flag"
         if "answer.flag" in trans:
             # 上一轮探查已暴露路径，本轮读取 flag 文件
-            return "command: type hidden\\answer.flag"
+            return f"command: {CMD_READ_FLAG}"
         # 第 1 轮：读提示 + 列出全部文件，找到 flag 文件位置
-        return "command: type README.txt\ncommand: dir /s /b"
+        return f"command: {CMD_READ_HINT}\ncommand: {CMD_LIST_ALL}"
 
     return llm
 
@@ -86,7 +98,7 @@ def _make_blind_llm():
     """
 
     def llm(prompt: str) -> str:
-        return "command: dir /s /b"
+        return f"command: {CMD_LIST_ALL}"
 
     return llm
 
