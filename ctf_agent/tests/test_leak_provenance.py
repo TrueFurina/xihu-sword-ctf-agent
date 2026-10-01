@@ -97,3 +97,48 @@ def test_mutation_break_sha_compare(tmp_path, monkeypatch):
     monkeypatch.setattr(lp, "_sha", lambda b: "0" * 64)
     r = lp.classify(q, tmp_path)
     assert r["provenance"] != "att_leak"
+
+
+# ---------------------------------------------------------------- 裸 token 通道
+# 2026-10-01 二次审计：真值是不带 {} 外壳的裸 token（`145` / `cisco123` / 裸 md5）时，
+# 旧判据（只认 flag 形状）会**漏判成 unsolved**，虚增"干净"分母。内部 92 池实测
+# 有 9 道属此类（real_misc_sheng2022_traffic_* ×5 + real_misc_longjian2024_* ×4）。
+
+
+def test_bare_token_answer_in_attachment_is_att_leak(tmp_path):
+    """答案是无外壳裸 token（如 145）→ 仍必须判 att_leak。"""
+    q = _mkq(tmp_path, att_name="flag.txt", att_data=b"145\r\n", flag="145")
+    r = lp.classify(q, tmp_path)
+    assert r["provenance"] == "att_leak"
+    assert r["attachment_file"].endswith("#bare-token")
+
+
+def test_bare_token_whole_file_variant(tmp_path):
+    q = _mkq(tmp_path, att_name="flag.txt", att_data=b"cisco123\n", flag="cisco123")
+    r = lp.classify(q, tmp_path)
+    assert r["provenance"] == "att_leak"
+
+
+def test_bare_token_no_false_positive(tmp_path):
+    """附件里没有真值 token → 不得判 att_leak（精确哈希，而非子串）。"""
+    q = _mkq(tmp_path, att_name="noise.txt", att_data=b"1450 cisco1234 random\n",
+             flag="145")
+    r = lp.classify(q, tmp_path)
+    assert r["provenance"] == "none"
+
+
+def test_bare_token_hit_is_exact_not_substring():
+    """直接测 _bare_token_hit：只有精确 token 命中，子串/超长串不命中。"""
+    s = _sha("145")
+    assert lp._bare_token_hit(b"a 145 b", s) is True
+    assert lp._bare_token_hit(b"1450", s) is False
+    assert lp._bare_token_hit(b"1979", s) is False
+
+
+def test_mutation_disable_bare_token_pass(tmp_path, monkeypatch):
+    """变异：禁用裸 token 通道，裸答案的题必须掉出 att_leak。"""
+    q = _mkq(tmp_path, att_name="flag.txt", att_data=b"145\r\n", flag="145")
+    monkeypatch.setattr(lp, "_bare_token_hit", lambda *a, **k: False)
+    r = lp.classify(q, tmp_path)
+    assert r["provenance"] != "att_leak", \
+        "变异失败：禁用裸 token 通道后仍判 att_leak，说明该通道没真正生效"

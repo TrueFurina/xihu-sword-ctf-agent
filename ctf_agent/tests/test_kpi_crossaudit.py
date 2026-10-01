@@ -115,8 +115,10 @@ def test_real_repo_kpi_counted_matches_canonical_and_is_leak_free():
     """真实台账 × 真实泄漏审计：计入数与权威口径一致，且**零 att/desc 泄漏**。"""
     from scripts._merge_gate import count_offline_verified
     ledger = (_ROOT / "REAL_SOLVES_LEDGER.md").read_text(encoding="utf-8")
+    # v2 = 修复「裸 token 盲区」后的规范证据（att_leak 68→77）；见
+    # deliverables/锐评质检/答案来源审计裸token盲区修复_20261001.md
     leak = json.loads((_ROOT / "heldout_evidence" /
-                       "leak_provenance_real92_20261001.json").read_text(encoding="utf-8"))
+                       "leak_provenance_real92_v2_20261001.json").read_text(encoding="utf-8"))
     r = ka.cross_audit(ledger, leak["rows"])
     assert r["counted"] == count_offline_verified(), \
         "交叉审计的计入口径与 count_offline_verified() 分叉"
