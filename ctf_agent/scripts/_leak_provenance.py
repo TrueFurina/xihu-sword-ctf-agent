@@ -9,8 +9,14 @@
   于是需要一个客观口径：每题的真值 flag 到底「物理上」出现在哪里？
     att_leak   真值明文就在附件里（grep 可得）→ 任何工具的命中都不算实力
     desc_leak  真值明文/内层 token 就在题目描述里（题面即 wp 摘要）→ 同上
-    computed   附件与描述都没有 → 命中只能靠计算/解码 = 真分析
-    unsolved   没有命中，且不属于上面任何一类
+    computed   附件与描述都没有真值明文，且 presolve 参照解命中 → 只能靠计算/解码 = 真分析
+    unsolved   附件与描述都没有真值明文，且 presolve 参照解**未**命中
+
+  ⚠️ **`unsolved` ≠ 题目不可解**（2026-10-01 交叉审计踩到的坑）：此档只陈述
+  「本次 presolve 参照解没命中」。A 类「完整攻击链」题本就不是 presolve 的目标，
+  常由专用 verifier 脚本核验（如 `verify_specialcurve2.py`）——`real_crypto_specialcurve2`
+  就是此档，但台账状态确为 `✅ offline_verified`。**引用本档时须回台账/verifier 复核，
+  不可把 `unsolved` 读成"该题没被解出"。** 交叉审计见 `scripts/_kpi_leak_crossaudit.py`。
 
   判定只看「真值是否物理存在」，与谁解出无关；这样 presolve / 基线 / 未来
   任何解法的命中率都能被拆成「注水部分 / 实力部分」两块。
