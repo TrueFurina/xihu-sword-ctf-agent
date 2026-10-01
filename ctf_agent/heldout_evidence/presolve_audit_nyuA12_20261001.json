@@ -1,0 +1,123 @@
+{
+  "summary": {
+    "dir": "data/questions_ext_A_20261001",
+    "n": 12,
+    "seconds": 2.7,
+    "no_answers_true": 0,
+    "no_answers_false": 0,
+    "no_answers_none": 12,
+    "with_answers_true": 0,
+    "with_answers_false": 0,
+    "with_answers_none": 12
+  },
+  "rows": [
+    {
+      "id": "ext_nyu_ctf_bench_2017f_cry_ecxor",
+      "category": "crypto",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017q_cry_almost_xor",
+      "category": "crypto",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017q_cry_another_xor",
+      "category": "crypto",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_cry_babycrypto",
+      "category": "crypto",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_cry_collusion",
+      "category": "crypto",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_cry_lowe",
+      "category": "crypto",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2019q_cry_des2bites",
+      "category": "crypto",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2022f_cry_m_ster_0f_prn9",
+      "category": "crypto",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023f_for_hypokrinesthai",
+      "category": "forensics",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023q_for_1black0white",
+      "category": "forensics",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023q_for_br3akth3vau1t",
+      "category": "forensics",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018f_rev_free_as_in_freedom",
+      "category": "rev",
+      "atts_ok": true,
+      "with_answers": null,
+      "no_answers": null,
+      "no_answers_verdict": "-",
+      "with_answers_verdict": "-"
+    }
+  ]
+}

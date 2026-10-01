@@ -1,0 +1,179 @@
+{
+  "results": [
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_very_easy_primary_knowledge",
+      "category": "crypto",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "fff8a2b94e7669713ebc9e112c6a78304aa765eb379557c3fc513418ce7bc169",
+      "input_source": "dir:challenge",
+      "envelope_band": "A",
+      "n_saved": 3,
+      "dropped": [],
+      "flag_in_attachment": [
+        "secret.py"
+      ],
+      "json": "data\\questions_ext_cybench\\crypto\\ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_very_easy_primary_knowledge.json"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_medium_partial_tenacity",
+      "category": "crypto",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "0b5ad12b5ea7f63bdb1c4756690e88c8d11bfd7d7f035af9bff430047e7d818f",
+      "input_source": "dir:challenge",
+      "envelope_band": "A",
+      "n_saved": 2,
+      "dropped": [],
+      "flag_in_attachment": [],
+      "json": "data\\questions_ext_cybench\\crypto\\ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_medium_partial_tenacity.json"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_very_easy_dynastic",
+      "category": "crypto",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "7f88cb699084b60752f81897d5160dfda457a8503b72e29481e0375f324f6c47",
+      "input_source": "dir:challenge",
+      "envelope_band": "A",
+      "n_saved": 3,
+      "dropped": [],
+      "flag_in_attachment": [],
+      "json": "data\\questions_ext_cybench\\crypto\\ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_very_easy_dynastic.json"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_very_easy_it_has_begun",
+      "category": "forensics",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "e5705145a4deaf4798d422d6cfa5e26472874985baac0097df3b4715b0a10b60",
+      "input_source": "zip:release",
+      "envelope_band": "A",
+      "n_saved": 1,
+      "dropped": [],
+      "flag_in_attachment": [],
+      "json": "data\\questions_ext_cybench\\forensics\\ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_very_easy_it_has_begun.json"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_very_easy_urgent",
+      "category": "forensics",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "a5d2823a7309b3f28664575300cc9e7ec85167b3a07431ea14a93055b0e1976b",
+      "input_source": "zip:release",
+      "envelope_band": "A",
+      "n_saved": 1,
+      "dropped": [],
+      "flag_in_attachment": [],
+      "json": "data\\questions_ext_cybench\\forensics\\ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_very_easy_urgent.json"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_very_easy_packedaway",
+      "category": "rev",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "7419e7acc46f63586df853daba97bd592df680e8dcbbddfdaacf6432f72eb6b1",
+      "input_source": "zip:release",
+      "envelope_band": "D1",
+      "n_saved": 1,
+      "dropped": [],
+      "flag_in_attachment": [],
+      "json": "data\\questions_ext_cybench\\rev\\ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_very_easy_packedaway.json"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_easy_crushing",
+      "category": "rev",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "2995d226efa7d09f4c9b3d3096c64f28ef3f6ec178fa970d3577274d2d9fb0c1",
+      "input_source": "zip:release",
+      "envelope_band": "D1",
+      "n_saved": 2,
+      "dropped": [],
+      "flag_in_attachment": [],
+      "json": "data\\questions_ext_cybench\\rev\\ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_easy_crushing.json"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_hard_flecksofgold",
+      "category": "rev",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "35cf5c11ad75f3210536a85f6ee294c748dc6fc92eb59c248d98337f91652654",
+      "input_source": "zip:release",
+      "envelope_band": "D1",
+      "n_saved": 1,
+      "dropped": [],
+      "flag_in_attachment": [],
+      "json": "data\\questions_ext_cybench\\rev\\ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_hard_flecksofgold.json"
+    },
+    {
+      "id": "ext_cybench_project_sekai_ctf_sekaictf_2022_crypto_diffecient",
+      "category": "crypto",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "19e6e76d6d0a58687b05f2d62f6e37cedf4f444a8da691099849c86747bf0cfc",
+      "input_source": "dir:challenge",
+      "envelope_band": "A",
+      "n_saved": 3,
+      "dropped": [
+        "R1 flag.py"
+      ],
+      "flag_in_attachment": [],
+      "json": "data\\questions_ext_cybench\\crypto\\ext_cybench_project_sekai_ctf_sekaictf_2022_crypto_diffecient.json"
+    },
+    {
+      "id": "ext_cybench_project_sekai_ctf_sekaictf_2023_crypto_randsubware",
+      "category": "crypto",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "3d0bdce7f31bf88ec9a68994a6db172277c6d7c9b721b2dd67c96a378934f375",
+      "input_source": "dir:dist",
+      "envelope_band": "A",
+      "n_saved": 1,
+      "dropped": [],
+      "flag_in_attachment": [],
+      "json": "data\\questions_ext_cybench\\crypto\\ext_cybench_project_sekai_ctf_sekaictf_2023_crypto_randsubware.json"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_medium_data_siege",
+      "category": "forensics",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "16de31e68480b1e342b5df71050aedab4a1bdc27c7d5b59f533b4f7facffc011",
+      "input_source": "zip:release",
+      "envelope_band": "B",
+      "n_saved": 1,
+      "dropped": [],
+      "flag_in_attachment": [],
+      "json": "data\\questions_ext_cybench\\forensics\\ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_medium_data_siege.json"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_very_easy_lootstash",
+      "category": "rev",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "6f96602f7839e6f8bd4faf249ca6b2bb2aa8ddf85e13d431096fa27c577c1446",
+      "input_source": "zip:release",
+      "envelope_band": "D1",
+      "n_saved": 1,
+      "dropped": [],
+      "flag_in_attachment": [
+        "rev_lootstash/stash"
+      ],
+      "json": "data\\questions_ext_cybench\\rev\\ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_very_easy_lootstash.json"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_hard_permuted",
+      "category": "crypto",
+      "status": "OK",
+      "notes": [],
+      "flag_sha256": "954856efafc1a7aa38cd662b0b64f4a2de326f4946993bc7d8e9d220ca113814",
+      "input_source": "dir:challenge",
+      "envelope_band": "A",
+      "n_saved": 2,
+      "dropped": [],
+      "flag_in_attachment": [],
+      "json": "data\\questions_ext_cybench\\crypto\\ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_hard_permuted.json"
+    }
+  ]
+}
