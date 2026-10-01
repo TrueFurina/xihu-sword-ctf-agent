@@ -21,6 +21,13 @@
   判定只看「真值是否物理存在」，与谁解出无关；这样 presolve / 基线 / 未来
   任何解法的命中率都能被拆成「注水部分 / 实力部分」两块。
 
+  ⚠️ **裸 token 盲区（2026-10-01 二次审计发现并修复）**：首版只按 flag 形状
+  （`xxx{...}`）扫附件，于是「答案是不带外壳的裸 token」的题（`145` / `cisco123` /
+  `Cisc0` / 裸 md5 / 裸 uuid）被**漏判成 unsolved**，虚增了"干净"分母。修复后新增
+  `_bare_token_hit`（精确哈希，无子串误报）——内部 92 池有 **9 道**由 unsolved 纠正
+  为 att_leak（`real_misc_sheng2022_traffic_*` ×5、`real_misc_longjian2024_*` ×4）。
+  **裸 token 与 flag 形状两条通道都必须生效，否则泄漏会被系统性少报。**
+
 零成本、纯本地、零 LLM。
 
 用法：
@@ -66,13 +73,52 @@ def _scan_blob_for(blob: bytes, sha: str) -> list[str]:
     return hits
 
 
+_BARE_WS = re.compile(rb"\s+")
+_BARE_MAX_TOKENS = 20000
+_BARE_MAX_BYTES = 4_000_000
+
+
+def _bare_token_hit(blob: bytes, sha: str) -> bool:
+    """附件里是否存在「无 {} 外壳」的裸 token，其 sha256 == sha。
+
+    补 `FLAG_SHAPE` 的盲区（2026-10-01 二次审计）：`145` / `cisco123` / `Cisc0` /
+    裸 md5 / 裸 uuid 这类答案**没有 flag{...} 外壳**，正则永远匹配不上，但明文
+    确实物理躺在附件里（典型：建库时把 `flag.txt` 答案文件误当题目附件挂上）。
+
+    判定只用**精确哈希相等**（整块 strip / 空白切分出的每个 token），
+    不做子串匹配，因此除 sha256 碰撞外**无假阳性**；token 数与字节数均有上限，
+    大文件不会拖垮。
+    """
+    if not sha or not blob:
+        return False
+    if len(blob) <= _BARE_MAX_BYTES and _sha(blob.strip()) == sha:
+        return True
+    n = 0
+    for tok in _BARE_WS.split(blob):
+        if not tok:
+            continue
+        n += 1
+        if n > _BARE_MAX_TOKENS:
+            return False
+        if len(tok) <= 256 and _sha(tok) == sha:
+            return True
+    return False
+
+
 def _attachment_plaintext(atts: list[str], sha: str, base: Path) -> tuple[bool, str]:
-    """真值明文是否物理出现在附件里。返回 (是否, 哪个文件)。"""
+    """真值明文是否物理出现在附件里。返回 (是否, 哪个文件)。
+
+    先按 flag 形状（`xxx{...}`）扫，再按裸 token 扫（`#bare-token` 后缀标记来源）。
+    """
     for a in atts or []:
         p = Path(a)
         if not p.exists():
-            hits = list(Path("data").rglob(p.name))
-            p = hits[0] if len(hits) == 1 else p
+            p2 = base / Path(a).name
+            if p2.exists():
+                p = p2
+            else:
+                hits = list(Path("data").rglob(p.name))
+                p = hits[0] if len(hits) == 1 else p
         if not p.exists():
             continue
         try:
@@ -81,6 +127,8 @@ def _attachment_plaintext(atts: list[str], sha: str, base: Path) -> tuple[bool, 
             continue
         if _scan_blob_for(data, sha):
             return True, p.name
+        if _bare_token_hit(data, sha):
+            return True, f"{p.name}#bare-token"
         # 归档：内存只读遍历（防 zip-slip）
         if data[:2] == b"PK":
             try:
@@ -89,10 +137,13 @@ def _attachment_plaintext(atts: list[str], sha: str, base: Path) -> tuple[bool, 
                         if n.endswith("/") or ".." in n.split("/"):
                             continue
                         try:
-                            if _scan_blob_for(zf.read(n), sha):
-                                return True, f"{p.name}!{n}"
+                            inner = zf.read(n)
                         except Exception:  # noqa: BLE001
                             continue
+                        if _scan_blob_for(inner, sha):
+                            return True, f"{p.name}!{n}"
+                        if _bare_token_hit(inner, sha):
+                            return True, f"{p.name}!{n}#bare-token"
             except Exception:  # noqa: BLE001
                 pass
     return False, ""

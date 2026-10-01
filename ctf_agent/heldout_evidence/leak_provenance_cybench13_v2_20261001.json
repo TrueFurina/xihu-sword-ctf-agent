@@ -1,0 +1,140 @@
+{
+  "dir": "data/questions_ext_cybench",
+  "n": 13,
+  "summary": {
+    "unsolved": 11,
+    "att_leak": 2
+  },
+  "rows": [
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_hard_permuted",
+      "category": "crypto",
+      "sha": "954856efafc1",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_medium_partial_tenacity",
+      "category": "crypto",
+      "sha": "0b5ad12b5ea7",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_very_easy_dynastic",
+      "category": "crypto",
+      "sha": "7f88cb699084",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_very_easy_primary_knowledge",
+      "category": "crypto",
+      "sha": "fff8a2b94e76",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "secret.py",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "ext_cybench_project_sekai_ctf_sekaictf_2022_crypto_diffecient",
+      "category": "crypto",
+      "sha": "19e6e76d6d0a",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_cybench_project_sekai_ctf_sekaictf_2023_crypto_randsubware",
+      "category": "crypto",
+      "sha": "3d0bdce7f31b",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_medium_data_siege",
+      "category": "forensics",
+      "sha": "16de31e68480",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_very_easy_it_has_begun",
+      "category": "forensics",
+      "sha": "e5705145a4de",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_very_easy_urgent",
+      "category": "forensics",
+      "sha": "a5d2823a7309",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_easy_crushing",
+      "category": "rev",
+      "sha": "2995d226efa7",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_hard_flecksofgold",
+      "category": "rev",
+      "sha": "35cf5c11ad75",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_very_easy_lootstash",
+      "category": "rev",
+      "sha": "6f96602f7839",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "stash",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_very_easy_packedaway",
+      "category": "rev",
+      "sha": "7419e7acc46f",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    }
+  ]
+}

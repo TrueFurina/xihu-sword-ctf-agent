@@ -1,0 +1,27 @@
+{
+  "pool": "data/questions_real",
+  "n": 92,
+  "att_leak": 77,
+  "desc_leak": 1,
+  "clean": 14,
+  "presolve_total": 74,
+  "presolve_clean": 12,
+  "baseline_total": 62,
+  "baseline_clean": 0,
+  "presolve_clean_ids": [
+    "real_crypto_anwang_crypto1",
+    "real_crypto_exciting_inverse",
+    "real_crypto_ezmult",
+    "real_crypto_ezrsa",
+    "real_crypto_filterrandom",
+    "real_crypto_qiangwang_classic",
+    "real_crypto_simplelegendre",
+    "real_misc_vnctf_flag",
+    "real_misc_xuanhun_signin",
+    "real_reverse_sheng",
+    "real_reverse_upx",
+    "real_reverse_vnctf_cm1"
+  ],
+  "baseline_clean_ids": [],
+  "leaky_examples": []
+}

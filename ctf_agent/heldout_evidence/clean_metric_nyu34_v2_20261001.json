@@ -1,0 +1,14 @@
+{
+  "pool": "data/questions_ext",
+  "n": 34,
+  "att_leak": 1,
+  "desc_leak": 0,
+  "clean": 33,
+  "presolve_total": 1,
+  "presolve_clean": 0,
+  "baseline_total": 1,
+  "baseline_clean": 0,
+  "presolve_clean_ids": [],
+  "baseline_clean_ids": [],
+  "leaky_examples": []
+}

@@ -1,0 +1,116 @@
+{
+  "counted": 14,
+  "in_corpus": 13,
+  "computed": 12,
+  "leak": 0,
+  "unsolved": 1,
+  "missing_corpus": 1,
+  "contaminated": false,
+  "leak_ids": [],
+  "unsolved_ids": [
+    "real_crypto_specialcurve2"
+  ],
+  "missing_corpus_ids": [
+    "10733"
+  ],
+  "rows": [
+    {
+      "id": "real_crypto_specialcurve2",
+      "title": "1. real_crypto_specialcurve2 【A类·完整攻击链】（西湖论剑 2021）",
+      "in_corpus": true,
+      "provenance": "unsolved",
+      "bucket": "unsolved"
+    },
+    {
+      "id": "10733",
+      "title": "3. 10733（CRYPTO-02 【A类·完整攻击链】 · 正式赛真题 · How_many_rot_are_there）",
+      "in_corpus": false,
+      "provenance": null,
+      "bucket": "missing_corpus"
+    },
+    {
+      "id": "real_misc_vnctf_flag",
+      "title": "4. real_misc_vnctf_flag 【A类·完整攻击链】（VNCTF2022 · flag · 北京奥运图标杂色点）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    },
+    {
+      "id": "real_crypto_anwang_crypto1",
+      "title": "6. real_crypto_anwang_crypto1 【B类·presolve密码学变换】（历年真题 · 八进制 ASCII + Vigenère）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    },
+    {
+      "id": "real_crypto_ezrsa",
+      "title": "7. real_crypto_ezrsa 【B类·presolve密码学变换】（历年真题 · Hastad 广播攻击 e=17）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    },
+    {
+      "id": "real_crypto_simplelegendre",
+      "title": "8. real_crypto_simplelegendre 【B类·presolve密码学变换】（历年真题 · 勒让德符号逐位解密）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    },
+    {
+      "id": "real_crypto_ezmult",
+      "title": "9. real_crypto_ezmult 【B类·presolve密码学变换】（历年真题 · base64 + ROT13）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    },
+    {
+      "id": "real_misc_xuanhun_signin",
+      "title": "10. real_misc_xuanhun_signin 【A类·完整攻击链】（玄盾杯 Misc-SignIN · JPEG 尾部嵌 PNG）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    },
+    {
+      "id": "real_crypto_exciting_inverse",
+      "title": "11. real_crypto_exciting_inverse 【B类·presolve密码学变换】（历年真题 · phi+双模逆 RSA 分解）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    },
+    {
+      "id": "real_crypto_filterrandom",
+      "title": "12. real_crypto_filterrandom 【B类·presolve密码学变换】（历年真题 · LFSR 噪声恢复）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    },
+    {
+      "id": "real_crypto_qiangwang_classic",
+      "title": "13. real_crypto_qiangwang_classic 【B类·presolve密码学变换】（历年真题 · 摩斯+单表替换）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    },
+    {
+      "id": "real_reverse_sheng",
+      "title": "14. real_reverse_sheng 【A类·完整攻击链】（历年真题 · 逆向静态分析）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    },
+    {
+      "id": "real_reverse_upx",
+      "title": "15. real_reverse_upx 【A类·完整攻击链】（历年真题 · UPX 脱壳）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    },
+    {
+      "id": "real_reverse_vnctf_cm1",
+      "title": "21. real_reverse_vnctf_cm1 【B类·presolve确定性变换】 · VNCTF2022 cm1（Android reverse）",
+      "in_corpus": true,
+      "provenance": "computed",
+      "bucket": "computed"
+    }
+  ]
+}

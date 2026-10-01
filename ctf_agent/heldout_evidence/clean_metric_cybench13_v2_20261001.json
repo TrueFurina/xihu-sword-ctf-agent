@@ -1,0 +1,14 @@
+{
+  "pool": "data/questions_ext_cybench",
+  "n": 13,
+  "att_leak": 2,
+  "desc_leak": 0,
+  "clean": 11,
+  "presolve_total": 2,
+  "presolve_clean": 0,
+  "baseline_total": 2,
+  "baseline_clean": 0,
+  "presolve_clean_ids": [],
+  "baseline_clean_ids": [],
+  "leaky_examples": []
+}
