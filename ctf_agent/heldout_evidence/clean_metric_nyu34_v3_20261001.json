@@ -1,0 +1,16 @@
+{
+  "pool": "data/questions_ext",
+  "n": 34,
+  "att_leak": 1,
+  "desc_leak": 0,
+  "clean": 33,
+  "presolve_total": 2,
+  "presolve_clean": 1,
+  "baseline_total": 1,
+  "baseline_clean": 0,
+  "presolve_clean_ids": [
+    "ext_nyu_ctf_bench_2023q_for_1black0white"
+  ],
+  "baseline_clean_ids": [],
+  "leaky_examples": []
+}
