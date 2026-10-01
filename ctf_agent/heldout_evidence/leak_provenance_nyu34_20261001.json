@@ -1,0 +1,350 @@
+{
+  "dir": "data/questions_ext",
+  "n": 34,
+  "summary": {
+    "unsolved": 33,
+    "att_leak": 1
+  },
+  "rows": [
+    {
+      "id": "ext_nyu_ctf_bench_2017f_cry_ecxor",
+      "category": "crypto",
+      "sha": "0e063f15a4c2",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017q_cry_almost_xor",
+      "category": "crypto",
+      "sha": "6bb0e2756e56",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017q_cry_another_xor",
+      "category": "crypto",
+      "sha": "d8a4684a12d7",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_cry_babycrypto",
+      "category": "crypto",
+      "sha": "f8d5f4db80f8",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_cry_collusion",
+      "category": "crypto",
+      "sha": "f2f037fd6d9e",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_cry_lowe",
+      "category": "crypto",
+      "sha": "d26af118b715",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2019q_cry_des2bites",
+      "category": "crypto",
+      "sha": "bbf9ec750cd2",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2022f_cry_m_ster_0f_prn9",
+      "category": "crypto",
+      "sha": "854eab1128f8",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017f_for_thoroughlystripped",
+      "category": "forensics",
+      "sha": "4f8f5c5944ea",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017q_for_missed_registration",
+      "category": "forensics",
+      "sha": "b0e408d1da7e",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_for_simple_recovery",
+      "category": "forensics",
+      "sha": "a3c34d68553e",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_for_whyos",
+      "category": "forensics",
+      "sha": "3c39de2d0089",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023f_for_emoji",
+      "category": "forensics",
+      "sha": "ce5aff49a641",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023f_for_floating_points",
+      "category": "forensics",
+      "sha": "6500f523032d",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023f_for_hypokrinesthai",
+      "category": "forensics",
+      "sha": "63d21d3b4037",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023q_for_1black0white",
+      "category": "forensics",
+      "sha": "d02cc7d16502",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023q_for_br3akth3vau1t",
+      "category": "forensics",
+      "sha": "b3c9db6b888f",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_msc_short_circuit",
+      "category": "misc",
+      "sha": "645a9bc8528d",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2022f_msc_farmlang",
+      "category": "misc",
+      "sha": "d647ab6a557d",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017f_rev_rabbithole",
+      "category": "rev",
+      "sha": "09cda71f1117",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017q_rev_bananascript",
+      "category": "rev",
+      "sha": "2819d24b75a6",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017q_rev_realism",
+      "category": "rev",
+      "sha": "bb6da24e15a2",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2017q_rev_tablez",
+      "category": "rev",
+      "sha": "2fbda70805e6",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018f_rev_1nsayne",
+      "category": "rev",
+      "sha": "d9a771a9200e",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018f_rev_bdos",
+      "category": "rev",
+      "sha": "3b844f557aeb",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018f_rev_free_as_in_freedom",
+      "category": "rev",
+      "sha": "e07b81a7bbf4",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_rev_a_walk_through_x86_part_2",
+      "category": "rev",
+      "sha": "721ff23bccd8",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2018q_rev_kvm",
+      "category": "rev",
+      "sha": "b27971426166",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2019f_rev_steady_counting",
+      "category": "rev",
+      "sha": "71b4a3398cf8",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2019q_rev_beleaf",
+      "category": "rev",
+      "sha": "57f3b2a86dd1",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2019q_rev_halfpike",
+      "category": "rev",
+      "sha": "9a49394edf79",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023q_rev_baby_s_third",
+      "category": "rev",
+      "sha": "637b37749344",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "babysthird",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023q_rev_rox",
+      "category": "rev",
+      "sha": "98af532276d0",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "ext_nyu_ctf_bench_2023q_rev_whataxor",
+      "category": "rev",
+      "sha": "707e9186da17",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    }
+  ]
+}

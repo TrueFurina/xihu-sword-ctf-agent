@@ -1,0 +1,932 @@
+{
+  "dir": "data/questions_real",
+  "n": 92,
+  "summary": {
+    "computed": 12,
+    "att_leak": 68,
+    "desc_leak": 1,
+    "unsolved": 11
+  },
+  "rows": [
+    {
+      "id": "real_crypto_anwang_crypto1",
+      "category": "crypto",
+      "sha": "2e9f80ef4619",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_crypto_anxun2020_aes",
+      "category": "crypto",
+      "sha": "c6027195acce",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": true,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_crypto_anxun2020_coolboy",
+      "category": "crypto",
+      "sha": "a1a65ec215e7",
+      "plaintext_known": false,
+      "in_attachment": true,
+      "attachment_file": "anxun2020_official.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_crypto_changan2021_checkin",
+      "category": "crypto",
+      "sha": "75fa5daa8c30",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_crypto_changan2021_easyrsa",
+      "category": "crypto",
+      "sha": "b8b6b346054d",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_crypto_changan2021_ezpy",
+      "category": "crypto",
+      "sha": "f7494167e4c3",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_crypto_dnui_keyboard",
+      "category": "crypto",
+      "sha": "0629c8d6eb02",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": true,
+      "provenance": "desc_leak"
+    },
+    {
+      "id": "real_crypto_exciting_inverse",
+      "category": "crypto",
+      "sha": "4b84616cccbe",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_crypto_ezmult",
+      "category": "crypto",
+      "sha": "60b6c2c15e65",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_crypto_ezrsa",
+      "category": "crypto",
+      "sha": "93be5f3ad422",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_crypto_filterrandom",
+      "category": "crypto",
+      "sha": "768a21b90196",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_crypto_gaoxiao2024_z3",
+      "category": "crypto",
+      "sha": "cb03e9c867d2",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_crypto_gkctf2020_che11y",
+      "category": "crypto",
+      "sha": "37d6539632d5",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_crypto_gkctf2020_rsa",
+      "category": "crypto",
+      "sha": "69f42f7dd30f",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_crypto_isctf2024_decrypt",
+      "category": "crypto",
+      "sha": "490433211738",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_crypto_longjian2023_hd1",
+      "category": "crypto",
+      "sha": "80659615f477",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_crypto_qiangwang_classic",
+      "category": "crypto",
+      "sha": "f4adf0d868f5",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_crypto_simplelegendre",
+      "category": "crypto",
+      "sha": "75e6aa4de894",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_crypto_specialcurve2",
+      "category": "crypto",
+      "sha": "cd7e815f4a5a",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "real_crypto_udomctf2022_aes",
+      "category": "crypto",
+      "sha": "bf9462ee7b04",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_crypto_umdctf2022_vigenere",
+      "category": "crypto",
+      "sha": "7f9fa04fd358",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_taishan2021_crypto_cgroup",
+      "category": "crypto",
+      "sha": "c36eec6e6de3",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "real_anxun2020_BeCare4",
+      "category": "misc",
+      "sha": "cc52e2806a88",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "BeCare4.md",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_anxun2020_depressed",
+      "category": "misc",
+      "sha": "c0e60525cb10",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "depressed.md",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_anxun2020_easyzip",
+      "category": "misc",
+      "sha": "7799cc74e49f",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "easyzip.md",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_anxun2020_love_letter",
+      "category": "misc",
+      "sha": "962e66806ec1",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "love_letter.md",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_anxun2020_722b6d",
+      "category": "misc",
+      "sha": "01ef7cc4ea5b",
+      "plaintext_known": false,
+      "in_attachment": true,
+      "attachment_file": "anxun2020_official.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_bytectf_flag",
+      "category": "misc",
+      "sha": "bfc59f143a3a",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_chunqiu2022_checkin",
+      "category": "misc",
+      "sha": "b1ecd2fb216a",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_chunqiu2022_tiger",
+      "category": "misc",
+      "sha": "70d0fd2b14bb",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_gaoxiao2024_cve41773",
+      "category": "misc",
+      "sha": "f9961e049a8d",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_gaoxiao2024_file_extract",
+      "category": "misc",
+      "sha": "e41706e49f0b",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_gaoxiao2024_phish_link",
+      "category": "misc",
+      "sha": "4204e09d956a",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_gaoxiao2024_phish_sender",
+      "category": "misc",
+      "sha": "f8510e717fcd",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_gaoxiao2024_xiandian",
+      "category": "misc",
+      "sha": "760099fac655",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_gkctf2020_pokemon",
+      "category": "misc",
+      "sha": "937246de7789",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_hws2022_badpdf",
+      "category": "misc",
+      "sha": "e98521f8688a",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_isctf2024_checkin02",
+      "category": "misc",
+      "sha": "1fedad704d70",
+      "plaintext_known": false,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_isctf2024_park2",
+      "category": "misc",
+      "sha": "13934ba22677",
+      "plaintext_known": false,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_isctf2024_pixel",
+      "category": "misc",
+      "sha": "8c18b1122278",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_isctf2024_sstv",
+      "category": "misc",
+      "sha": "53c1442be01c",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_isctf2024_win_rar",
+      "category": "misc",
+      "sha": "aea4237b7bcd",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_longjian2023_baby_forensics3",
+      "category": "misc",
+      "sha": "20e6092c6184",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_longjian2023_bf",
+      "category": "misc",
+      "sha": "85715f14b9ae",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_longjian2023_smallsword3",
+      "category": "misc",
+      "sha": "2415582719bf",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_longjian2024_smallsword1",
+      "category": "misc",
+      "sha": "81bf4b26d52d",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "real_misc_longjian2024_smallsword2",
+      "category": "misc",
+      "sha": "817268a4f808",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "real_misc_longjian2024_smallsword3",
+      "category": "misc",
+      "sha": "2415582719bf",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_longjian2024_ssw_redis",
+      "category": "misc",
+      "sha": "35d1fcb0f40c",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "real_misc_longjian2024_telnet",
+      "category": "misc",
+      "sha": "7d9b97f0c5b7",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "real_misc_longjian2025_app_part2",
+      "category": "misc",
+      "sha": "e93f142a43a4",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_longjian2025_data_security1",
+      "category": "misc",
+      "sha": "d7e730c091c7",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_longjian2025_siem",
+      "category": "misc",
+      "sha": "ced419973bb6",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_mjuctf_speak",
+      "category": "misc",
+      "sha": "c67bcf59d240",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_mjuctf_this_is_the_flag",
+      "category": "misc",
+      "sha": "ff7dbfd3ab7f",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_nactf2020_zip_madness",
+      "category": "misc",
+      "sha": "5ba05e190682",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_qiangwang2020_cefang",
+      "category": "misc",
+      "sha": "279351e64523",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_qiangwang2020_upload",
+      "category": "misc",
+      "sha": "c462cfa208b3",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_sheng2022_traffic_bruteforce_count",
+      "category": "misc",
+      "sha": "be47addbcb8f",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "real_misc_sheng2022_traffic_enable_pwd",
+      "category": "misc",
+      "sha": "0fc5ec3ed9da",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "real_misc_sheng2022_traffic_ftp_dataconn_count",
+      "category": "misc",
+      "sha": "6b86b273ff34",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "real_misc_sheng2022_traffic_ftp_port",
+      "category": "misc",
+      "sha": "48449a14a4ff",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "real_misc_sheng2022_traffic_telnet_pwd",
+      "category": "misc",
+      "sha": "cc0f6b523bef",
+      "plaintext_known": false,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "unsolved"
+    },
+    {
+      "id": "real_misc_udomctf2022_morse",
+      "category": "misc",
+      "sha": "bb0e2397592f",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_vnctf_flag",
+      "category": "misc",
+      "sha": "7d9ce4e1a4e7",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_misc_vnctf_strangeflag",
+      "category": "misc",
+      "sha": "85ab27107d2a",
+      "plaintext_known": false,
+      "in_attachment": true,
+      "attachment_file": "vnctf2022.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_vnctf_vnloan",
+      "category": "misc",
+      "sha": "68fb5e5275a1",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_misc_xuanhun_signin",
+      "category": "misc",
+      "sha": "d5e1894ae1bb",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_pwn_changan2021_pwn3",
+      "category": "pwn",
+      "sha": "92b80a26ebab",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_pwn_hws2022_peach",
+      "category": "pwn",
+      "sha": "13c42279aade",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_reverse_anxun2020_easycm",
+      "category": "reverse",
+      "sha": "888adf3fcf54",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "anxun2020_official.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_reverse_anxun2020_notright",
+      "category": "reverse",
+      "sha": "fae681a2f211",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "anxun2020_official.txt",
+      "in_description": true,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_reverse_gaoxiao2024_upx",
+      "category": "reverse",
+      "sha": "710f317623fc",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_reverse_js",
+      "category": "reverse",
+      "sha": "aec640f00c41",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "index.html",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_reverse_sheng",
+      "category": "reverse",
+      "sha": "d65b30ccdac4",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_reverse_upx",
+      "category": "reverse",
+      "sha": "7130218010da",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_reverse_vnctf_babymaze",
+      "category": "reverse",
+      "sha": "25f6112642aa",
+      "plaintext_known": false,
+      "in_attachment": true,
+      "attachment_file": "vnctf2022.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_reverse_vnctf_cm1",
+      "category": "reverse",
+      "sha": "a9bb88af1650",
+      "plaintext_known": true,
+      "in_attachment": false,
+      "attachment_file": "",
+      "in_description": false,
+      "provenance": "computed"
+    },
+    {
+      "id": "real_reverse_vnctf_timeflies",
+      "category": "reverse",
+      "sha": "81dd6bd94dde",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_anxun2020_welcome",
+      "category": "web",
+      "sha": "64811b6ef98f",
+      "plaintext_known": false,
+      "in_attachment": true,
+      "attachment_file": "anxun2020_official.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_changan2021_soeasy",
+      "category": "web",
+      "sha": "95a8f144fd20",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_dicectf2022_knockknock",
+      "category": "web",
+      "sha": "b29a018aa481",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_dicectf2022_point",
+      "category": "web",
+      "sha": "fc993d494016",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_gongye_web2",
+      "category": "web",
+      "sha": "6061e0235615",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "index.php",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_hacktheboo2022_spookifier",
+      "category": "web",
+      "sha": "fe687acb1bd7",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_linectf2022_ssti_jwt",
+      "category": "web",
+      "sha": "50d32d18a939",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_longjian2023_hard_web1",
+      "category": "web",
+      "sha": "df19fd0b5e6a",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_longjian2023_hard_web2",
+      "category": "web",
+      "sha": "67e6629dd56f",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_longjian2025_which_sql",
+      "category": "web",
+      "sha": "3038d6fe45d4",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": true,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_udomctf2022_cmdinj",
+      "category": "web",
+      "sha": "73c07e35e026",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_wgmy2022_christmas_wishlist",
+      "category": "web",
+      "sha": "76add0f3b533",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    },
+    {
+      "id": "real_web_wgmy2022_christmas_wishlist2",
+      "category": "web",
+      "sha": "a47ad91fbba5",
+      "plaintext_known": true,
+      "in_attachment": true,
+      "attachment_file": "flag.txt",
+      "in_description": false,
+      "provenance": "att_leak"
+    }
+  ]
+}
