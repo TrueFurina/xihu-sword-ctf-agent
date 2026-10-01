@@ -50,7 +50,14 @@ def _warn_import_once(skill_name: str, exc: Exception) -> None:
     logger.warning("[presolve] 导入 %s 失败（skill 缺失/语法错误/依赖未装）: %s", skill_name, exc)
 
 # flag 格式统一正则（多格式：flag{}/DASCTF{}/ctf{}）
-_FLAG_RE = re.compile(r"(?:flag|dasctf|ctf)\{[^}\s]{3,}\}", re.IGNORECASE)
+# 2026-10-01 修前缀截断：原式 `(?:flag|dasctf|ctf)\{...\}` 会把 `csawctf{...}`
+# 截成 `ctf{...}`（匹配到词中间的 ctf），而截断后的串**仍能通过宽松的 flag_pattern**
+# → 在无 answers 的基准跑批里会造出「看似合法实则错误」的 flag（假解出）。
+# 修法：加词边界前瞻 (?<![A-Za-z0-9_]) + 允许前缀组 [A-Za-z0-9_]{0,15}，
+# 使匹配从**完整前缀**开始（csawctf / picoCTF / xctf / xxflag 均取全串）。
+_FLAG_RE = re.compile(
+    r"(?<![A-Za-z0-9_])(?:[A-Za-z0-9_]{0,15}(?:flag|dasctf|ctf))\{[^}\s]{3,}\}",
+    re.IGNORECASE)
 
 
 def presolve_candidates(question) -> list:
@@ -150,6 +157,8 @@ _WIRED_SKILL_MODULES = {
     "skills.reverse_router",               # reverse 路由：静态富化（存 methodology）
     "skills.web_ssrf",                      # 靶机可达时 SSRF 读内网 flag
     "skills.ssti_detect",                   # 靶机可达时 SSTI RCE 提取 flag
+    # 2026-10-01 新增（确定性静态求解）
+    "skills.misc_qr_matrix",                # 数字矩阵 → QR 码解码（纯 Python，版本 1-10）
 }
 
 
@@ -479,6 +488,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_hash_crack(question)),
         asyncio.ensure_future(_try_pwn_exploit(question)),
         asyncio.ensure_future(_try_reverse_route(question)),
+        # 2026-10-01 确定性静态求解：数字矩阵 → QR 码
+        asyncio.ensure_future(_try_qr_matrix(question)),
     ]
     try:
         for _fut in asyncio.as_completed(_tasks):
@@ -1597,4 +1608,56 @@ async def _try_reverse_route(question) -> Optional[str]:
             _extra["reverse_guidance"] = guidances
         logger.info("[presolve:reverse_route] %s 路由 %d 个附件，供 solver 消费",
                     getattr(question, "id", "?"), len(guidances))
+    return None
+
+
+async def _try_qr_matrix(question) -> Optional[str]:
+    """数字矩阵 → QR 码解码（2026-10-01 新增 · B 类静态求解）。
+
+    对「附件是一串整数、每个整数是二维码一行」的题型做确定性解码：
+    N 行 × 每行 N 位 → N×N 模块矩阵 → QR 版本 v=(N-17)/4。
+    实现见 skills/misc_qr_matrix（纯 Python：格式信息 BCH + 掩码表 + 之字形
+    取码字 + 分块反交织 + 段解析），支持版本 1-10、byte/alnum/numeric。
+
+    诚实口径：本路是「QR 解码」这一公开标准的确定性实现，非 grep 明文；
+    实测 NYU CTF Bench 2023q-for-1black0white 解出
+    csawctf{1_d1dnt_kn0w_th1s_w0uld_w0rk}，与题面 flag_sha256 逐字匹配
+    （该题在答案来源审计中为 unsolved = 附件/题面均不含明文，属真实解出）。
+    命中由下游 flag_pattern + 答案校验（题面提供时）把关。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc", "forensics"):
+        return None
+    attach = _attachments(question)
+    if not attach:
+        return None
+    try:
+        from skills.misc_qr_matrix import run as qr_run
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.misc_qr_matrix", exc)
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p) or os.path.getsize(p) > 2 * 1024 * 1024:
+            continue
+        try:
+            res = await asyncio.to_thread(qr_run, {"path": p})
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:qr_matrix] %s 异常: %s", p, exc)
+            continue
+        if not res:
+            continue
+        decoded = ""
+        for enc in ("utf-8", "latin-1"):
+            try:
+                decoded = res.decode(enc)
+                break
+            except Exception:  # noqa: BLE001
+                continue
+        flag = _flag_from_text(decoded)
+        if flag and _is_plausible_flag(flag):
+            logger.info("[presolve:qr_matrix] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
     return None

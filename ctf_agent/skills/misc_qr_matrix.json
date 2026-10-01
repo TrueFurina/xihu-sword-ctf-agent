@@ -1,0 +1,8 @@
+{
+  "name": "misc_qr_matrix",
+  "purpose": "数字矩阵 → QR 码解码（版本 1-10，全 8 掩码，byte/alnum/numeric）。适用题型：附件是一串整数、每个整数是二维码的一行（n 位 = n 个模块）、行数=列数=QR 边长。纯 Python 实现（格式信息 BCH + 掩码表 + 之字形取码字 + 分块反交织 + 段解析），零第三方依赖。实测 NYU CTF Bench 2023q-for-1black0white：29 行 29 位整数 → 29×29 版本 3 → csawctf{1_d1dnt_kn0w_th1s_w0uld_w0rk}（与题面 flag_sha256 逐字匹配）。",
+  "input_spec": "params = {'path': 整数文本文件路径 | 'text': 含整数文本 | 'rows': 整数列表(最高优先)}；文本须为「纯整数」（空白/逗号/分号分隔），夹杂非数字内容即拒绝（避免把普通题面当矩阵）。",
+  "output_spec": "解码出的 payload bytes（自动尝试 {MSB/LSB 位序} × {暗=1/暗=0} 四种组合，取更像 flag 者）；版本 >10 / 汉字模式 / ECI / 非纯整数文本 → None。",
+  "categories": ["crypto", "misc", "forensics"],
+  "version": "1.0"
+}
