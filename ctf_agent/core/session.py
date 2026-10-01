@@ -18,6 +18,7 @@ presolve miss 后 LLM 看不到"我刚跑了什么"，只能凭题面静态猜�
 
 from __future__ import annotations
 
+import locale
 import os
 import subprocess
 import threading
@@ -40,6 +41,31 @@ class CommandRecord:
 
     def ok(self) -> bool:
         return self.returncode == 0
+
+
+def _decode_out(b: bytes | None) -> str:
+    """命令输出解码：utf-8 优先，失败回退系统本地编码（中文 Windows = cp936/GBK）。
+
+    P0 修复（2026-10-01 实测实锤）：
+        此前 `_exec` 用 `subprocess.run(..., text=True)`，Python 默认按 **utf-8 严格**
+        解码。在中文路径工作区跑 `dir` / `type`（cmd 内置命令输出是 GBK）时，
+        解码线程抛 `UnicodeDecodeError` → **`proc.stdout` 变成 None** → 上层拿到
+        「命令返回 0 但没有任何输出」。
+
+        后果不是报错，而是**静默空输出**：agent 以为命令执行了却读不到东西，
+        于是一遍遍重试 recon，把整题预算空烧光。A 档 5 题抬到单题 20 万 token
+        仍 0/5，日志里的「工作区 shell 持续不可用…无法读取脚本内容」就是它。
+
+    改为先取 bytes 再自行解码：utf-8 正常，GBK 回退本地编码，最坏 errors=replace
+    ——**任何编码都不返回 None，也不抛异常**。
+    """
+    if not b:
+        return ""
+    try:
+        return b.decode("utf-8")
+    except UnicodeDecodeError:
+        return b.decode(locale.getpreferredencoding(False) or "utf-8",
+                        errors="replace")
 
 
 class Session:
@@ -73,21 +99,24 @@ class Session:
             return rec
 
     def _exec(self, cmd: str, timeout: int, note: str) -> CommandRecord:
-        """实际执行（子类可替换为 Docker/远程后端）。"""
+        """实际执行（子类可替换为 Docker/远程后端）。
+
+        输出解码见模块级 `_decode_out`：必须拿 bytes 自行解码，不能用 `text=True`
+        （中文 Windows 上会把 GBK 输出解崩成 None，表现为「命令成功但无输出」）。
+        """
         try:
             proc = subprocess.run(
                 cmd,
                 shell=True,
                 cwd=self.cwd,
-                capture_output=True,
-                text=True,
+                capture_output=True,      # 拿 bytes，解码交给 _decode_out
                 timeout=timeout,
             )
             return CommandRecord(
                 cmd=cmd,
                 cwd=self.cwd,
-                stdout=proc.stdout,
-                stderr=proc.stderr,
+                stdout=_decode_out(proc.stdout),
+                stderr=_decode_out(proc.stderr),
                 returncode=proc.returncode,
                 ts=time.strftime("%Y-%m-%d %H:%M:%S"),
                 note=note,
@@ -96,8 +125,8 @@ class Session:
             return CommandRecord(
                 cmd=cmd,
                 cwd=self.cwd,
-                stdout=e.stdout or "",
-                stderr=(e.stderr or "") + "\n[TIMEOUT]",
+                stdout=_decode_out(e.stdout),
+                stderr=_decode_out(e.stderr) + "\n[TIMEOUT]",
                 returncode=-1,
                 ts=time.strftime("%Y-%m-%d %H:%M:%S"),
                 note=note,
