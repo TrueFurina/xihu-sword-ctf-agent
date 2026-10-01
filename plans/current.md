@@ -26,7 +26,7 @@
 | 门禁脚本 | 🟢 **已修** | `test_file_guard.py` 已于提交 `834bffd` 入库（`git ls-files` 可查） |
 | 跑批默认值 | 🟡 **部分已修** | `eval/benchmark.py` 默认已改 `deepseek`（`d51fdae`）；`benchmark_heldout.py` 因他人在途改动**未改**（仍 baidu + limit 全跑），真实跑批须显式指定 |
 | 能力水位 | 🟡 | held-out 大模型自主解出 **0/17**（关早停 + 预算 2.5 倍重测仍 0）；解出 9 题全来自 presolve |
-| 扩池 | 🟢 | NYU **34 题**已落 `data/questions_ext/`（gitignore 不入库），零成本预扫仅 1/34 |
+| 扩池 | 🟢 | NYU **34 题**已落 `data/questions_ext/`（gitignore 不入库），零成本预扫 **2/34**（干净口径 **1/33**；2026-10-01 修复后更新，原记 1/34） |
 | 计划文件 | 🟢 | 本文件已重建（原为空且停更于 09-21） |
 
 ---
