@@ -1,6 +1,6 @@
 # Held-out 重测报告 · 首次真实 LLM 实测 + P0 验证器修复（2026-09-19）
 
-> ⚠️ **2026-09-26 口径更正：本文的能力数字已作废，请勿单独引用**
+> ⚠️ **2026-09-26 口径更正：本文的能力数字已作废，请勿单独引用**（2026-10-03 复核刷新下方「当前口径」块）
 >
 > 本文基于 **10 题** held-out 池。该池后被确认**受污染**：7 道 WRITEUP 重建题（flag 明文在附件）
 > + 1 道源码泄露 web 题（`real_web_gongye_web2`，flag 就在其提供的 `index.php` 内）。
@@ -8,8 +8,8 @@
 > 以及 566,570 / 696,506 tokens 均**不再作为能力率引用**。
 >
 > **当前口径（唯一真值＝`scripts/_kpi_canonical.py`）**：
-> - `heldout_candidates = 2` —— **能力分母**。LLM 自主推理 **1/2**（`real_crypto_dnui_keyboard`，sha256 闭环），另一题 `real_reverse_js` 由确定性 presolve 解出。
-> - `heldout_runnable_pool = 17` —— **可选跑池**（2 自有 + 15 道外部 Google CTF 采源）。难度显著更高（单题 token 成本约为干净池的 ~50×），抽样跑过的题全部未解出，报告被机器标记 `integrity.interpretable=false`，**不是能力分母**。
+> - `heldout_candidates = 2` —— **能力分母**。⚠️ **LLM 自主推理 = 0**（2026-10-01 复核作废原记的「1/2」：`real_crypto_dnui_keyboard` 在 2026-09-29 全池与 2026-10-01 NYU 抽样两次独立实测中**均被判 `solved_by=presolve`**，78ms、tokens≈0；另一题 `real_reverse_js` 同为确定性 presolve 解出）。
+> - `heldout_runnable_pool = 41` —— **可选跑池**（2026-10-03 引入 Google CTF 2021/2022/2025 后由 **17 → 41**；原为 2 自有 + 15 道外部采源）。难度显著更高（单题 token 成本约为干净池的 ~50×），抽样跑过的题全部未解出，报告被机器标记 `integrity.interpretable=false`，**不是能力分母**。
 > - 两者**不可互换、不可合并成一个率**。
 >
 > 本文保留作为**历史过程记录**（当时确属真实实测、非编造），不代表当前结论。
