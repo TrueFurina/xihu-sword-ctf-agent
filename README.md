@@ -1,5 +1,7 @@
 # xihu-sword-ctf-agent
 
+> 🔧 **确定性优先的 CTF 智能体框架** — 先用 56 个可复现确定性技能横向爆破常见题型，LLM 仅在静态分析 miss 时才作为最后手段介入，且受白名单 / token 预算 / 墙钟止损三重约束。结果可复现、可调试、且**对自己能做什么诚实**。
+
 > 🌏 **中文文档 / Chinese documentation**: [README.zh.md](./README.zh.md)
 
 > ⚠️ **Honesty disclaimer (read first)**: This project's real-world competition result on the live platform was **0 accepted flags**. All "solved / pass-rate" figures in this repo refer to **offline deterministic analysis** of historical CTF problems (the `data/questions_real/` corpus), not any live contest score. We do not claim LLM autonomous reasoning capability — the real capability here is a **deterministic static analyzer (presolve)** covering common CTF categories. See [Honest KPI](#honest-kpi) below.
@@ -32,6 +34,8 @@ ctf_agent/
 ├── run.py         entry point (--mode cli/web/mock)
 └── setup.sh       environment bootstrap
 ```
+
+![解题流水线（确定性优先）](docs/architecture.svg)
 
 ### Solve pipeline
 
