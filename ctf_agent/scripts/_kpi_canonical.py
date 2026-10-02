@@ -142,12 +142,12 @@ def count_heldout_candidates() -> int:
 
 
 def count_heldout_runnable_pool() -> int:
-    """可选跑池大小（= 自有 2 + 外部采源 15，实测 17）。
+    """可选跑池大小（= 自有 2 + 外部采源；实测随扩池增长，2026-10-03 为 41）。
 
     ⚠️ 与 `heldout_candidates` 是两个不同口径，**绝不可互换、更不可合并成一个率**：
       - `heldout_candidates`（=2）：**能力分母**。unseen 非平凡、已排除 WRITEUP 重建/
         附件泄露/源码泄露/已训练，是「LLM 真·自主推理」唯一合法分母。
-      - `heldout_runnable_pool`（=17）：**可选跑池**。在前者基础上并入外部采源
+      - `heldout_runnable_pool`（实测 41 @ 2026-10-03）：**可选跑池**。在前者基础上并入外部采源
         （Google CTF，难度显著更高，实测单题成本 ~50×）。用于「能跑哪些题」，
         **不用于**报告能力率——把 0/17 或 1/17 当能力率，等于把「题更难」说成
         「能力更低」，属欺骗性比率。
@@ -316,8 +316,8 @@ def canonical_kpi() -> dict:
         "heldout_runnable_pool": runnable,     # 可选跑池（含外部采源）【非能力分母，禁混用】
         "skills": skills,                      # 确定性 skill 数（skills/*.py 顶层 run 入口）
         "regression_checks": regression,       # merge-gate 回归集条数
-        "coverage_of_corpus": round(coverage_all, 4),     # 14/92
-        "coverage_of_heldout": coverage_heldout,          # 恒 None：14 与 10 不相交
+        "coverage_of_corpus": round(coverage_all, 5),     # 14/93
+        "coverage_of_heldout": coverage_heldout,          # 恒 None：14 与 2 不相交
         "heldout_status": hs,                  # held-out 实测状态（读最新报告派生）
         "heldout_budget_ablation": abl,        # 1× vs 2× 预算对照（机器派生）
         "deprecated_subset": _DEPRECATED_SUBSET,          # 仅作警示锚点
@@ -329,10 +329,9 @@ def canonical_kpi() -> dict:
             f"⚠️ {heldout} 是能力分母、{runnable} 只是可跑范围，二者不可互换、不可合并成一个率），"
             + _heldout_clause(hs, abl) +
             f"15 题子集/86.7% 口径已作废。goal_log.jsonl 解出数恒 0，与 KPI 非同源。"
-            f"⚠️ ledger-vs-corpus 1 项漂移：AUTHORIZED_KPI_SOLVES=14，但其中 10733 在"
-            f"data/questions_real/ 无对应题文件（台账计 verified、语料缺文件）；"
-            f"held-out {heldout} 题分母不受影响（已排除的 13 道均正确命中授权 ID；"
-            f"另 7 道 WRITEUP 重建题于 2026-09-21 经 P0-a 排除，不再污染分母）。"
+            f"ledger-vs-corpus 漂移为零（10733 语料已于 2026-10-03 补齐 "
+            f"data/questions_real/crypto/10733.json）；held-out {heldout} 题分母不受影响"
+            f"（另 7 道 WRITEUP 重建题于 2026-09-21 经 P0-a 排除，不再污染分母）。"
         ),
     }
 

@@ -1,0 +1,14 @@
+{
+  "id": "10733",
+  "provenance": "real_past_ctf",
+  "category": "crypto",
+  "title": "DASCTF CRYPTO-02 · How many rot are there（高偶指数 RSA + hint 泄露 p + ROT13）",
+  "description": "给定 hint = (e*p + e^2)^q mod n、c = m^e mod n、n，e=65536=2^16。由 hint 可分解 n 得 p、q（p≡q≡3 mod 4）；在奇数阶子群求逆使 2^15·inv≡1，得 c^inv≡m^2，CRT+一轮 Rabin 还原 m。明文为 ROT13 编码（题名 \"How many rot\" 即提示），ROT13 解码得规范 flag。",
+  "flag": "ac232bd941738e22cfcdd6585ae478c19cffbea15d713c00a70ac157485ca6a4",
+  "flag_pattern": "[A-Za-z0-9_]{1,12}\\{[^}\\s]{3,120}\\}",
+  "attachments": [
+    "data/race_attachments/10733_How_many_rot_are_there的附件/tempdir/CRYPTO附件/task.py"
+  ],
+  "difficulty": "MEDIUM",
+  "flag_sha256": "ac232bd941738e22cfcdd6585ae478c19cffbea15d713c00a70ac157485ca6a4"
+}
