@@ -301,9 +301,9 @@ def canonical_kpi() -> dict:
     skills = count_skills()
     regression = count_regression_checks()
     coverage_all = (ov / corpus) if corpus else 0.0
-    # 重要：offline_verified(14) 与 heldout_candidates(10) 是**不相交**集合
+    # 重要：offline_verified(14) 与 heldout_candidates(2) 是**不相交**集合
     # （14 全为已训练/KPI 题，本就在 held-out 排除逻辑里被剔除）。
-    # 故「14/10」是欺骗性比率，绝不输出。
+    # 故「14/2」是欺骗性比率，绝不输出。
     coverage_heldout = None
     # held-out 实测状态与预算对照**机器派生**（读 benchmark_report.json，禁止手写）。
     hs = heldout_status()
