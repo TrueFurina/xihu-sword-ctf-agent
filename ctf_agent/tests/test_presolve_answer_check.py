@@ -7,6 +7,17 @@
         （best lis|tened → flag{tened}）与 "e=1049"（→ flag{1049}）
         均产出假 flag；8 例假命中入账风险。
 修复后本文件锁定双向行为：真命中必须放行、变异/垃圾必须拒绝。
+
+背景（2026-10-03，B 组 answers=None 假命中治理，presolve_audit *_v3_20261003）：
+  P0-C  附件多候选：多题共用赛事官方 wp 全文（anxun2020_official.txt /
+        vnctf2022.txt）时，`_try_pattern_scan` 取"第一个匹配"→ 同赛事各题都
+        抓到该文件第一个 flag（常是别题的）；宽 pattern 在 png/jpg 二进制里
+        随机字节伪匹配上百次（hbv{buvkjhmi2} / 6{Rp8$} / au{HHHH}）。
+        修复 = 无真值时「附件多候选守卫」（宁漏报不虚报），有真值时不拦截。
+  P0-D  元词候选：`_try_desc_answer` 把"…提取得到 flag。"里的 "flag" 当答案
+        → flag{flag}（gaoxiao2024_file_extract）。
+  P0-E  占位填充：`_is_plausible_flag` 未拒星号 redacted（cybench dynastic
+        的 HTB{*******…*}）。
 """
 from __future__ import annotations
 
@@ -18,7 +29,13 @@ from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.presolve import _passes_answer_check, _try_desc_answer  # noqa: E402
+from core.presolve import (  # noqa: E402
+    _passes_answer_check,
+    _try_desc_answer,
+    _is_plausible_flag,
+    _attachment_multi_candidate,
+    _try_pattern_scan,
+)
 
 
 def _sha(s: str) -> str:
@@ -151,3 +168,112 @@ class TestDescAnswerExtraction:
 
     def test_short_description_ignored(self):
         assert self._run(self._desc("ab")) is None
+
+
+# ---------------------------------------------------------------- 元词候选（P0-D）
+class TestDescAnswerMetawordRejection:
+    """`_try_desc_answer` 拒绝元词：'…得到 flag。' 里的 'flag' 是指代词，非答案。"""
+
+    def _desc(self, desc, flag_pattern=""):
+        return _q(description=desc, flag_pattern=flag_pattern)
+
+    def _run(self, q):
+        return asyncio.run(_try_desc_answer(q))
+
+    def test_meta_word_flag_rejected(self):
+        """gaoxiao2024_file_extract 假命中来源：'提取得到 flag。' 曾产 flag{flag}。"""
+        assert self._run(self._desc("从流量/文件提取得到 flag。")) is None
+
+    def test_meta_word_ctf_rejected(self):
+        assert self._run(self._desc("解出 ctf 即可提交")) is None
+
+    def test_meta_word_dasctf_rejected(self):
+        assert self._run(self._desc("解出 dasctf 后提交")) is None
+
+    def test_real_answer_after_de_dao_still_extracted(self):
+        """回归锁：真答案仍要提取（不误伤 '得到 ABCD1234'）。"""
+        assert self._run(self._desc("分析后得到 ABCD1234")) == "flag{ABCD1234}"
+
+    def test_real_answer_after_answer_is_still_extracted(self):
+        assert self._run(self._desc("the answer is XYZ_2026")) == "flag{XYZ_2026}"
+
+
+# ---------------------------------------------------------------- 占位填充（P0-E）
+class TestPlausibleFlagPlaceholder:
+    """`_is_plausible_flag` 拒绝星号 redacted / 无字母数字 inner 的占位。"""
+
+    def test_star_fill_placeholder_rejected(self):
+        """cybench dynastic 假命中：HTB{*******…*} 是 redacted 占位。"""
+        assert _is_plausible_flag("HTB{" + "*" * 73 + "}") is False
+
+    def test_star_run_placeholder_rejected(self):
+        assert _is_plausible_flag("flag{abc***def}") is False
+
+    def test_no_alnum_inner_rejected(self):
+        assert _is_plausible_flag("flag{!!!???}") is False
+
+    def test_normal_flags_still_plausible(self):
+        """回归锁：正常 flag（含短 inner）不受影响。"""
+        assert _is_plausible_flag("flag{a1b2c3}") is True
+        assert _is_plausible_flag("DASCTF{70854278-ea0c-462e-bc18-468c7a04a505}") is True
+        assert _is_plausible_flag("csawctf{st1ng_th30ry_a1nt_so_h4rd}") is True
+        assert _is_plausible_flag("flag{A}") is True
+
+
+# ---------------------------------------------------------------- 附件多候选守卫（P0-C）
+class TestAttachmentMultiCandidateGuard:
+    """共享文档/二进制噪声的多候选检测 + `_try_pattern_scan` 无真值唯一性约束。"""
+
+    def _mk(self, tmp_path, content, name="a.txt"):
+        p = tmp_path / name
+        p.write_text(content, encoding="utf-8")
+        return str(p)
+
+    def _qa(self, path, fp=r"flag\{[^}]+\}"):
+        return _q(attachments=[path], flag_pattern=fp)
+
+    # —— _attachment_multi_candidate 判定 ——
+    def test_two_distinct_candidates_detected(self, tmp_path):
+        q = self._qa(self._mk(tmp_path, "flag{aaa} ... flag{bbb}"))
+        assert _attachment_multi_candidate(q) is True
+
+    def test_single_candidate_not_flagged(self, tmp_path):
+        q = self._qa(self._mk(tmp_path, "only here: flag{solo_value}"))
+        assert _attachment_multi_candidate(q) is False
+
+    def test_same_candidate_repeated_not_flagged(self, tmp_path):
+        """重复同一候选不算多候选（去重后唯一）。"""
+        q = self._qa(self._mk(tmp_path, "flag{same} and again flag{same}"))
+        assert _attachment_multi_candidate(q) is False
+
+    def test_no_attachment_not_flagged(self):
+        assert _attachment_multi_candidate(_q(flag_pattern=r"flag\{[^}]+\}")) is False
+
+    # —— _try_pattern_scan 唯一性约束（无 answers=生产/基准无真值路径）——
+    def test_shared_wp_multi_candidate_suppressed_without_answers(self, tmp_path):
+        """无 answers + 多候选 → 拒绝（防抄错别题 flag）。"""
+        q = self._qa(self._mk(tmp_path, "flag{wrong_first} flag{other}"))
+        assert asyncio.run(_try_pattern_scan(q, None)) is None
+
+    def test_unique_candidate_still_returned_without_answers(self, tmp_path):
+        """无 answers 但候选唯一 → 仍返回（真命中不得误伤）。"""
+        q = self._qa(self._mk(tmp_path, "the flag is flag{only_valid}"))
+        assert asyncio.run(_try_pattern_scan(q, None)) == "flag{only_valid}"
+
+    def test_multi_candidate_returned_when_answers_present(self, tmp_path):
+        """有 answers 时保持原行为（返回首个候选，由下游 answer check 校验）。"""
+        q = self._qa(self._mk(tmp_path, "flag{first} flag{second}"))
+        assert asyncio.run(_try_pattern_scan(q, {"t1": "flag{first}"})) == "flag{first}"
+
+    def test_binary_noise_multi_candidate_suppressed(self, tmp_path):
+        """宽 pattern 在二进制噪声里的多次伪匹配 → 无 answers 时拒绝。"""
+        p = tmp_path / "blob.bin"
+        p.write_bytes(bytes(range(256)) * 4 + b"hbv{buvkjhmi2} x au{HHHH}")
+        q = _q(attachments=[str(p)], flag_pattern=r"[A-Za-z0-9_]{1,12}\{[^}\s]{3,120}\}")
+        assert asyncio.run(_try_pattern_scan(q, None)) is None
+
+    def test_template_placeholder_still_rejected(self, tmp_path):
+        """模板占位（DASCTF{%d-%d}）继续被拒（既有行为不回归）。"""
+        q = self._qa(self._mk(tmp_path, "DASCTF{%d-%d}"), fp=r"DASCTF\{[^}]+\}")
+        assert asyncio.run(_try_pattern_scan(q, None)) is None
+
