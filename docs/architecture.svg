@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 470" font-family="'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#5f6368"/>
+    </marker>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="680" height="470" fill="#f7f8fa"/>
+
+  <!-- title -->
+  <text x="340" y="26" text-anchor="middle" font-size="16" font-weight="700" fill="#202124">xihu-sword-ctf-agent · 解题流水线（确定性优先）</text>
+
+  <!-- input -->
+  <rect x="255" y="44" width="170" height="36" rx="18" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.5"/>
+  <text x="340" y="67" text-anchor="middle" font-size="13" font-weight="600" fill="#1a56c4">题面 / 附件 / 靶机</text>
+  <line x1="340" y1="80" x2="340" y2="100" stroke="#5f6368" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- supervisor -->
+  <rect x="150" y="100" width="380" height="48" rx="8" fill="#e6f4ea" stroke="#34a853" stroke-width="1.5"/>
+  <text x="340" y="122" text-anchor="middle" font-size="13" font-weight="700" fill="#1e7e34">supervisor · 总控</text>
+  <text x="340" y="139" text-anchor="middle" font-size="11" fill="#2e7d32">步骤预算 · 工具优先纪律 · 提交闸门 fail-closed</text>
+
+  <!-- arrows supervisor -> 3 columns -->
+  <line x1="235" y1="148" x2="125" y2="172" stroke="#5f6368" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="340" y1="148" x2="340" y2="172" stroke="#5f6368" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="445" y1="148" x2="555" y2="172" stroke="#5f6368" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- presolve -->
+  <rect x="40" y="172" width="170" height="72" rx="8" fill="#fef7e0" stroke="#f9ab00" stroke-width="1.5"/>
+  <text x="125" y="196" text-anchor="middle" font-size="13" font-weight="700" fill="#b06000">presolve 静态分析器</text>
+  <text x="125" y="214" text-anchor="middle" font-size="11" fill="#7a4a00">并行扇出确定性技能库</text>
+  <text x="125" y="230" text-anchor="middle" font-size="11" fill="#7a4a00">（RSA / stego / 多层解码 / 审计…）</text>
+
+  <!-- agents -->
+  <rect x="255" y="172" width="170" height="72" rx="8" fill="#fef7e0" stroke="#f9ab00" stroke-width="1.5"/>
+  <text x="340" y="196" text-anchor="middle" font-size="13" font-weight="700" fill="#b06000">解题 agents</text>
+  <text x="340" y="214" text-anchor="middle" font-size="11" fill="#7a4a00">crypto / misc / web</text>
+  <text x="340" y="230" text-anchor="middle" font-size="11" fill="#7a4a00">/ reverse / pwn 分题型</text>
+
+  <!-- math_engine -->
+  <rect x="470" y="172" width="170" height="72" rx="8" fill="#fef7e0" stroke="#f9ab00" stroke-width="1.5"/>
+  <text x="555" y="196" text-anchor="middle" font-size="13" font-weight="700" fill="#b06000">math_engine</text>
+  <text x="555" y="214" text-anchor="middle" font-size="11" fill="#7a4a00">数论 / 格 推理补充</text>
+  <text x="555" y="230" text-anchor="middle" font-size="11" fill="#7a4a00">确定性数学求解</text>
+
+  <!-- presolve -> LLM -->
+  <path d="M125,244 C125,258 125,262 125,266" fill="none" stroke="#ea4335" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="200" y="258" text-anchor="start" font-size="10.5" fill="#c5221f">static miss 才升级</text>
+
+  <!-- LLM -->
+  <rect x="40" y="266" width="170" height="64" rx="8" fill="#fce8e6" stroke="#ea4335" stroke-width="1.5"/>
+  <text x="125" y="290" text-anchor="middle" font-size="13" font-weight="700" fill="#c5221f">LLM 推理（最后手段）</text>
+  <text x="125" y="308" text-anchor="middle" font-size="11" fill="#a50e0e">白名单 · token 预算 · 墙钟止损</text>
+  <text x="125" y="323" text-anchor="middle" font-size="11" fill="#a50e0e">贡献 KPI = 0 / 14</text>
+
+  <!-- governance footer -->
+  <rect x="40" y="360" width="190" height="58" rx="8" fill="#f1f3f4" stroke="#5f6368" stroke-width="1.2" stroke-dasharray="5,3"/>
+  <text x="135" y="384" text-anchor="middle" font-size="12" font-weight="700" fill="#3c4043">诚实水位扫描</text>
+  <text x="135" y="401" text-anchor="middle" font-size="10.5" fill="#5f6368">拦截虚假战报</text>
+
+  <rect x="245" y="360" width="190" height="58" rx="8" fill="#f1f3f4" stroke="#5f6368" stroke-width="1.2" stroke-dasharray="5,3"/>
+  <text x="340" y="384" text-anchor="middle" font-size="12" font-weight="700" fill="#3c4043">合并闸门</text>
+  <text x="340" y="401" text-anchor="middle" font-size="10.5" fill="#5f6368">KPI 只升不降 + 全量 pytest</text>
+
+  <rect x="450" y="360" width="190" height="58" rx="8" fill="#f1f3f4" stroke="#5f6368" stroke-width="1.2" stroke-dasharray="5,3"/>
+  <text x="545" y="384" text-anchor="middle" font-size="12" font-weight="700" fill="#3c4043">发布脱敏自检</text>
+  <text x="545" y="401" text-anchor="middle" font-size="10.5" fill="#5f6368">真 flag / 密钥 永不入公开仓</text>
+
+  <text x="340" y="446" text-anchor="middle" font-size="10.5" fill="#80868b">能力 = 静态分析覆盖率，而非 LLM 推理。要解更多题型，就写更多确定性技能。</text>
+</svg>
