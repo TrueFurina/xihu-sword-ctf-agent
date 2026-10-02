@@ -243,10 +243,59 @@ def _is_plausible_flag(flag: str) -> bool:
     # 纯「字母-数字」题号式（如 C-02）
     if re.fullmatch(r"[A-Za-z]+-\d{1,3}", inner):
         return False
+    # 2026-10-03 治理：占位填充（如 cybench dynastic 的 HTB{*******…*}）——
+    # inner 不含任何字母数字，或含 ≥3 连续星号 → redacted 占位而非真 flag。
+    if not re.search(r"[A-Za-z0-9]", inner):
+        return False
+    if re.search(r"\*{3,}", inner):
+        return False
     return True
 
 
 _SHA256_HEX_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
+def _attachment_multi_candidate(question, cap: int = 2) -> bool:
+    """附件中是否存在 ≥2 个**不同** flag 候选（2026-10-03 假命中治理）。
+
+    判据来源：presolve_audit B 组（answers=None）假命中实证——
+      ① **共享文档**：多题共用赛事官方 wp 全文（anxun2020_official.txt /
+         vnctf2022.txt），同赛事各题都抓到该文件第一个 flag（常是别题的）；
+      ② **二进制 + 宽 pattern**：NYU 题 flag_pattern=
+         `[A-Za-z0-9_]{1,12}\\{[^}\\s]{3,120}\\}` 在 png/jpg 二进制里随机字节
+         伪匹配上百次（hbv{buvkjhmi2} / 6{Rp8$} / au{HHHH}）。
+    多候选 = 无真值时无法唯一确定本题答案 → 调用方应拒绝一切"抓第一个"式命中。
+    cap 早停（默认 2）以省时。
+    """
+    attach = _attachments(question)
+    if not attach:
+        return False
+    pattern = getattr(question, "flag_pattern", None)
+    rx = None
+    if pattern:
+        try:
+            rx = re.compile(str(pattern))
+        except re.error:
+            rx = None
+    if rx is None:
+        rx = _FLAG_RE
+    seen = set()
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            txt = open(p, "rb").read().decode("utf-8", errors="ignore")
+        except Exception:  # noqa: BLE001
+            continue
+        for m in rx.finditer(txt):
+            c = m.group(0)
+            if _is_plausible_flag(c):
+                seen.add(c)
+                if len(seen) >= cap:
+                    return True
+    return False
+
 
 
 def _passes_answer_check(question, flag: str, answers) -> bool:
@@ -461,6 +510,20 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
     # 在 await 之前打标记：并发任务只嗅探一次（去重）
     _mark_attempted(question)
 
+    # 2026-10-03 治理：无真值时的「共享附件多候选」统一守卫——
+    # 若本题附件出现 ≥2 个不同 flag 候选（共享 wp 全文 / 二进制宽匹配噪声），则
+    # **任何**"抓第一个"式路径（_try_pattern_scan / misc_decode / attachment_script
+    # / …）都可能抓错，且无 answers 可校验 → 直接跳过全部嗅探（宁漏报不虚报）。
+    # 有真值（answers 含本题条目）时下游 _passes_answer_check 兜底，不拦截，
+    # 故 A 组（KPI 路径）计数完全不受影响。
+    _has_truth = bool(answers) and bool(
+        str(answers.get(str(getattr(question, "id", "")), "") or "").strip())
+    if not _has_truth and _attachment_multi_candidate(question):
+        logger.info(
+            "[presolve] %s 附件含 ≥2 个不同 flag 候选且无真值校验，判为共享文档/噪声，跳过全部嗅探",
+            getattr(question, "id", "?"))
+        return None
+
     # 并发预扫（2026-08-22 锐评整改：6 路确定性嗅探并发启动，先完成且通过答案校验者即返回，
     # 其余立即取消——既拿并发最低时延，又保留「命中即短路、不冗余烧墙钟」语义）
     _tasks = [
@@ -480,7 +543,7 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_grid_resample(question)),
         asyncio.ensure_future(_try_zip_fake_encryption(question)),
         asyncio.ensure_future(_try_zero_width(question)),
-        asyncio.ensure_future(_try_pattern_scan(question)),
+        asyncio.ensure_future(_try_pattern_scan(question, answers)),
         asyncio.ensure_future(_try_attachment_script(question)),
         asyncio.ensure_future(_try_maze_solver(question)),
         # 2026-09-22 大确定性 skill 覆盖：新增 4 路（静态求解 + 静态富化）
@@ -553,6 +616,11 @@ async def _try_desc_answer(question) -> Optional[str]:
     if not m:
         return None
     raw = m.group(1)
+    # 2026-10-03 治理：拒绝**元词候选**——desc 若写"…从流量/文件提取得到 flag。"，
+    # 正则捕获到的 "flag" 是**指代词**（指"答案本身"），不是答案内容；包成
+    # flag{flag} 即假命中（gaoxiao2024_file_extract 实证，B 组 answers=None 漏过）。
+    if raw.lower() in ("flag", "ctf", "dasctf", "flags"):
+        return None
     # 已经带花括号
     if re.search(r"\{[^}]+\}\s*$", raw):
         return raw if re.search(r"(?:flag|dasctf|ctf)\{", raw, re.I) else None
@@ -883,7 +951,7 @@ async def _try_zero_width(question) -> Optional[str]:
     return None
 
 
-async def _try_pattern_scan(question) -> Optional[str]:
+async def _try_pattern_scan(question, answers=None) -> Optional[str]:
     """按题面声明 flag_pattern 扫附件明文（2026-09-01 精进 ③b/③c 核心引擎）。
 
     根因：flag_scan 只匹配 flag{}/DASCTF{}/CTF{} 三种前缀——VNCTF{}/HTB{}/D0g3{}/
@@ -893,6 +961,18 @@ async def _try_pattern_scan(question) -> Optional[str]:
     LINECTF、BeCare4 D0g3、cmd_inj UDOM 等）答案明文就在附件里。
     本路按题面 flag_pattern 直扫附件文本；模板占位（%d/%s）拒绝；正确性由下游
     flag_matches（sha256 双源校验）把关——匹配不上就是诱饵，不算真解。
+
+    2026-10-03 治理（B 组 answers=None 假命中根因，presolve_audit 报出）：
+      原实现"取第一个匹配"在两类附件上产出假命中——
+      ① **共享文档**：多题共用赛事官方 wp 全文（anxun2020_official.txt /
+         vnctf2022.txt 等），同赛事各题都抓到该文件第一个 flag（常是别题的）；
+      ② **二进制 + 宽 pattern**：NYU 题 flag_pattern 形如
+         `[A-Za-z0-9_]{1,12}\\{[^}\\s]{3,120}\\}`，在 png/jpg 二进制里随机字节
+         伪匹配上百次，取到噪声串（hbv{buvkjhmi2} / 6{Rp8$} / au{HHHH}）。
+      修法：无 answers（生产/基准无真值路径）时，若附件出现 ≥2 个**不同**候选，
+      判为"无法唯一确定本题答案" → 拒绝返回（宁漏报不虚报）。有 answers 时行为
+      完全不变（仍返回第一个候选，由下游 _passes_answer_check 校验），故 A 组
+      KPI 计数不受影响。
     """
     attach = _attachments(question)
     pattern = getattr(question, "flag_pattern", None)
@@ -904,6 +984,8 @@ async def _try_pattern_scan(question) -> Optional[str]:
         rx = _re.compile(pattern)
     except Exception:  # noqa: BLE001 - 非法 pattern 跳过
         return None
+    first = None
+    all_cands = []
     for a in attach:
         p = str(a)
         if not os.path.isfile(p):
@@ -912,17 +994,31 @@ async def _try_pattern_scan(question) -> Optional[str]:
             txt = open(p, "rb").read().decode("utf-8", errors="ignore")
         except Exception:  # noqa: BLE001 - 单附件读失败跳过
             continue
-        m = rx.search(txt)
-        if not m:
-            continue
-        cand = m.group(0)
-        if _re.search(r"%[dsfx]", cand):
-            continue  # 模板占位（如 filterrandom 的 DASCTF{%d-%d}），拒绝
-        if _is_plausible_flag(cand):
-            logger.info("[%s] flag_pattern 附件直扫命中: %s",
-                        getattr(question, "id", "?"), cand[:40])
-            return cand
-    return None
+        # 全局去重候选（供无 answers 的唯一性判定；不含模板占位）
+        for _mm in rx.finditer(txt):
+            _c = _mm.group(0)
+            if _re.search(r"%[dsfx]", _c):
+                continue
+            if _is_plausible_flag(_c) and _c not in all_cands:
+                all_cands.append(_c)
+        # 原语义：按附件顺序取第一个匹配（模板占位则跳过该附件）
+        if first is None:
+            m = rx.search(txt)
+            if m:
+                cand = m.group(0)
+                if not _re.search(r"%[dsfx]", cand) and _is_plausible_flag(cand):
+                    first = cand
+    if first is None:
+        return None
+    if answers is None and len(all_cands) > 1:
+        logger.debug(
+            "[%s] flag_pattern 附件直扫命中多候选(%d)且无 answers，拒绝"
+            "(防共享wp/二进制噪声假命中): %s",
+            getattr(question, "id", "?"), len(all_cands), str(first)[:60])
+        return None
+    logger.info("[%s] flag_pattern 附件直扫命中: %s",
+                getattr(question, "id", "?"), str(first)[:40])
+    return first
 
 
 async def _try_attachment_script(question) -> Optional[str]:

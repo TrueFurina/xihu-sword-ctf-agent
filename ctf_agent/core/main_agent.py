@@ -395,6 +395,9 @@ class MainAgent:
             # 2026-09-30 修复（92 题审计）：兜底路径此前传 answers=None，
             # 形状扫描引擎扫到的诱饵/别题 flag（8 例假命中）会无闸入账。
             # 改传单题预置答案表（明文或 sha256 占位均由 answer check 感知）。
+            # 2026-10-03 加硬：presolve 入口新增「无真值时附件多候选守卫」——
+            # 当题面无 flag 字段（preset_answers 为空）时，附件若含 ≥2 个不同候选
+            # 即判为共享文档/噪声，跳过全部嗅探（防"抓第一个"抄错别题 flag）。
             from eval.cases import preset_answers
 
             flag = await presolve(question, registry=self.registry, sandbox=self.sandbox,
