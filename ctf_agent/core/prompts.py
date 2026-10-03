@@ -105,6 +105,16 @@ def build_plan_prompt(ctx, attempt: int) -> str:
             _bb_text = ""
         if _bb_text:
             parts.append(_bb_text)
+    # P2 第三刀（2026-10-03）：卡壳时的「分层作战视图」——把题型标准流程与黑板
+    # 失败签名桥接，让规划器显式跳过已试失败路径、优先走未试步骤（flat-plan 空转
+    # 根因的确定性修复）。仅黑板启用且已有失败记录时注入；否则 prompt 不变。
+    try:
+        from core.hierarchical_plan import build_hierarchical_view
+        _hv = build_hierarchical_view(ctx)
+    except Exception:  # noqa: BLE001 - 视图生成故障不影响主流程
+        _hv = ""
+    if _hv:
+        parts.append(_hv)
     # G1/G5（2026-09-29 接入运行时）：持久工作区会话记录注入 plan prompt。
     # 这是"LLM 贡献 0/14"根因（证据不进脑）的会话层修复：下一步能看到上一步
     # 真实命令与完整输出（而非仅近 3 步 1200 字摘要）。优先用 G5 压缩记忆

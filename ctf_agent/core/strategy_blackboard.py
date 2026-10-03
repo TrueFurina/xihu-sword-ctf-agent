@@ -98,6 +98,13 @@ class StrategyBlackboard:
         entry = self._entries.get(self.signature(step))
         return bool(entry and entry.failures > 0)
 
+    def failed_signatures(self) -> list:
+        """已试且失败/无产出的策略签名列表（供分层规划视图桥接用）。"""
+        return [
+            e.signature for e in self._entries.values()
+            if e.failures > 0 or e.empties > 0
+        ]
+
     def repeat_ratio(self, window: Optional[int] = None) -> Optional[float]:
         """近 window 步中「重复已试签名」的比例；样本不足返回 None。
 
@@ -119,8 +126,14 @@ class StrategyBlackboard:
         }
 
     def summary(self, max_items: int = 10) -> str:
-        """渲染为 plan prompt 注入块；黑板为空返回 ''（prompt 不变）。"""
+        """渲染为 plan prompt 注入块；黑板为空或全是「有进展」路径时返回 ''。
+
+        黑板的价值在于警告「失败/无产出」路径（防原样重复）；纯 progress 路径
+        无需警告，注入反而冗余——故无失败/无产出时不注入（prompt 不变）。
+        """
         if not self._entries:
+            return ""
+        if not any(e.failures > 0 or e.empties > 0 for e in self._entries.values()):
             return ""
         lines = [
             "【已试策略黑板】以下策略签名已执行过，结局标注在后。"
