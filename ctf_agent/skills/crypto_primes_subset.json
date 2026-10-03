@@ -1,0 +1,8 @@
+{
+  "name": "crypto_primes_subset",
+  "purpose": "Google CTF 2023「PRIMES」题的确定性求解器：由 x = ∏ p_i^{b_i} mod q（p_i 为前 n 个素数、q = next_prime(∏ 末 r 素数)）恢复 flag。本质是 Coppersmith 平滑因子法（T=x+y·q 整除已知平滑数 M=∏p_i），非离散对数",
+  "input_spec": "params = {'kind': 'solve', 'q': <int/0xhex>, 'x': <int/0xhex>, 'n': 7*字节数, 'r': 131(默认), 'X': y上界(可选)} | {'kind': 'gen', 'flag': <明文>, 'r': 131}",
+  "output_spec": "solve → {'flag': <恢复出的明文，含 CTF{...}>}；gen → {'q','x','n'}（自造已知答案实例）",
+  "categories": ["crypto", "coppersmith", "lattice"],
+  "version": "1.0"
+}
