@@ -201,3 +201,40 @@ def test_solve_primes_real_default_X_ladder():
     i = msg.index("CTF{")
     flag = msg[i:msg.index("}", i) + 1]
     assert hashlib.sha256(flag.encode()).hexdigest() == REAL_FLAG_SHA256
+
+
+# --------------------------------------------------------------------------
+# 6) presolve 接线（未接线 = 只是库，不算能力）
+# --------------------------------------------------------------------------
+def test_skill_is_wired_into_presolve():
+    from core import presolve as P
+
+    assert "skills.crypto_primes_subset" in P.wired_skill_modules()
+    assert callable(getattr(P, "_try_crypto_primes", None))
+
+
+def test_recover_n_from_q_is_deterministic():
+    """n 不给在题面里，必须由 q 反解（next_prime 自校验）——这条挂了整路就废了。"""
+    from core import presolve as P
+
+    assert P._recover_primes_n(REAL_Q, 131) == 518
+    assert P._recover_primes_n(REAL_Q + 1, 131) is None      # 假 q 不得误判
+
+
+@pytest.mark.slow
+def test_presolve_path_solves_real_problem():
+    """真实题目对象端到端：必须用 load_questions()（自建对象会因 flag_pattern
+    缺失被诱饵守卫丢弃 → 假红）。"""
+    import asyncio
+
+    from eval.cases import load_questions
+
+    qs = load_questions("data/questions_external")
+    target = next((q for q in qs if getattr(q, "id", "") ==
+                   "ext_gctf2023_primes"), None)
+    assert target is not None, "题库里找不到 ext_gctf2023_primes"
+    from core import presolve as P
+
+    flag = asyncio.run(P._try_crypto_primes(target))
+    assert flag, "presolve 接线路径未解出 flag"
+    assert hashlib.sha256(flag.encode()).hexdigest() == REAL_FLAG_SHA256

@@ -102,9 +102,10 @@ def test_coverage_gap_is_known_and_documented():
         # ── 需特定参数提取规格（尚未沉淀为 presolve 静态嗅探）的 crypto 攻击 ──
         "skills.crypto_coppersmith",
         # ── B1 工具链补齐产物（2026-10-04）：已能确定性解出对应真题，但**尚未接入
-        #    presolve**（需先补「题面 → (q,x,n,r) 参数提取」规格），故仍属未接线 ──
+        #    presolve**（需先补「题面 → 参数」提取规格），故仍属未接线 ──
         "skills.crypto_knapsack_mhk",      # MHK2 背包等价密钥（Google CTF 2023）
-        "skills.crypto_primes_subset",     # 子集积 mod q 的 Coppersmith 平滑因子
+        # 注：skills.crypto_primes_subset 已于 2026-10-04 接线（_try_crypto_primes），
+        #     故不再属于缺口。
         "skills.crypto_high_exponent",
         "skills.crypto_lattice_attack",
         "skills.crypto_pkcs1_improved",
