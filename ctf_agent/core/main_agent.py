@@ -663,22 +663,32 @@ class MainAgent:
                     # continue / switch / redirect：继续循环（stuck_count 可能已被 reset）
                     continue
 
-                # ── E2（2026-08-25 桶B攻坚）：连续同动作 3 次 → 强制切换策略 ──
-                # 仅看 action（不要求 observation 完全相同），比下方"完全相同 observation 死循环放弃"
-                # 更宽松：真在"换参数重试"也算重复，主动换策略而非空等到监督已放弃。
-                # 与下方"完全相同 observation → presolve 兜底 → 放弃"互补（软 switch 优先于硬放弃）。
+                # ── E2（2026-08-25 桶B攻坚）：连续同「策略签名」3 次 → 强制切换策略 ──
+                # P2 修复（2026-10-03，A/B 跑批 G_p2ab 实证）：原仅看 action 名——crypto 题
+                # 里 LLM 连续写不同算法的解密脚本是正常探索，被误伤打断（该轮 47% 的步被
+                # 强制切换 vs 前两轮 17-24%）。改为三元组签名 (action, observation[:200],
+                # tool_used)，与下方"同参数重复检测"对齐：observation 实质不同（换算法/
+                # 参数/输出）不算重复；真死循环（同动作+同输出前缀+同工具）仍被拦截。
                 if len(ctx.steps) >= 3:
-                    _acts = [getattr(s, "action", "") for s in ctx.steps[-3:]]
-                    if all(_a and _a == _acts[0] for _a in _acts):
+                    _sigs = [
+                        (
+                            getattr(s, "action", ""),
+                            (getattr(s, "observation", "") or "")[:200],
+                            getattr(s, "tool_used", None) or "",
+                        )
+                        for s in ctx.steps[-3:]
+                    ]
+                    if _sigs[0][0] and all(_s == _sigs[0] for _s in _sigs):
                         ctx.strategy_switches += 1
                         ctx.stuck_count = 0
                         ctx.no_progress_streak = 0
                         ctx.advisor_hint = (
-                            f"⚠️ 检测到连续 3 步执行相同动作（{_acts[0]}），疑似策略空转死循环，"
+                            f"⚠️ 检测到连续 3 步执行相同策略签名（action={_sigs[0][0]}，"
+                            "观察输出前缀与工具均相同），疑似策略空转死循环，"
                             "强制切换解题策略：换个切入点/工具/参数，禁止重复同一动作。"
                         )
-                        logger.info("[%s] 连续同动作3次检测：强制切换策略 (action=%s)",
-                                    question.id, _acts[0])
+                        logger.info("[%s] 连续同策略签名3次检测：强制切换策略 (action=%s)",
+                                    question.id, _sigs[0][0])
                         continue
 
                 # ── 同参数重复检测（第五轮锐评：连续同工具同参数=死循环，快速终止）──

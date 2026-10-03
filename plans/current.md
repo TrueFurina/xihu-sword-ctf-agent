@@ -152,6 +152,13 @@
 - **止损语义确认正确（非回归）**：每题 race_abandon 发生在两轮 attempt 合计 token ≥60% 且零候选时——P1 首轮「token 仅 35% 就认输」未复发；budget_exceeded 题 83.6K/80K 触发步级硬停，口径精确。
 - **新发现（下一刀目标）**：E2「连续同动作 3 次→强制切换」只看 action 名不看实质——本轮 **47% 的步被强制切换**（前两轮 17-24%），crypto 题 LLM 连续写**不同算法**的解密脚本是正常探索，却被 E2 每 3 步误伤打断（strategy_switches 空转、advisor_hint 反复覆盖）。修法候选：E2 改用与「同参数重复检测」一致的三元组签名（action+observation[:200]+tool）——observation 实质不同（换算法/参数）不算重复。P2 三刀无回归、行为未恶化。
 
+**P2 收尾刀：E2 三元组签名修复（✅ 2026-10-03 深夜，用户「可以」授权，¥0）**：
+
+- **改动**（`core/main_agent.py` E2 块）：判重签名由 `action` 单元组改为三元组 `(action, observation[:200], tool_used)`——与下方「同参数重复检测」对齐：observation 实质不同（换算法/参数/输出）的正常探索不再被强切；真死循环（同动作+同输出前缀+同工具）仍被拦截。advisor_hint 与日志文案同步更新。
+- **验证**：新增 2 例回归（①同 action 不同 observation 的 crypto 探索 12 步内 switches==0；②同前缀 200 字符尾部不同的近似重复仍触发强切）；**双重变异验证**（签名退化回 action-only → 探索用例红；整体禁用 E2 → 前缀用例红）；全量 **866p/16s**。
+- **测试坑（变异前自查揪出）**：probe 的 plan 工厂写成了同步函数 → `await plan_step` 报 "object dict can't be used in await" → 每步走异常分支，探索用例「假绿」（switches==0 是因为 action 从未生效）。plan/act mock 必须 async；判「假绿」看测试日志有无 plan 步异常 WARNING。
+- **跑批口径提醒**：日志统计脚本若 grep「强制切换策略」旧文案会失配，新文案为「连续同策略签名3次检测」。下一轮 A/B 对比基线以此为准。
+
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
 - **缺口**：台账计 10733 为 ✅ offline_verified，但 `data/race_details/10733.json`、`race_attachments/10733_*`、`data/questions_real/` 条目**三者皆缺** → `_kpi_leak_crossaudit` 报 `missing_corpus=1`。
