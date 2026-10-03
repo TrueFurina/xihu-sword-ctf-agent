@@ -4,7 +4,7 @@
 验证 E2 三机制（不依赖真 LLM/工具，全 mock）：
 1. 每题 LLM 调用预算硬封顶 12（难题 15 步 → 收敛 12，杜绝无限试错）
 2. 每步超时（step_timeout_s）触发单步失败而非拖死整题/并发池
-3. 连续同动作 3 次 → 强制切换策略（strategy_switches++，不空等到放弃）
+3. 连续同「策略签名」(action, observation[:200], tool) 3 次 → 强制切换策略（P2 修复：换算法/参数的正常探索不误伤）
 4. result 契约暴露 llm_calls / step_timeouts 供 goal_log 统计
 """
 import sys
@@ -131,9 +131,77 @@ def test_budget_and_switch_coexist_on_hard_stuck():
     print(f"✓ test_budget_and_switch_coexist (llm_calls={ctx.llm_calls}, switches={ctx.strategy_switches})")
 
 
+def _make_counting_observe(action, obs_factory):
+    """可编程 observe：action 固定，observation 由 obs_factory(i) 逐步生成。"""
+    counter = {"i": 0}
+
+    def _observe(agent, ctx, plan, act):
+        i = counter["i"]
+        counter["i"] += 1
+        return StepRecord(
+            stage="recon",
+            action=action,
+            observation=obs_factory(i),
+            error_category=None,
+        )
+    return _observe
+
+
+async def _async_act(*a, **k):
+    return {}
+
+
+def _run_e2_probe(agent, captured, obs_factory):
+    """E2 三元组签名探针：action 固定 script，observation 由 obs_factory(i) 生成。"""
+    async def _plan_capture(agent, ctx, attempt):
+        captured["ctx"] = ctx
+        return {"action": "script", "hypothesis": "e2_triple_probe"}
+
+    observe = _make_counting_observe("script", obs_factory)
+
+    async def _run():
+        with patch("core.phases.plan_step", _plan_capture), \
+             patch("core.phases.act_step", _async_act), \
+             patch("core.phases.supervise_step", _fake_supervise), \
+             patch("core.phases.observe_step", observe), \
+             patch("core.presolve.presolve", _fake_presolve):
+            return await agent.solve(_q(difficulty="EASY"))
+    return asyncio.run(_run())
+
+
+def test_crypto_explore_different_outputs_not_interrupted():
+    """P2 修复回归（2026-10-03）：同 action 连续写不同算法脚本（observation 实质不同）
+    是正常 crypto 探索，不得被 E2 强制切换打断（G_p2ab 轮 47% 强切误伤的病灶）。"""
+    captured = {}
+    agent = MainAgent(per_question_wallclock=300, llm_call_budget=12)
+    _run_e2_probe(agent, captured, lambda i: f"rot13 decode attempt -> output variant {i}")
+    ctx = captured["ctx"]
+    assert ctx.strategy_switches == 0, (
+        f"同 action+不同 observation 是正常探索，不应强切，实得 {ctx.strategy_switches}"
+    )
+    assert len(ctx.steps) >= 8, f"应能持续推进多步而非被打断，实得 {len(ctx.steps)} 步"
+    print(f"✓ test_crypto_explore_different_outputs_not_interrupted (steps={len(ctx.steps)}, switches=0)")
+
+
+def test_same_output_prefix_different_tail_still_interrupted():
+    """E2 三元组签名按 observation[:200] 前缀判重：前 200 字符相同、尾部不同的
+    近似重复仍会被拦截（比"完全相同 observation"严、比"仅同 action"松）。"""
+    captured = {}
+    agent = MainAgent(per_question_wallclock=300, llm_call_budget=12)
+    common = "y" * 200
+    _run_e2_probe(agent, captured, lambda i: common + f"tail-{i}")
+    ctx = captured["ctx"]
+    assert ctx.strategy_switches >= 1, (
+        f"同 action+同输出前缀（前200字符）应仍触发强切，实得 {ctx.strategy_switches}"
+    )
+    print(f"✓ test_same_output_prefix_different_tail_still_interrupted (switches={ctx.strategy_switches})")
+
+
 if __name__ == "__main__":
     test_llm_call_budget_capped_at_12()
     test_per_step_timeout_does_not_hang()
     test_repeated_action_3_times_forces_switch()
     test_budget_and_switch_coexist_on_hard_stuck()
+    test_crypto_explore_different_outputs_not_interrupted()
+    test_same_output_prefix_different_tail_still_interrupted()
     print("=== main_agent E2 预算/止损测试全部通过 ===")
