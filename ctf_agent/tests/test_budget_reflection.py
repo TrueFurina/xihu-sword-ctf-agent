@@ -172,3 +172,65 @@ def test_abandon_gate_fires_on_realistic_zero_candidate():
         assert a._budget_reflection_should_abandon(ctx) is True
     finally:
         os.environ.pop("CTF_AGENT_BUDGET_REFLECTION", None)
+
+
+# ── 2026-10-03（P1 诊断）规则⑥ token 口径：步数/token 两预算错位不得提前放弃 ──
+# 实证：held-out 41 池前 5 题 / deepseek / 2026-10-03 G_rerun_20261003_191824——
+# 5 题全部在第 ~8 步（步数比 8/12≈67%）被规则⑥放弃，token 仅消耗 ~35%，
+# 失败码全为 race_abandon。修复：token_ratio 已知时须 token 也 >=60% 才允许 ABANDON。
+def test_reflect_rule6_waits_when_tokens_not_burnt():
+    """步数 67% 但 token 仅 35% → 不得 ABANDON（继续探索剩余 token 预算）。"""
+    steps = [_S(obs=f"recon output {i}") for i in range(8)]
+    res = reflect(BudgetState(budget_total=12, budget_used=8,
+                              candidates_found=0, token_ratio=0.35),
+                  steps, confidence=0.75)
+    assert res.decision != DECISION_ABANDON
+
+
+def test_reflect_rule6_fires_when_tokens_also_burnt():
+    """步数 67% 且 token 70% + 零候选 → 止损语义保留，仍 ABANDON。"""
+    steps = [_S(obs=f"recon output {i}") for i in range(8)]
+    res = reflect(BudgetState(budget_total=12, budget_used=8,
+                              candidates_found=0, token_ratio=0.7),
+                  steps, confidence=0.75)
+    assert res.decision == DECISION_ABANDON
+
+
+def test_reflect_rule6_token_unknown_keeps_old_behavior():
+    """token_ratio=None（老调用方/单测）→ 与修复前行为一致（ABANDON）。"""
+    steps = [_S(obs=f"recon output {i}") for i in range(8)]
+    res = reflect(BudgetState(budget_total=12, budget_used=8, candidates_found=0),
+                  steps, confidence=0.75)
+    assert res.decision == DECISION_ABANDON
+
+
+def test_gate_uses_token_usage_fn():
+    """端到端：token_usage_fn 报 token 未过半 → 闸门不放弃；过半 → 放弃。"""
+    os.environ["CTF_AGENT_BUDGET_REFLECTION"] = "1"
+    try:
+        a = MainAgent.__new__(MainAgent)
+        a.llm_call_budget = 12
+        a.token_usage_fn = lambda ctx: 0.35
+        ctx = _mk_ctx_realistic(8, 0.75)
+        assert a._budget_reflection_should_abandon(ctx) is False
+        a.token_usage_fn = lambda ctx: 0.7
+        assert a._budget_reflection_should_abandon(ctx) is True
+    finally:
+        os.environ.pop("CTF_AGENT_BUDGET_REFLECTION", None)
+
+
+def test_gate_tolerates_faulty_token_usage_fn():
+    """token_usage_fn 抛异常/返回脏值 → 记账故障不影响求解主流程（回退 None=旧行为）。"""
+    os.environ["CTF_AGENT_BUDGET_REFLECTION"] = "1"
+    try:
+        a = MainAgent.__new__(MainAgent)
+        a.llm_call_budget = 12
+        a.token_usage_fn = lambda ctx: (_ for _ in ()).throw(RuntimeError("boom"))
+        ctx = _mk_ctx_realistic(8, 0.75)
+        assert a._budget_reflection_should_abandon(ctx) is True  # None → 旧口径，仍 ABANDON
+        a.token_usage_fn = lambda ctx: "not-a-number"
+        assert a._budget_reflection_should_abandon(ctx) is True
+        a.token_usage_fn = lambda ctx: None
+        assert a._budget_reflection_should_abandon(ctx) is True
+    finally:
+        os.environ.pop("CTF_AGENT_BUDGET_REFLECTION", None)
