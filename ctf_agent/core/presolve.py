@@ -161,6 +161,7 @@ _WIRED_SKILL_MODULES = {
     "skills.misc_qr_matrix",                # 数字矩阵 → QR 码解码（纯 Python，版本 1-10）
     # 2026-10-04 新增（B1 工具链补齐产物，确定性静态求解）
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
+    "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
 }
 
 
@@ -557,6 +558,7 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_qr_matrix(question)),
         # 2026-10-04 B1 确定性静态求解：子集积 mod q → Coppersmith 平滑因子
         asyncio.ensure_future(_try_crypto_primes(question)),
+        asyncio.ensure_future(_try_knapsack_mhk(question)),
     ]
     try:
         for _fut in asyncio.as_completed(_tasks):
@@ -1798,6 +1800,107 @@ def _recover_primes_n(q: int, r: int, max_bytes: int = 200) -> Optional[int]:
         P //= primes[n - r]                  # 滑窗：P(n+1) = P(n)·p_n / p_{n-r}
         P *= primes[n]
         n += 1
+    return None
+
+
+def _mhk2_extract(text: str):
+    """从题面/附件文本里抠出 MHK2 的 (pk, ct)。
+
+    pk = ``{'a1': [n 个大整数], 'a2': [...]}``，ct = ``[(c1, c2), ...]``。
+    门槛：公钥长度 ≥64（实测 n<48 攻击不成立），密文 ≥8 组且均为二元组。
+    """
+    import ast
+
+    pk = None
+    ct = None
+    for line in str(text or "").splitlines():
+        s = line.strip()
+        if len(s) < 20:
+            continue
+        try:
+            obj = ast.literal_eval(s)
+        except Exception:  # noqa: BLE001 —— 非 Python 字面量行直接跳过
+            continue
+        if pk is None and isinstance(obj, dict):
+            a1, a2 = obj.get("a1"), obj.get("a2")
+            if (isinstance(a1, list) and isinstance(a2, list) and len(a1) >= 64
+                    and len(a1) == len(a2)
+                    and all(isinstance(v, int) for v in a1[:8])
+                    and all(isinstance(v, int) for v in a2[:8])):
+                pk = {"a1": a1, "a2": a2}
+        elif ct is None and isinstance(obj, (list, tuple)) and len(obj) >= 8:
+            head = obj[:8]
+            if all(isinstance(t, (list, tuple)) and len(t) == 2
+                   and all(isinstance(v, int) for v in t) for t in head):
+                ct = [tuple(t) for t in obj]
+        if pk and ct:
+            break
+    return (pk, ct) if (pk and ct) else (None, None)
+
+
+async def _try_knapsack_mhk(question) -> Optional[str]:
+    """MHK/MHK2 背包等价密钥恢复（2026-10-04 新增 · B 类静态求解）。
+
+    对「附件给出 MHK2 公钥 a1/a2 + 密文 (c1,c2) 序列」的题型做确定性攻击：
+    正交格 L(a) → 饱和整数核 → LLL → 丢番图解出私钥 → 解密得明文。
+    实现见 :mod:`core.lattice` + :mod:`skills.crypto_knapsack_mhk`。
+
+    触发面：仅当文本里能抠出「长度 ≥64 的 a1/a2 + ≥8 组二元组密文」时才跑
+    （该形态极罕见）。n=256 两把公钥约 300s，故墙钟上限给到 600s。
+    命中由下游 flag_pattern + 题面 flag_sha256 把关。
+
+    诚实口径：本路是「等价密钥攻击」这一真实密码学攻击的确定性实现（非 grep
+    明文、非读答案密钥）；实测 Google CTF 2023 mhk2 解出 flag 且与题库
+    flag_sha256 逐字匹配。⚠️ 属 **B1 工具链补齐**产物，不代表 LLM 自主能力。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc"):
+        return None
+    blobs = [str(getattr(question, "description", "") or "")]
+    for a in _attachments(question):
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            if os.path.getsize(p) > 8 * 1024 * 1024:
+                continue
+            with open(p, "r", encoding="utf-8", errors="replace") as fh:
+                blobs.append(fh.read())
+        except OSError:
+            continue
+    pk = ct = None
+    for blob in blobs:
+        pk, ct = _mhk2_extract(blob)
+        if pk and ct:
+            break
+    if not pk or not ct:
+        return None
+    try:
+        from skills.crypto_knapsack_mhk import run as mhk_run
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.crypto_knapsack_mhk", exc)
+        return None
+    logger.info("[presolve:knapsack_mhk] %s 识别出 MHK2 公钥 n=%d，密文 %d 组",
+                getattr(question, "id", "?"), len(pk["a1"]), len(ct))
+    try:
+        res = await asyncio.wait_for(
+            asyncio.to_thread(mhk_run, {"kind": "mhk2_decrypt", "pk": pk, "ct": ct}),
+            timeout=600)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:knapsack_mhk] %s 攻击异常: %s",
+                     getattr(question, "id", "?"), exc)
+        return None
+    text = ""
+    if isinstance(res, dict):
+        text = str(res.get("plaintext") or "")
+    if not text:
+        return None
+    flag = _flag_from_text(text)
+    if flag and _is_plausible_flag(flag):
+        logger.info("[presolve:knapsack_mhk] %s 命中 flag=%s",
+                    getattr(question, "id", "?"), flag[:60])
+        _save_candidates(question, [flag])
+        return flag
     return None
 
 
