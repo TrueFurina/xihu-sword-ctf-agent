@@ -122,6 +122,13 @@
 
 **P1 首轮（✅ 已执行 2026-10-03 19:18–19:21，实耗 172,747 tokens ≈¥0.3–0.9，预算内）**：41 池前 5 题（1 crypto + 4 misc，全 GCTF2021）× deepseek 主链路；冷黑板 + E3 ON + require_sha256；硬封顶 80K/题、40 万全局（未触顶）。**结果＝0/5（自主解出仍 0）**，`integrity.interpretable=true`、`zero_work_not_attempted=0`、5 题**全部 `race_abandon`（预算反思早停，非基础设施故障）**；轨迹显示 agent 仅做 ~8 步 recon 即自我放弃（`goal_log.jsonl` 实录 `recon:command ×2-3, steps=8`）。**诊断**：瓶颈不在预算（token 远未顶格）而在**反思环过早 ABANDON**——即路线图 P2「分层规划 + 工具化 + RAG 抗幻觉 + 记忆」四件套针对的病灶；下一步候选＝P2 落地（零成本）或再跑 5 题扩样（≈¥1，须单独授权）。证据：`data/results/heldout/G_rerun_20261003_191824/`（时间戳目录，未覆盖旧证据）。
 
+**P2 首刀 + P1 第二轮（✅ 用户 10-03 晚拍板「12」＝P2 治过早放弃 + P1 扩样都做）**：
+
+- **P2 首刀（¥0，提交 `09ee5fb` 实现 + `78bec78` 测试）**：反思规则⑥加 **token 口径**——`BudgetState.token_ratio`（None=未知→旧行为，向后兼容），token 已知时须 **token 也 ≥60%** 才允许 ABANDON；`MainAgent` 新增 `token_usage_fn` 注入点，`run.build_solver` 把真实 token 记账（`_usage_cv` 盒 + BudgetTracker）除以单题预算注入。止损语义保留（token 烧穿场景不受影响）。变异验证：注释守卫→2 新用例 FAIL→恢复；全量 **835 passed / 16 skipped**。
+- **P1 第二轮（✅ 19:54–20:00，实耗 387,783 tokens，累计两轮 ≈¥1.0–2.0——预算基本用尽，后续跑批须重新授权）**：41 池第 6–10 题（GCTF2021 tiramisu/tonality + GCTF2022 custom-protocol/cycling/electric-mayhem-cls）× deepseek，口径同首轮（冷黑板 + E3 ON + require_sha256）。**结果＝0/5**（`by_error`: race_abandon ×4 + budget_exceeded ×1；`interpretable=true`）。
+- **修复被证实生效（A/B 对照）**：首轮每题 token 仅 ~35%（34.5K/80K）就被步数规则掐死；第二轮每题烧到 **84–104%（67K–83K）** 才停——不再有「token 还剩大半就认输」。0/5 是**能力事实**（这批 2022 题更难），不是机制截断。
+- 累计 held-out 对抗口径：外部池 **0/10**（本会话两轮）。**预算结论不变**：钱已花到位，瓶颈=自主推理能力本身 → 下一步只有 P2 四件套剩余部分（分层规划/记忆/RAG）是合法路径，扩样/加钱已无增量。
+
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
 - **缺口**：台账计 10733 为 ✅ offline_verified，但 `data/race_details/10733.json`、`race_attachments/10733_*`、`data/questions_real/` 条目**三者皆缺** → `_kpi_leak_crossaudit` 报 `missing_corpus=1`。
