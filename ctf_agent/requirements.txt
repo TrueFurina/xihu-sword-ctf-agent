@@ -29,6 +29,7 @@ Pygments==2.21.0
 pytest==9.1.1
 starlette==0.46.2
 sympy==1.14.0
+python-flint==0.9.0
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 uvicorn==0.52.4

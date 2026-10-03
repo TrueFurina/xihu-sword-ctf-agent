@@ -1,0 +1,8 @@
+{
+  "name": "crypto_knapsack_mhk",
+  "purpose": "MHK/MHK2 背包公钥加密的等价密钥恢复攻击（正交格 LLL + 饱和核 + 二元丢番图）。适用于公钥 a_j = e·s_j mod p 且 p = sum(s)+2 的 Murakami 体制，典型题：Google CTF 2023 MHK2",
+  "input_spec": "params = {'kind': 'recover_key|mhk2_decrypt', 'a': [公钥序列]（recover_key）, 'pk': {'a1': [...], 'a2': [...]}, 'ct': [(c1,c2), ...]（mhk2_decrypt）, 's_bits': 128}",
+  "output_spec": "recover_key → {'p','e','drop'}；mhk2_decrypt → {'plaintext'}（7-bit ASCII 明文，含 flag）",
+  "categories": ["crypto", "lattice"],
+  "version": "1.0"
+}
