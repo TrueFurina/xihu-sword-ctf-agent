@@ -318,6 +318,8 @@ class MainAgent:
         few_shot: Optional[bool] = None,               # E6 few-shot 方向范例注入（None→env/默认关）
         e3_enabled: Optional[bool] = None,             # E3 附件证据注入开关（None→env/默认关）
         g_session: Optional[bool] = None,              # G1/G5 持久会话开关（None→env/默认开）
+        token_usage_fn=None,   # 可选 callable() -> float|None：真实 token 消耗比例（0..1），
+                               # 供 budget_reflection 规则⑥做 token 口径判定（None→不参与）
     ):
         self.llm_client = llm_client
         self.registry = registry
@@ -326,6 +328,7 @@ class MainAgent:
         self.supervisor = supervisor
         self.router = router
         self.coordinator = coordinator
+        self.token_usage_fn = token_usage_fn
         self.max_retries = max_retries
         self.goal_logger = goal_logger or GoalLogger()
         self.skill_manager = skill_manager
@@ -969,6 +972,22 @@ class MainAgent:
             getattr(self, "llm_call_budget", 12) or 12, override=True,
         )
 
+    def _token_ratio(self, ctx: AgentContext) -> Optional[float]:
+        """真实 token 消耗比例（0..1）；无 token_usage_fn / 调用失败 → None（规则⑥不参与）。"""
+        fn = getattr(self, "token_usage_fn", None)
+        if fn is None:
+            return None
+        try:
+            v = fn(ctx)
+        except Exception:  # noqa: BLE001 - 记账故障不得影响求解主流程
+            return None
+        if v is None:
+            return None
+        try:
+            return max(0.0, min(1.0, float(v)))
+        except (TypeError, ValueError):
+            return None
+
     def _log_budget_reflection(self, ctx: AgentContext) -> None:
         """每 5 步做预算反思并日志（纯规则，零额外 LLM 调用，不改控制流，除非闸门开启）。"""
         try:
@@ -984,6 +1003,8 @@ class MainAgent:
             # 2026-09-23 修复：把"是否已拿到候选 flag"这一不可自欺的信号喂给反思器。
             # 此前只喂步数比例，导致真实链路（observation 恒非空）下 ABANDON 不可达。
             candidates_found=1 if getattr(ctx, "candidate_flag", None) else 0,
+            # 2026-10-03（P1 诊断）：喂真实 token 比例，防"步数先到、token 还剩大半"的过早放弃。
+            token_ratio=self._token_ratio(ctx),
         )
         _res = _reflect_budget(_st, ctx.steps, getattr(ctx, "last_confidence", None))
         ctx.last_reflection = {
@@ -1017,6 +1038,8 @@ class MainAgent:
             # 2026-09-23 修复：把"是否已拿到候选 flag"这一不可自欺的信号喂给反思器。
             # 此前只喂步数比例，导致真实链路（observation 恒非空）下 ABANDON 不可达。
             candidates_found=1 if getattr(ctx, "candidate_flag", None) else 0,
+            # 2026-10-03（P1 诊断）：喂真实 token 比例，防"步数先到、token 还剩大半"的过早放弃。
+            token_ratio=self._token_ratio(ctx),
         )
         _res = _reflect_budget(_st, ctx.steps, getattr(ctx, "last_confidence", None))
         return _res.decision == DECISION_ABANDON

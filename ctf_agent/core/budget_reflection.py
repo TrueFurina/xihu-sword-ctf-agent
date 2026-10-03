@@ -32,6 +32,15 @@ class BudgetState:
     # None = 未知（老调用方/单测）→ 零候选规则**不参与判定**，保证向后兼容；
     # 0    = 明确"至今零候选"，这是真实链路唯一可靠、不可自欺的进展信号。
     candidates_found: Optional[int] = None
+    # 真实 token 消耗比例（2026-10-03 新增，P1 诊断驱动）：
+    # None = 未知（老调用方）→ 规则⑥不要求 token 信号，保持向后兼容；
+    # 0..1 = 真实 token 用量 / 单题 token 预算。
+    # 诊断实证（held-out 41 池前 5 题 / deepseek / 2026-10-03 G_rerun_20261003_191824）：
+    # 5 题全部在第 ~8 步（步数比 67%）被规则⑥放弃，但 token 仅消耗 ~35%——
+    # 「步数预算(12)」与「token 预算(80K)」两个口径错位，agent 在远未山穷水尽时
+    # 主动认输（race_abandon ×5）。规则⑥改为：零候选且 **token 也烧过 60%** 才允许
+    # ABANDON；token 未过半时继续探索（止损语义保留：token 烧穿重灾场景不受影响）。
+    token_ratio: Optional[float] = None
 
 
 @dataclass
@@ -78,6 +87,7 @@ def reflect(state: BudgetState, steps: List[Any],
         "progress_in_window": len(prog),
         "trailing_no_progress": trailing,
         "candidates_found": getattr(state, "candidates_found", None),
+        "token_ratio": getattr(state, "token_ratio", None),
     }
 
     # 候选 flag 硬信号（2026-09-23）：None=未知（不参与判定，向后兼容）；0=明确零候选
@@ -107,7 +117,16 @@ def reflect(state: BudgetState, steps: List[Any],
     # 3 题各烧 19-22 万 token、候选全程 False，15/15 次反思全 CONTINUE，
     # 直到预算耗尽报 budget_exceeded——钱烧光了，反思器还在说"预算充足"。
     # 候选 flag 数是不可自欺的硬信号：没有它就是没有，与"做了很多动作"无关。
-    if cand is not None and int(cand) <= 0 and ratio >= 0.6 and used >= 5:
+    # 2026-10-03 追加（P1 诊断）：token_ratio 已知时必须 token 也过 60% 才允许
+    # ABANDON——防止"步数口径先到、token 预算还剩大半"时的过早认输（race_abandon ×5）。
+    _token_ratio = getattr(state, "token_ratio", None)
+    if (
+        cand is not None
+        and int(cand) <= 0
+        and ratio >= 0.6
+        and used >= 5
+        and (_token_ratio is None or float(_token_ratio) >= 0.6)
+    ):
         return ReflectionResult(
             DECISION_ABANDON,
             "消耗>=60%且全程零候选 flag：无收敛信号，早停避免空烧（候选口径）",

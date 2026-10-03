@@ -185,6 +185,20 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
         return data
 
     checker = FlagChecker()
+
+    # 真实 token 比例注入（2026-10-03，P1 诊断）：供 budget_reflection 规则⑥做
+    # token 口径判定——步数预算(12)与 token 预算(80K)口径错位曾致 5 题在 token 仅
+    # 消耗 ~35% 时被步数规则提前放弃（race_abandon ×5）。此处读本 solve 的
+    # ContextVar 记账盒 + BudgetTracker 已记账部分，除以单题 token 预算。
+    def _token_usage_fn(_ctx=None):
+        box = _usage_cv.get()
+        if box is None:
+            return None
+        _qid = box.get("question_id") or ""
+        _used = int(budget.usage(_qid)) + int(box.get("total_tokens") or 0)
+        _cap = max(int(budget.config.per_question_token_budget), 1)
+        return min(1.0, _used / _cap)
+
     agent = MainAgent(
         llm_client=llm_client,
         supervisor=SupervisorAgent(llm_client=llm_client),  # 监督也走同一 provider（修复多 provider 时监督打默认端点 402）
@@ -194,6 +208,7 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
         coordinator=_intervention,  # 人工干预协调（卡壳标记 + 提示注入闭环）
         skill_manager=skill_manager,  # ← /goal 动态 Skill 加载
         provider=provider,   # ← 报告与流量吻合（真实 provider 标签）
+        token_usage_fn=_token_usage_fn,  # ← 预算反思 token 口径（2026-10-03）
     )
     # 正确性判定：未显式传入时，本地题库评测默认与题库 flag 比对（防幻觉 flag 假阳性）；
     # 平台单解模式（validate_locally=False）无本地 ground truth，仅做格式校验
