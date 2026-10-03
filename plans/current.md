@@ -178,7 +178,9 @@
   - 三条硬坑（已固化进模块文档头）：① 格多项式**必须首一** `f=y+c`，非首一时的可达 X 上限从 2^1419 塌到 2^391，真 y=2^1446 永不命中；② **X 必须大于真 y**（症状＝范数低于阈值、基多项式全被 T^m 整除、却无整数根）——注意 chal.sage 里的 `m` 是诱饵，真 (q,x) 是注释值；③ 求根走**精确 Hensel**（`ground_roots` 在巨系数上挂死 17 分钟、`nroots` 不收敛）。
   - 余下工具链题：`electric-mayhem×2` 附件是 21–27 字节的**空 tgz**（power traces 根本没提供）→ 侧信道离线结构性不可做，**降级回「需靶机」类**；跨架构 `abc-arm-and-amd` 待查。
   - ✅ **primes 已接入 presolve 主链（10-04，`087610f` 实现 / `c008acc` 测试）**：`_try_crypto_primes` 从题面/附件抠 (q, x, r)，再用 **`_recover_primes_n` 由 q 反解 n**（`q=next_prime(∏p_{n-r..n-1})` 由 (n,r) 唯一决定 → 滑窗 + 间隙过滤 + nextprime 自校验；0.8s 得 518，假 q 返回 None）。真实题目对象端到端 24.6s 解出、sha256 与题库真值匹配。这是 **B1 首个真正进主链的产物**。
-  - ⚠️ **mhk2 仍未接线**（缺「output.txt 54KB 公钥序列 → 参数」提取规格），仍在 `test_skill_coverage.py` 的 KNOWN_GAP 中诚实标注为未接线缺口。
+  - ✅ **mhk2 也已接入 presolve（10-04，`c3677d7` 实现 / `6d11f26` 测试）**：`_mhk2_extract` 从 `output.txt` 认出 `a1/a2`（256 个大整数）+ 335 组 `(c1,c2)` 密文，门槛 n≥64（n<48 攻击本就不成立，拒绝而非白跑），`_try_knapsack_mhk` 600s 墙钟、实测 **146.6s 解出**，sha256 与题库真值匹配。
+  - ✅ **至此 B1 已破 2 道（mhk2、primes）全部接入主链**，KNOWN_GAP 两个条目均已摘除；接线状态由新增的 `tests/test_presolve_b1_wiring.py` 盯守（未接线＝只是库、不算能力）。
+  - ⚠️ **KPI 未变**：这两题属 `questions_external`（外部池口径），**不进 `offline_verified=14` 台账**；且属工具链补齐，不代表 LLM 自主推理能力。
 
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
