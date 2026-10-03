@@ -159,6 +159,15 @@
 - **测试坑（变异前自查揪出）**：probe 的 plan 工厂写成了同步函数 → `await plan_step` 报 "object dict can't be used in await" → 每步走异常分支，探索用例「假绿」（switches==0 是因为 action 从未生效）。plan/act mock 必须 async；判「假绿」看测试日志有无 plan 步异常 WARNING。
 - **跑批口径提醒**：日志统计脚本若 grep「强制切换策略」旧文案会失配，新文案为「连续同策略签名3次检测」。下一轮 A/B 对比基线以此为准。
 
+**P2 全链验证跑批 G_p2c + E2 去重修复（✅ 2026-10-03 深夜，用户「可以」授权跑批，¥0 修复）**：
+
+- **跑批（≈¥0.5-0.6，实耗 2m50s）**：41 池第 16-20 题（GCTF2023 mhk2/primes/zip + GCTF2024 blinders/desfunctional，crypto×5），与 G_p2ab 完全同口径（同 provider / 冷黑板 / E3 ON / 规则⑥ ON / 80K·40 万封顶），**唯一变量＝E2 三元组签名修复**。**0/5**（budget_exceeded×2 + race_abandon×3）。证据：`data/results/heldout/G_rerun_20261003_232435/`（时间戳目录，未覆盖旧证据）。
+- **强切率 35%（33/94 步）vs 基线 47%**——降了但**未消失**：逐条日志显示 mhk2 从第 4 步起**每步**都触发强切。
+- **🔴 深一层根因**：`observe_step` 对 `kind="script"` 且 output 为空时写 `observation=""` → 三元组恒等 `("script","",None)` → E2 每步命中；而 E2 命中后 `continue`，**把下方「同参数重复检测 → presolve 兜底 → 止损 break」整条硬止损路径屏蔽**——这正是 2 题烧穿到 budget_exceeded 的机制。空观察不构成「产出重复」的证据。
+- **修法**：`AgentContext.e2_switched_signatures`（已强切签名集合）——**同一签名只强切一次**，重复则放行给硬止损，恢复「软 switch 优先于硬放弃」的互补语义（此前是互斥：软切换吃掉硬止损）。
+- **验证**：新增 2 例回归（空观察恒等流转 switches==1 且 <12 步即止损 / 不同签名互不影响）；**变异验证**（去掉去重守卫 → 2 例红）；全量 **868p/16s**。两例旧断言同步校正：原 `llm_calls==12`（＝「烧满预算」）在新语义下不成立（硬止损提前 break）→ 改为「≤12 上限」+ 差异化观察场景另测真封顶；归因由 unresolved 放宽为 unresolved/stuck_loop（后者才是「无报错+零候选」空转的正确分类）。
+- **待验证**：去重修复的真实 A/B 效果——建议下一轮授权跑批时**重跑已跑过的 16-20 题做配对比较**（同题前后对比，比跨题对比更能隔离变量）。
+
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
 - **缺口**：台账计 10733 为 ✅ offline_verified，但 `data/race_details/10733.json`、`race_attachments/10733_*`、`data/questions_real/` 条目**三者皆缺** → `_kpi_leak_crossaudit` 报 `missing_corpus=1`。

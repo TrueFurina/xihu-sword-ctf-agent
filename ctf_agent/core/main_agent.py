@@ -153,6 +153,12 @@ class AgentContext:
     # E2（2026-08-25 桶B攻坚）可观测计数：每题 LLM 调用数 / 每步超时次数
     llm_calls: int = 0
     step_timeouts: int = 0
+    # E2 强切去重（2026-10-03 实证修复）：已强切过的策略签名集合。
+    # 背景：script 无输出时 observation="" → 三元组恒等 → E2 每步都触发并 continue，
+    # 把下方「同参数重复检测 → presolve 兜底 → 止损 break」整条硬止损路径屏蔽
+    # （G_p2c 轮实测：mhk2 第 4 步起每步强切，2 题 budget_exceeded）。
+    # 语义：同一签名只给一次软切换机会；再重复则放行给硬止损（互补而非互斥）。
+    e2_switched_signatures: set = field(default_factory=set)
     # E6（2026-08-25 桶B攻坚）：few-shot 方向决策范例注入开关（默认关，A/B 可切）
     few_shot: bool = False
     # E3（2026-08-25 桶C攻坚）：附件证据强制注入 plan prompt 开关（默认关，A/B 可切）
@@ -678,17 +684,23 @@ class MainAgent:
                         )
                         for s in ctx.steps[-3:]
                     ]
-                    if _sigs[0][0] and all(_s == _sigs[0] for _s in _sigs):
+                    _sig0 = _sigs[0]
+                    # 同一签名只强切一次：重复触发会让 E2 屏蔽下方硬止损路径
+                    # （同参数重复检测 → presolve 兜底 → 止损 break），实测导致烧穿预算。
+                    if (_sig0[0] and all(_s == _sig0 for _s in _sigs)
+                            and _sig0 not in ctx.e2_switched_signatures):
+                        ctx.e2_switched_signatures.add(_sig0)
                         ctx.strategy_switches += 1
                         ctx.stuck_count = 0
                         ctx.no_progress_streak = 0
                         ctx.advisor_hint = (
-                            f"⚠️ 检测到连续 3 步执行相同策略签名（action={_sigs[0][0]}，"
+                            f"⚠️ 检测到连续 3 步执行相同策略签名（action={_sig0[0]}，"
                             "观察输出前缀与工具均相同），疑似策略空转死循环，"
                             "强制切换解题策略：换个切入点/工具/参数，禁止重复同一动作。"
+                            "（该签名已切换过一次，若仍重复将直接止损换题。）"
                         )
                         logger.info("[%s] 连续同策略签名3次检测：强制切换策略 (action=%s)",
-                                    question.id, _sigs[0][0])
+                                    question.id, _sig0[0])
                         continue
 
                 # ── 同参数重复检测（第五轮锐评：连续同工具同参数=死循环，快速终止）──
