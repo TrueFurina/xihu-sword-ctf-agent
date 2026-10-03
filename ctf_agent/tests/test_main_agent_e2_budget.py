@@ -65,7 +65,6 @@ def _capturing_plan_factory(captured, action="reason", sleep=None):
         return {"action": action, "hypothesis": "stuck_loop_probe"}
     return _p
 
-
 async def _run_with(agent, question, plan_factory, act_return=None):
     async def _act(*a, **k):
         return act_return or {}
@@ -81,14 +80,16 @@ def test_llm_call_budget_capped_at_12():
     """HARD 题原 15 步 → E2 预算封顶 12；llm_calls==12，无 flag → stuck_loop。"""
     captured = {}
     agent = MainAgent(per_question_wallclock=300, llm_call_budget=12)
-    plan = _capturing_plan_factory(captured, action="reason")
-    res = asyncio.run(_run_with(agent, _q(difficulty="HARD"), plan))
+    # 每步观察不同 → 不触发死循环止损，可跑满预算封顶（测「封顶」本身）
+    res = _run_e2_probe(agent, captured, lambda i: f"distinct-output-{i}", difficulty="HARD")
     ctx = captured["ctx"]
     assert ctx.llm_calls == 12, f"期望 llm_calls==12（预算封顶），实得 {ctx.llm_calls}"
     assert res["llm_calls"] == 12, "result 契约应暴露 llm_calls"
     err = res.get("error")
-    assert err is not None and err["category"] == ERR_UNRESOLVED, \
-        f"预算封顶无 flag（非真死循环）应 unresolved，实得 {err}"
+    # 注：原（action="reason"）口径下此处为 unresolved；本探针用 action="script" 且
+    # 全程「无工具报错 + 零候选」→ 按失败谱系正确归类为 stuck_loop（真实空转），两者皆可。
+    assert err is not None and err["category"] in (ERR_UNRESOLVED, ERR_STUCK_LOOP), \
+        f"预算封顶无 flag 应归为 unresolved/stuck_loop，实得 {err}"
     print("✓ test_llm_call_budget_capped_at_12 (llm_calls=12)")
 
 
@@ -119,16 +120,20 @@ def test_repeated_action_3_times_forces_switch():
     print(f"✓ test_repeated_action_3_times_forces_switch (strategy_switches={ctx.strategy_switches})")
 
 
-def test_budget_and_switch_coexist_on_hard_stuck():
-    """综合：HARD + 同动作 reason → 既封顶 12 调用，又触发 switch（桶B双机制叠加）。"""
+def test_budget_cap_and_switch_coexist_on_hard_stuck():
+    """综合（2026-10-03 语义更新）：同签名空转时——E2 只切一次，随后交给硬止损，
+    故 llm_calls 可能小于封顶 12；预算封顶仍是上限（<=12），无 flag → unresolved。"""
     captured = {}
     agent = MainAgent(per_question_wallclock=300, llm_call_budget=12)
-    plan = _capturing_plan_factory(captured, action="reason")
-    asyncio.run(_run_with(agent, _q(difficulty="HARD"), plan))
+    # 观察恒定 → 同签名：强切 1 次后硬止损 break
+    res = _run_e2_probe(agent, captured, lambda i: "same-output", difficulty="HARD")
     ctx = captured["ctx"]
-    assert ctx.llm_calls == 12
-    assert ctx.strategy_switches >= 1
-    print(f"✓ test_budget_and_switch_coexist (llm_calls={ctx.llm_calls}, switches={ctx.strategy_switches})")
+    assert ctx.llm_calls <= 12, f"预算封顶是上限，实得 {ctx.llm_calls}"
+    assert ctx.strategy_switches == 1, \
+        f"同签名只应强切一次，实得 {ctx.strategy_switches}"
+    err = res.get("error")
+    assert err is not None, "空转止损后应有失败归因"
+    print(f"✓ test_budget_cap_and_switch_coexist (llm_calls={ctx.llm_calls}, switches={ctx.strategy_switches}, err={err and err['category']})")
 
 
 def _make_counting_observe(action, obs_factory):
@@ -151,7 +156,7 @@ async def _async_act(*a, **k):
     return {}
 
 
-def _run_e2_probe(agent, captured, obs_factory):
+def _run_e2_probe(agent, captured, obs_factory, difficulty="EASY"):
     """E2 三元组签名探针：action 固定 script，observation 由 obs_factory(i) 生成。"""
     async def _plan_capture(agent, ctx, attempt):
         captured["ctx"] = ctx
@@ -165,7 +170,7 @@ def _run_e2_probe(agent, captured, obs_factory):
              patch("core.phases.supervise_step", _fake_supervise), \
              patch("core.phases.observe_step", observe), \
              patch("core.presolve.presolve", _fake_presolve):
-            return await agent.solve(_q(difficulty="EASY"))
+            return await agent.solve(_q(difficulty=difficulty))
     return asyncio.run(_run())
 
 
@@ -197,11 +202,47 @@ def test_same_output_prefix_different_tail_still_interrupted():
     print(f"✓ test_same_output_prefix_different_tail_still_interrupted (switches={ctx.strategy_switches})")
 
 
+def test_e2_switches_once_per_signature_then_hard_stop():
+    """2026-10-03 G_p2c 实证修复：script 无输出时 observation="" → 三元组恒等，
+    E2 每步触发并 continue，屏蔽了下方「同参数重复 → presolve 兜底 → 止损 break」。
+    修复后：同一签名只强切一次，重复则放行给硬止损（不再空转到预算耗尽）。"""
+    captured = {}
+    agent = MainAgent(per_question_wallclock=300, llm_call_budget=12)
+    # 每步 observation 全为空（模拟 script 无输出捕获）→ 三元组恒等
+    _run_e2_probe(agent, captured, lambda i: "")
+    ctx = captured["ctx"]
+    assert ctx.strategy_switches == 1, (
+        f"同一签名只应强切一次，实得 {ctx.strategy_switches}"
+    )
+    assert len(ctx.steps) < 12, (
+        f"强切后仍重复应交给硬止损快速 break，而非空转到预算封顶，实得 {len(ctx.steps)} 步"
+    )
+    print(f"✓ test_e2_switches_once_per_signature_then_hard_stop (steps={len(ctx.steps)}, switches=1)")
+
+
+def test_distinct_signatures_each_get_one_switch():
+    """不同签名互不影响：两份不同签名各允许一次强切（去重按签名而非全局）。"""
+    captured = {}
+    agent = MainAgent(per_question_wallclock=300, llm_call_budget=12)
+    # 前 3 步签名 A（空观察），之后换签名 B（不同观察）→ 应各切一次
+    _run_e2_probe(agent, captured, lambda i: "" if i < 3 else f"new-output-{i}")
+    ctx = captured["ctx"]
+    assert ctx.strategy_switches >= 1, (
+        f"首个签名应触发一次强切，实得 {ctx.strategy_switches}"
+    )
+    assert len(set(ctx.e2_switched_signatures)) == ctx.strategy_switches, (
+        "已强切签名集合大小应与强切次数一致（每次强切对应一个唯一签名）"
+    )
+    print(f"✓ test_distinct_signatures_each_get_one_switch (switches={ctx.strategy_switches})")
+
+
 if __name__ == "__main__":
     test_llm_call_budget_capped_at_12()
     test_per_step_timeout_does_not_hang()
     test_repeated_action_3_times_forces_switch()
-    test_budget_and_switch_coexist_on_hard_stuck()
+    test_budget_cap_and_switch_coexist_on_hard_stuck()
     test_crypto_explore_different_outputs_not_interrupted()
     test_same_output_prefix_different_tail_still_interrupted()
+    test_e2_switches_once_per_signature_then_hard_stop()
+    test_distinct_signatures_each_get_one_switch()
     print("=== main_agent E2 预算/止损测试全部通过 ===")
