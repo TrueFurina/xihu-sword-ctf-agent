@@ -145,6 +145,13 @@
 - **验证**：新增 8 例回归（黑板 None/无失败→空串；有失败→含路径+签名+决策规则；无 flow 题型仍出签名+规则；`failed_signatures` 排除纯 progress；prompt 集成 + 等价性）；**变异验证**：注释分层视图守卫 → 注入用例 FAIL → 恢复复绿；全量 **858 passed / 16 skipped**（835 基线 + 15 黑板 + 8 分层）。
 - **待 A/B**：同黑板——下次授权真跑对比分层视图注入前后重复路径率与解出率。
 
+**P2 第四刀：RAG 语料审计 + A/B 验证跑批（✅ 2026-10-03 深夜，用户「都可以」授权）**：
+
+- **RAG 语料审计（¥0，提交 `816fa5e`+`27b9f39`）**：新脚本 `scripts/_rag_corpus_audit.py`——①泄漏红线：语料 22 条 × 两外部池 74 题三层比对（题名/描述特征 token≥60% 覆盖/flag 值）**零交集**，RAG 开启无评测污染风险；②台账对齐：offline_verified 14 题 vs 语料 verified 10 条（gap 4 条只报告不编造）。回归 6 例。
+- **A/B 验证跑批（≈¥0.6，实耗 3m48s）**：41 池第 11-15 题（GCTF2022/2023 crypto×5：pqc/enigma/maybe-someday/cursved/least-common-genominator），P2 三刀默认生效 + 规则⑥闸门 ON + 冷黑板 + E3 ON + 硬封顶 80K/题·40 万全局。**结果＝0/5**（race_abandon×4 + budget_exceeded×1）。证据：`data/results/heldout/G_p2ab_20261003_221727/`（时间戳目录，未覆盖旧证据）。
+- **止损语义确认正确（非回归）**：每题 race_abandon 发生在两轮 attempt 合计 token ≥60% 且零候选时——P1 首轮「token 仅 35% 就认输」未复发；budget_exceeded 题 83.6K/80K 触发步级硬停，口径精确。
+- **新发现（下一刀目标）**：E2「连续同动作 3 次→强制切换」只看 action 名不看实质——本轮 **47% 的步被强制切换**（前两轮 17-24%），crypto 题 LLM 连续写**不同算法**的解密脚本是正常探索，却被 E2 每 3 步误伤打断（strategy_switches 空转、advisor_hint 反复覆盖）。修法候选：E2 改用与「同参数重复检测」一致的三元组签名（action+observation[:200]+tool）——observation 实质不同（换算法/参数）不算重复。P2 三刀无回归、行为未恶化。
+
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
 - **缺口**：台账计 10733 为 ✅ offline_verified，但 `data/race_details/10733.json`、`race_attachments/10733_*`、`data/questions_real/` 条目**三者皆缺** → `_kpi_leak_crossaudit` 报 `missing_corpus=1`。
