@@ -159,6 +159,8 @@ _WIRED_SKILL_MODULES = {
     "skills.ssti_detect",                   # 靶机可达时 SSTI RCE 提取 flag
     # 2026-10-01 新增（确定性静态求解）
     "skills.misc_qr_matrix",                # 数字矩阵 → QR 码解码（纯 Python，版本 1-10）
+    # 2026-10-04 新增（B1 工具链补齐产物，确定性静态求解）
+    "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
 }
 
 
@@ -553,6 +555,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_reverse_route(question)),
         # 2026-10-01 确定性静态求解：数字矩阵 → QR 码
         asyncio.ensure_future(_try_qr_matrix(question)),
+        # 2026-10-04 B1 确定性静态求解：子集积 mod q → Coppersmith 平滑因子
+        asyncio.ensure_future(_try_crypto_primes(question)),
     ]
     try:
         for _fut in asyncio.as_completed(_tasks):
@@ -1756,4 +1760,120 @@ async def _try_qr_matrix(question) -> Optional[str]:
                         getattr(question, "id", "?"), flag[:60])
             _save_candidates(question, [flag])
             return flag
+    return None
+
+
+# --------------------------------------------------------------------------
+# 2026-10-04 B1 接线：PRIMES 子集积 mod q（Coppersmith 平滑因子）
+# --------------------------------------------------------------------------
+_QX_HEX_RE = re.compile(r"\b([qx])\s*=\s*0x([0-9A-Fa-f]{16,})")
+_QX_DEC_RE = re.compile(r"\b([qx])\s*=\s*(\d{20,})")
+_PRIMES_R_RE = re.compile(r"encode\(\s*(\d+)\s*,|gen_primes\(\s*(\d+)\s*,")
+# 1500-bit 数的平均素数间隙约 ln(P)≈1000，取 10 万作保守上界
+_PRIMES_GAP_LIMIT = 100000
+
+
+def _recover_primes_n(q: int, r: int, max_bytes: int = 200) -> Optional[int]:
+    """由 q 反解 n（确定性，自校验）。
+
+    题面从不直接给 n（=7×明文字节数），但 q 由 (n, r) 唯一决定：
+    ``q = next_prime(∏ p_{n-r}..p_{n-1})``。故滑窗枚举 n，先按「q-∏ 落在素数
+    间隙内」廉价过滤，再用 nextprime 逐个确认——全程确定性，命中即唯一。
+    """
+    from core.coppersmith import _first_primes, sympy_nextprime
+
+    n_max = 7 * max_bytes
+    if r <= 0 or r >= n_max:
+        return None
+    primes = _first_primes(n_max + 8)
+    n = r + 1
+    P = 1
+    for i in range(n - r, n):
+        P *= primes[i]
+    while n <= n_max:
+        if n % 7 == 0:                       # n = 7 × 字节数
+            d = q - P
+            if 0 < d <= _PRIMES_GAP_LIMIT and sympy_nextprime(P) == q:
+                return n
+        P //= primes[n - r]                  # 滑窗：P(n+1) = P(n)·p_n / p_{n-r}
+        P *= primes[n]
+        n += 1
+    return None
+
+
+async def _try_crypto_primes(question) -> Optional[str]:
+    """PRIMES 子集积 mod q → Coppersmith 平滑因子（2026-10-04 新增 · B 类静态求解）。
+
+    对「题面/附件给出 q 与 x = ∏ p_i^{b_i} mod q」的题型做确定性求解：
+    从文本里正则抠出 q/x 与 r，**用 q 反解 n**（next_prime 自校验），再交给
+    :func:`core.coppersmith.solve_primes`（首一化 Howgrave-Graham 格 + 精确
+    Hensel 求根），由明文比特重组出 flag。
+
+    触发面：仅当文本中同时出现 q / x 且 q ≥ 2^256 时才跑（实测该形态极罕见）。
+    命中由下游 flag_pattern + 题面 flag_sha256 把关。
+
+    诚实口径：本路是「Coppersmith 平滑因子攻击」这一真实密码学攻击的确定性实现
+    （非 grep 明文、非读答案密钥）；实测 Google CTF 2023 primes 解出
+    flag 且与题库 flag_sha256 逐字匹配。⚠️ 它属于**工具链补齐**产物，
+    不代表 LLM 自主推理能力。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc"):
+        return None
+    parts = [str(getattr(question, "description", "") or "")]
+    for a in _attachments(question):
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            if os.path.getsize(p) > 512 * 1024:
+                continue
+            with open(p, "r", encoding="utf-8", errors="replace") as fh:
+                parts.append(fh.read())
+        except OSError:
+            continue
+    blob = "\n".join(parts)
+    if not blob:
+        return None
+
+    q = x = None
+    for rx, base in ((_QX_HEX_RE, 16), (_QX_DEC_RE, 10)):
+        for mt in rx.finditer(blob):
+            val = int(mt.group(2), base)
+            if mt.group(1).lower() == "q" and q is None:
+                q = val
+            elif mt.group(1).lower() == "x" and x is None:
+                x = val
+        if q is not None and x is not None:
+            break
+    if not q or not x or q.bit_length() < 256:
+        return None
+
+    r = 131
+    mr = _PRIMES_R_RE.search(blob)
+    if mr:
+        r = int(mr.group(1) or mr.group(2))
+    try:
+        n = await asyncio.to_thread(_recover_primes_n, q, r)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:crypto_primes] n 反解异常: %s", exc)
+        return None
+    if not n:
+        return None
+    logger.info("[presolve:crypto_primes] %s 反解 n=%d r=%d，开始 Coppersmith",
+                getattr(question, "id", "?"), n, r)
+    try:
+        from core.coppersmith import solve_primes
+        msg = await asyncio.wait_for(
+            asyncio.to_thread(solve_primes, q, x, n, r), timeout=180)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:crypto_primes] %s 求解异常: %s",
+                     getattr(question, "id", "?"), exc)
+        return None
+    flag = _flag_from_text(str(msg or ""))
+    if flag and _is_plausible_flag(flag):
+        logger.info("[presolve:crypto_primes] %s 命中 flag=%s",
+                    getattr(question, "id", "?"), flag[:60])
+        _save_candidates(question, [flag])
+        return flag
     return None
