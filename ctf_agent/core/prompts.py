@@ -94,6 +94,17 @@ def build_plan_prompt(ctx, attempt: int) -> str:
     if ctx.steps:
         recent = [f"{s.stage} | {s.action} | {s.observation[:1200]}" for s in ctx.steps[-3:]]
         parts.append("已执行步骤:\n" + "\n".join(recent))
+    # P2 记忆层（2026-10-03）：题内「已试策略黑板」注入——近 3 步窗口挤出的更早
+    # 失败策略在这里保持可见，防规划器原样重复已失败路径（0/10 诊断的空转根源）。
+    # 纯规则零 LLM；黑板未启用/为空时此块不出现，prompt 与旧版逐字一致。
+    _bb = getattr(ctx, "blackboard", None)
+    if _bb is not None:
+        try:
+            _bb_text = _bb.summary()
+        except Exception:  # noqa: BLE001 - 黑板渲染故障不影响主流程
+            _bb_text = ""
+        if _bb_text:
+            parts.append(_bb_text)
     # G1/G5（2026-09-29 接入运行时）：持久工作区会话记录注入 plan prompt。
     # 这是"LLM 贡献 0/14"根因（证据不进脑）的会话层修复：下一步能看到上一步
     # 真实命令与完整输出（而非仅近 3 步 1200 字摘要）。优先用 G5 压缩记忆

@@ -173,12 +173,19 @@ class AgentContext:
     # solve() 按 g_session 开关创建；None = 未启用（行为与旧版完全一致）。
     g_session: Optional[Any] = None   # core.session.Session（跨步 shell 工作区）
     g_memory: Optional[Any] = None    # core.memory.SessionMemory（规则式事实抽取，零 token）
+    # P2 记忆层（2026-10-03）：题内跨步「已试策略黑板」——沉淀每步策略签名+结局，
+    # 经 build_plan_prompt 注入规划提示词防重复。None = 未启用（行为与旧版一致）。
+    blackboard: Optional[Any] = None  # core.strategy_blackboard.StrategyBlackboard
 
     def is_stuck(self) -> bool:
         return self.stuck_count >= 3
 
     def record(self, step: StepRecord) -> None:
         self.steps.append(step)
+        # P2 记忆层（2026-10-03）：同步沉淀进题内策略黑板（黑板未启用时无操作）。
+        bb = getattr(self, "blackboard", None)
+        if bb is not None:
+            bb.record(step)
         # 僵局计数（P0-1 修复 2026-09-23）：拆为两个语义清晰的计数器。
         #   stuck_count        ：工具报错步数（失败桶分类用，语义不变）
         #   no_progress_streak ：连续「无工具报错且无候选推进」步数（真正的空转检测器）
@@ -433,6 +440,13 @@ class MainAgent:
         ctx = AgentContext(question=question, hint_text=hint, correction=correction)
         ctx.few_shot = self.few_shot  # E6 开关透传：plan 提示按需注入方向决策范例
         ctx.e3_enabled = self.e3_enabled  # E3 开关透传：plan 提示按需注入附件全文
+        # P2 记忆层（2026-10-03）：题内「已试策略黑板」——每次 solve 新建（题内记忆，
+        # 与跨会话 flag 缓存黑板 data/results/blackboard.json 互不相干）。纯规则零 LLM。
+        try:
+            from core.strategy_blackboard import StrategyBlackboard
+            ctx.blackboard = StrategyBlackboard()
+        except Exception:  # noqa: BLE001 - 黑板创建失败退化为无黑板旧行为
+            ctx.blackboard = None
         # 2026-08-21 攻坚（解出数优先）+ P1-3 收敛（赛后）：确定性预扫统一入口——
         # 原入口手工 flag_scan/crypto_auto 收敛为 core.presolve.presolve，按序
         # flag_scan → crypto_auto → math_engine → 关键词 fast_solve；命中即直接
