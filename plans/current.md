@@ -177,7 +177,8 @@
 - **🔥 B1 第二道已落地（10-04 凌晨，¥0）**：`primes`（Google CTF 2023，子集积 mod q）用 **Coppersmith 平滑因子法**解出，**flag sha256 = 题库 `flag_sha256`（`df18e59d…`）完全匹配**。工程化为 `core/coppersmith.py` + `skills/crypto_primes_subset.py/json`，提交 `c501266`（实现）/ `6d1ae1d`（测试），**未推送**（红线⑥需豁免）。
   - 三条硬坑（已固化进模块文档头）：① 格多项式**必须首一** `f=y+c`，非首一时的可达 X 上限从 2^1419 塌到 2^391，真 y=2^1446 永不命中；② **X 必须大于真 y**（症状＝范数低于阈值、基多项式全被 T^m 整除、却无整数根）——注意 chal.sage 里的 `m` 是诱饵，真 (q,x) 是注释值；③ 求根走**精确 Hensel**（`ground_roots` 在巨系数上挂死 17 分钟、`nroots` 不收敛）。
   - 余下工具链题：`electric-mayhem×2` 附件是 21–27 字节的**空 tgz**（power traces 根本没提供）→ 侧信道离线结构性不可做，**降级回「需靶机」类**；跨架构 `abc-arm-and-amd` 待查。
-  - ⚠️ mhk2 与 primes **均未接入 presolve**（缺「题面 → 参数」提取规格），已在 `test_skill_coverage.py` 的 KNOWN_GAP 中诚实标注为未接线缺口。
+  - ✅ **primes 已接入 presolve 主链（10-04，`087610f` 实现 / `c008acc` 测试）**：`_try_crypto_primes` 从题面/附件抠 (q, x, r)，再用 **`_recover_primes_n` 由 q 反解 n**（`q=next_prime(∏p_{n-r..n-1})` 由 (n,r) 唯一决定 → 滑窗 + 间隙过滤 + nextprime 自校验；0.8s 得 518，假 q 返回 None）。真实题目对象端到端 24.6s 解出、sha256 与题库真值匹配。这是 **B1 首个真正进主链的产物**。
+  - ⚠️ **mhk2 仍未接线**（缺「output.txt 54KB 公钥序列 → 参数」提取规格），仍在 `test_skill_coverage.py` 的 KNOWN_GAP 中诚实标注为未接线缺口。
 
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
