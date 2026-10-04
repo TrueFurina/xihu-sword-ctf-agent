@@ -67,6 +67,50 @@ def _raw(op, path: str, cap: int = 4_000_000, timeout: int = 60) -> bytes:
         return r.read(cap)
 
 
+def _norm_join(base: str, target: str) -> str:
+    t = target.lstrip("/") if target.startswith("/") else \
+        ((base + "/" + target) if base else target)
+    parts: list[str] = []
+    for seg in t.split("/"):
+        if seg in ("", "."):
+            continue
+        if seg == "..":
+            if parts:
+                parts.pop()
+            continue
+        parts.append(seg)
+    return "/".join(parts)
+
+
+def resolve_symlink(op, by_path: dict, path: str, max_depth: int = 5):
+    """跟随 GitHub 软链接（mode 120000），返回 (真实 blob 路径, 节点) 或 (None, None)。
+
+    2026-10-04 修复：此前对 ``attachments/`` 下的 blob 直接 raw 下载，而 GitHub 对
+    软链接返回的是**目标路径文本**（几十字节），导致外部池 21/40 题附件只是路径字符串
+    （见 ``scripts/_attachment_integrity_audit.py`` 与 ``_repair_symlink_attachments.py``）。
+    """
+    cur = path
+    seen: set[str] = set()
+    for _ in range(max_depth):
+        if cur in seen:
+            return None, None
+        seen.add(cur)
+        node = by_path.get(cur)
+        if node is None:
+            return None, None
+        if str(node.get("mode")) != "120000":
+            return cur, node
+        try:
+            txt = _raw(op, cur, cap=4096).decode("utf-8", "ignore").strip()
+        except Exception:  # noqa: BLE001
+            return None, None
+        if not txt or len(txt) > 512 or "\n" in txt:
+            return None, None
+        base = cur.rsplit("/", 1)[0] if "/" in cur else ""
+        cur = _norm_join(base, txt)
+    return None, None
+
+
 def parse_metadata(text: str) -> dict:
     """容错解析 metadata.yaml（只用 name/description/flag/category，避免 yaml 依赖）。"""
     out: dict = {}
@@ -147,8 +191,11 @@ def main() -> int:
 
     op = _opener()
     print(f"[fetch] 拉取 {REPO} 树 …")
-    tree = _api(op, f"/repos/{REPO}/git/trees/{BRANCH}?recursive=1").get("tree", [])
-    tree = [e for e in tree if e.get("type") == "blob"]
+    raw_tree = _api(op, f"/repos/{REPO}/git/trees/{BRANCH}?recursive=1").get("tree", [])
+    tree = [e for e in raw_tree if e.get("type") == "blob"]
+    # 软链接在 GitHub tree API 里 type 也是 "blob"，但 mode=120000；保留 path→node 映射供
+    # resolve_symlink 跟随目标（否则软链接附件会被下成几十字节的路径文本，见 2026-10-04 修复）。
+    by_path = {e["path"]: e for e in raw_tree}
     print(f"[fetch] 树 {len(tree)} blobs")
 
     chals = enumerate_challenges(op, tree, years, cats)
@@ -172,16 +219,24 @@ def main() -> int:
         skip_this = False
         for e in player:
             rel_in_ch = e["path"][len(ch_dir) + 1:]        # attachments/xxx
-            if e.get("size", 0) > max_bytes:
-                print(f"  [skip] {ch_dir}: 附件过大 {e['path']} ({e['size']}B)")
+            # 跟随软链接得到真实 blob（软链接本身 size 仅几十字节，须用真实目标节点校验）
+            real_path, real_node = resolve_symlink(op, by_path, e["path"])
+            node = real_node if real_node is not None else e
+            download_path = real_path if real_path is not None else e["path"]
+            if real_path is None and str(e.get("mode")) == "120000":
+                print(f"  [skip] {ch_dir}: 软链接无法解析 {e['path']}")
+                skip_this = True
+                break
+            if node.get("size", 0) > max_bytes:
+                print(f"  [skip] {ch_dir}: 附件过大 {download_path} ({node.get('size', 0)}B)")
                 skip_this = True
                 break
             if args.dry_run:
                 continue
             try:
-                blob = _raw(op, e["path"], cap=max_bytes + 1024)
+                blob = _raw(op, download_path, cap=max_bytes + 1024)
             except Exception as exc:  # noqa: BLE001
-                print(f"  [skip] {ch_dir}: 下载失败 {e['path']} {exc}")
+                print(f"  [skip] {ch_dir}: 下载失败 {download_path} {exc}")
                 skip_this = True
                 break
             if flag_bytes in blob:
