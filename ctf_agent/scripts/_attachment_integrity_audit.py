@@ -48,15 +48,24 @@ def _classify(path: str) -> str:
         size = os.path.getsize(path)
     except OSError:
         return "MISSING"
-    if size == 0:
-        return "EMPTY"
-    if size < MIN_BYTES:
-        return f"TOO_SMALL({size}B)"
     try:
         with open(path, "rb") as fh:
             head = fh.read(512)
     except OSError:
         return "UNREADABLE"
+    if size == 0:
+        return "EMPTY"
+    if size < MIN_BYTES:
+        # 小文件本身不必然是缺陷（如 23B 的 go.mod 是真的）；
+        # 只有当它看起来像「软链接目标路径文本」时才判缺陷。
+        try:
+            t = head.split(b"\n")[0].decode("ascii").strip()
+        except UnicodeDecodeError:
+            return "OK"
+        if t and " " not in t and (t.startswith("../") or t.startswith("./")
+                                   or t.startswith("/")):
+            return f"SYMLINK_TEXT({size}B)"
+        return "OK"
     if head.startswith(b"version https://git-lfs"):
         return "GIT_LFS_POINTER"
     low = head[:200].lower()

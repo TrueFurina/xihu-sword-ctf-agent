@@ -119,6 +119,67 @@ def fetch_raw(op, src: dict, path: str, limit: int = 1_000_000) -> bytes:
     return op.open(url, timeout=60).read(limit)
 
 
+def _norm_join(base: str, target: str) -> str:
+    """把软链接目标（可能是 ../xxx 或 /xxx）解析成相对仓库根的路径。"""
+    t = target.lstrip("/") if target.startswith("/") else \
+        ((base + "/" + target) if base else target)
+    parts: list[str] = []
+    for seg in t.split("/"):
+        if seg in ("", "."):
+            continue
+        if seg == "..":
+            if parts:
+                parts.pop()
+            continue
+        parts.append(seg)
+    return "/".join(parts)
+
+
+def _looks_like_symlink_text(data: bytes) -> bool:
+    """抓取结果是否像「软链接目标路径文本」（而非真实载荷）。"""
+    try:
+        t = data.decode("ascii").strip()
+    except Exception:  # noqa: BLE001
+        return False
+    return bool(t) and " " not in t and (
+        t.startswith("../") or t.startswith("./") or t.startswith("/"))
+
+
+def resolve_symlink(op, src: dict, tree: dict, path: str, max_depth: int = 5):
+    """跟随 GitHub 软链接，返回 (真实 blob 路径, 说明)；失败返回 (None, 原因)。
+
+    背景（2026-10-04）：GitHub 对 ``mode == "120000"`` 的 blob，raw 取回的是
+    **目标路径文本**（几十字节）而不是真实文件。历史抓取器未处理，导致外部池
+    **21/40 道题的"附件"只是 9–62 字节的路径字符串**（见
+    ``scripts/_attachment_integrity_audit.py``），这些题实际是「不可测」而非
+    「不可解」，却一直被算进能力分母。本函数即该缺陷的修复。
+    """
+    cur = path
+    seen: set[str] = set()
+    for _ in range(max_depth):
+        if cur in seen:
+            return None, f"软链接循环 {path}"
+        seen.add(cur)
+        node = tree.get(cur)
+        if node is None:
+            return None, f"软链接目标不在 tree: {cur}"
+        if str(node.get("mode")) != "120000":
+            return cur, (f"跟随软链接 {path} -> {cur}" if cur != path else None)
+        try:
+            raw = fetch_raw(op, src, cur, limit=4096)
+        except Exception as exc:  # noqa: BLE001
+            return None, f"软链接目标读取失败 {cur}: {type(exc).__name__}"
+        try:
+            target = raw.decode("utf-8").strip()
+        except UnicodeDecodeError:
+            return None, f"软链接目标非文本 {cur}"
+        if not target or len(target) > 512 or "\n" in target:
+            return None, f"软链接目标文本异常 {cur}"
+        base = cur.rsplit("/", 1)[0] if "/" in cur else ""
+        cur = _norm_join(base, target)
+    return None, f"软链接层级过深 {path}"
+
+
 def resolve_files(tree: dict, task_path: str, declared: list[str]) -> tuple[list[str], list[str]]:
     """把 challenge.json 声明的文件名解析成 tree 里的真实路径。
 
@@ -246,6 +307,15 @@ def build_one(op, src: dict, tree: dict, rec: dict, out_dir: Path,
     task_bytes = 0
     saved = []
     for p in keep:
+        # 2026-10-04：GitHub 软链接（mode 120000）raw 取回的是目标路径文本，
+        # 必须跟随到真实 blob，否则附件只有几十字节（历史上 21 题因此不可测）。
+        real, note = resolve_symlink(op, src, tree, p)
+        if note:
+            result["notes"].append(note)
+        if real is None:
+            result["notes"].append(f"UNRESOLVED_SYMLINK 跳过 {p}")
+            continue
+        p = real
         size = tree[p].get("size", 0)
         if size > MAX_FILE_MB * 1024 * 1024:
             result["notes"].append(f"R4 单文件超限跳过 {p} ({size/1048576:.1f}MB)")
@@ -261,6 +331,10 @@ def build_one(op, src: dict, tree: dict, rec: dict, out_dir: Path,
             data = fetch_raw(op, src, p, limit=size + 1024)
         except Exception as exc:
             result["notes"].append(f"下载失败 {p}: {type(exc).__name__}")
+            continue
+        # 二次校验：即便 mode 未标注，也要挡住「只有路径文本」的残骸
+        if len(data) < 64 and _looks_like_symlink_text(data):
+            result["notes"].append(f"疑似软链接残骸（仅路径文本），跳过 {p}")
             continue
         reason = audit_attachment(data, p.split("/")[-1], flag_plain)
         if reason:
