@@ -9,7 +9,7 @@
 
 覆盖
 ----
-1. 两个 skill 必须同时出现在 `_WIRED_SKILL_MODULES` 且有对应 `_try_*` 协程；
+1. 四个 skill 必须同时出现在 `_WIRED_SKILL_MODULES` 且有对应 `_try_*` 协程（mhk2/primes/cycling/electric-mayhem-cls）；
 2. 参数提取（题面从不直接给全参数，必须自己抠）：
    - MHK2：`_mhk2_extract` 必须认出 a1/a2 + 密文二元组；垃圾文本、短公钥（n<48
      攻击不成立）必须**拒绝**而不是硬跑；
@@ -45,6 +45,7 @@ pytestmark = pytest.mark.skipif(
 MHK2_QID = "ext_gctf2023_mhk2"
 PRIMES_QID = "ext_gctf2023_primes"
 CYCLING_QID = "ext_gctf2022_cycling"
+CLS_QID = "ext_gctf2022_electric-mayhem-cls"
 
 
 def _big(rng, bits=136):
@@ -68,7 +69,8 @@ def test_b1_skills_are_wired():
     wired = P.wired_skill_modules()
     for mod, fn in (("skills.crypto_knapsack_mhk", "_try_knapsack_mhk"),
                     ("skills.crypto_primes_subset", "_try_crypto_primes"),
-                    ("skills.crypto_cycling", "_try_cycling")):
+                    ("skills.crypto_cycling", "_try_cycling"),
+                    ("skills.crypto_electric_mayhem_cls", "_try_electric_mayhem_cls")):
         assert mod in wired, f"{mod} 未接线（只是库，不算能力）"
         assert callable(getattr(P, fn, None)), f"{fn} 未定义"
 
@@ -147,6 +149,18 @@ def test_presolve_cycling_solves_real_problem():
     assert q is not None, f"题库里找不到 {CYCLING_QID}"
     truth = str(getattr(q, "flag_sha256", "") or "")
     flag = asyncio.run(P._try_cycling(q))
+    assert flag, "presolve 接线路径未解出 flag"
+    assert hashlib.sha256(flag.encode()).hexdigest() == truth
+
+
+@pytest.mark.slow
+def test_presolve_emcls_solves_real_problem():
+    import asyncio
+
+    q = _load(CLS_QID)
+    assert q is not None, f"题库里找不到 {CLS_QID}"
+    truth = str(getattr(q, "flag_sha256", "") or "")
+    flag = asyncio.run(P._try_electric_mayhem_cls(q))
     assert flag, "presolve 接线路径未解出 flag"
     assert hashlib.sha256(flag.encode()).hexdigest() == truth
 
