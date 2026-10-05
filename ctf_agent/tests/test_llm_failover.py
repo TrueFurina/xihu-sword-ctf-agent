@@ -32,7 +32,7 @@ class TestFailover(unittest.TestCase):
 
         _set_env()
         with mock.patch("llm.client.ai_chat", side_effect=fake_ai_chat), \
-             mock.patch("llm.client.provider_circuit_open", return_value=False):
+             mock.patch("llm.client.model_circuit_open", return_value=False):
             out = fo.ai_chat_failover([{"role": "user", "content": "x"}])
         self.assertEqual(out, "OK-FROM-QWEN")
         self.assertIn("baidu", calls)
@@ -49,7 +49,7 @@ class TestFailover(unittest.TestCase):
 
         _set_env()
         with mock.patch("llm.client.ai_chat", side_effect=fake_ai_chat), \
-             mock.patch("llm.client.provider_circuit_open", return_value=False):
+             mock.patch("llm.client.model_circuit_open", return_value=False):
             out = fo.ai_chat_failover(
                 [{"role": "user", "content": "x"}], provider="deepseek")
         self.assertEqual(out, "DEEPSEEK-OK")
@@ -66,7 +66,7 @@ class TestFailover(unittest.TestCase):
 
         _set_env(enabled="0")
         with mock.patch("llm.client.ai_chat", side_effect=fake_ai_chat), \
-             mock.patch("llm.client.provider_circuit_open", return_value=False):
+             mock.patch("llm.client.model_circuit_open", return_value=False):
             out = fo.ai_chat_failover([{"role": "user", "content": "x"}])
         self.assertEqual(out, "SINGLE")
         # 单源路径：只调用一次，且 provider 透传为 None
@@ -83,7 +83,7 @@ class TestFailover(unittest.TestCase):
 
         _set_env()
         with mock.patch("llm.client.ai_chat", side_effect=fake_ai_chat), \
-             mock.patch("llm.client.provider_circuit_open", return_value=False):
+             mock.patch("llm.client.model_circuit_open", return_value=False):
             out = fo.ai_chat_failover([{"role": "user", "content": "x"}])
         self.assertIsNone(out)
         self.assertEqual(calls, ["baidu", "qwen"])
@@ -91,7 +91,7 @@ class TestFailover(unittest.TestCase):
     def test_skips_circuit_open(self):
         """baidu 已熔断：跳过，直接打 qwen。"""
 
-        def fake_circuit(p):
+        def fake_circuit(p, m=""):
             return p == "baidu"
 
         def fake_ai_chat(messages, system=None, temperature=0.3, max_tokens=2000,
@@ -100,7 +100,7 @@ class TestFailover(unittest.TestCase):
 
         _set_env()
         with mock.patch("llm.client.ai_chat", side_effect=fake_ai_chat), \
-             mock.patch("llm.client.provider_circuit_open", side_effect=fake_circuit):
+             mock.patch("llm.client.model_circuit_open", side_effect=fake_circuit):
             out = fo.ai_chat_failover([{"role": "user", "content": "x"}])
         self.assertEqual(out, "QWEN-OK")
 
@@ -113,7 +113,7 @@ class TestFailover(unittest.TestCase):
 
         _set_env()
         with mock.patch("llm.client.ai_chat", side_effect=fake_ai_chat), \
-             mock.patch("llm.client.provider_circuit_open", return_value=False):
+             mock.patch("llm.client.model_circuit_open", return_value=False):
             out = fo.ai_chat_json_failover([{"role": "user", "content": "x"}])
         self.assertEqual(out, {"flag": "x"})
 
@@ -135,7 +135,7 @@ class TestFailover(unittest.TestCase):
 
         _set_env()
         with mock.patch("llm.client.ai_chat", side_effect=fake_ai_chat), \
-             mock.patch("llm.client.provider_circuit_open", return_value=False), \
+             mock.patch("llm.client.model_circuit_open", return_value=False), \
              mock.patch("llm.client.get_model_for_attempt", return_value="dummy"):
             out = asyncio.run(lw.llm_json("sys", "user", 0))
         self.assertEqual(out, {"flag": "flag{ok}"})
@@ -156,7 +156,7 @@ class TestFailover(unittest.TestCase):
 
         _set_env()
         with mock.patch("llm.client.ai_chat", side_effect=fake_ai_chat), \
-             mock.patch("llm.client.provider_circuit_open", return_value=False), \
+             mock.patch("llm.client.model_circuit_open", return_value=False), \
              mock.patch("llm.client.get_model_for_attempt", return_value="dummy"):
             out = asyncio.run(lw.llm_text("sys", "user", 0))
         self.assertEqual(out, "flag{text_ok}")

@@ -47,7 +47,7 @@ def test_ai_vision_constructs_multimodal_messages(monkeypatch, img_path):
         return "flag{abc}", {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
 
     monkeypatch.setattr(llm_client, "_resolve_settings", _fixed_settings)
-    monkeypatch.setattr(llm_client, "provider_circuit_open", lambda p: False)
+    monkeypatch.setattr(llm_client, "model_circuit_open", lambda p, m="": False)
     monkeypatch.setattr(llm_client, "_post_chat", fake_post)
     out = llm_client.ai_vision("read?", [img_path])
     assert out == "flag{abc}"
@@ -60,7 +60,7 @@ def test_ai_vision_constructs_multimodal_messages(monkeypatch, img_path):
 
 def test_ai_vision_empty_images_returns_none(monkeypatch):
     monkeypatch.setattr(llm_client, "_resolve_settings", _fixed_settings)
-    monkeypatch.setattr(llm_client, "provider_circuit_open", lambda p: False)
+    monkeypatch.setattr(llm_client, "model_circuit_open", lambda p, m="": False)
     assert llm_client.ai_vision("read?", []) is None
 
 
@@ -72,7 +72,7 @@ def test_ai_vision_circuit_open_skips(monkeypatch, img_path):
         return "x", {}
 
     monkeypatch.setattr(llm_client, "_resolve_settings", _fixed_settings)
-    monkeypatch.setattr(llm_client, "provider_circuit_open", lambda p: True)
+    monkeypatch.setattr(llm_client, "model_circuit_open", lambda p, m="": True)
     monkeypatch.setattr(llm_client, "_post_chat", fake_post)
     assert llm_client.ai_vision("read?", [img_path]) is None
     assert called["v"] is False
@@ -82,5 +82,5 @@ def test_ai_vision_missing_api_key_returns_none(monkeypatch, img_path):
     s = _fixed_settings()
     s["api_key"] = ""
     monkeypatch.setattr(llm_client, "_resolve_settings", lambda *a, **k: s)
-    monkeypatch.setattr(llm_client, "provider_circuit_open", lambda p: False)
+    monkeypatch.setattr(llm_client, "model_circuit_open", lambda p, m="": False)
     assert llm_client.ai_vision("read?", [img_path]) is None
