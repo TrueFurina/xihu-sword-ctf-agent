@@ -447,6 +447,38 @@ def _sha256_arbitrate(ctx, flag: str) -> Optional[bool]:
     return sha256_matches(flag, getattr(q, "flag_sha256", None))
 
 
+# 2026-10-05：题面 flag_pattern 可能声明有误（外部题池 38/40 题沿用默认 `flag{}`
+# 而 google-ctf 真 flag 实为 `CTF{...}`）→ 声明 pattern 在 output 里**定位不到**真 flag。
+# 宽 pattern 仅用于「定位」候选，正确性一律交 sha256 仲裁（见 _broad_sha256_flag）。
+_BROAD_FLAG_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]{1,20}\{[^}\n]{1,120}\}")
+
+
+def _broad_sha256_flag(ctx, text: str) -> Optional[str]:
+    """宽 pattern 扫描 + sha256 仲裁兜底（2026-10-05 flag_pattern 声明有误修复）。
+
+    仅当本题带官方 `flag_sha256` 真值时启用：扫出所有 flag 形状 token，返回
+    经 sha256 证真的那个。sha256 抗碰撞 → 仅真值可命中，**无法误纳诱饵**；
+    无 `flag_sha256` → 返回 None，行为完全不变（严格加法，不影响既有提取）。
+    用于「题面 flag_pattern 与真 flag 格式不符（如默认 `flag{}` vs 真值 `CTF{}`）」
+    导致声明 pattern 定位不到真 flag 的场合（与 presolve 侧
+    `_matches_expected_sha256` 同一根因、同一原理）。
+    """
+    try:
+        q = getattr(ctx, "question", None)
+        exp = getattr(q, "flag_sha256", None)
+        if not exp:
+            return None
+        from verify.flag_checker import sha256_matches
+
+        for m in _BROAD_FLAG_RE.finditer(text or ""):
+            cand = m.group(0)
+            if sha256_matches(cand, exp) is True:
+                return cand
+    except Exception as _e:  # noqa: BLE001 - 兜底失败不阻塞既有提取
+        logger.debug("broad sha256 flag 兜底异常: %s", _e)
+    return None
+
+
 def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
     """从执行结果中提取 flag（优先用 checker，其次正则）。原 MainAgent._extract_flag。
 
@@ -540,6 +572,18 @@ def extract_flag(agent, ctx: AgentContext, act: dict) -> Optional[str]:
                 _mark_hallucination(ctx)
                 return None
             return _f
+    # 2026-10-05：声明 pattern 定位失败（未匹配）时，若本题带官方 sha256 真值，
+    # 退回「宽 pattern 扫描 + sha256 仲裁」兜底——修复题面 flag_pattern 声明有误
+    # （如默认 flag{} vs 真值 CTF{}）导致真 flag 永远提取不到的缺陷。严格加法：
+    # 仅 sha256 命中的唯一真值被采信，无真值/无命中 → None（行为不变）。
+    if not primary_blocked:
+        _bf = _broad_sha256_flag(ctx, str(output))
+        if _bf:
+            logger.info("[%s] 宽 pattern+sha256 兜底命中真 flag（声明 pattern 未匹配）: %s",
+                        getattr(ctx, "question", None) and ctx.question.id or "?",
+                        _bf[:40])
+            ctx._extract_failed = False
+            return _bf
     # ── E1 结构化候选兜底：主输出无匹配时，扫 JSON 候选列表 ──
     # 仅做模板级正则校验（格式符占位/flag_pattern）；候选来自 LLM 结构化输出，
     # 但附件明文 flag 经正则提取即应接受（X8ccET：d0g3{...} 来自 read 工具落盘 output）。
