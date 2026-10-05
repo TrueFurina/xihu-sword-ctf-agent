@@ -322,4 +322,15 @@
 
 ---
 
+## 八、熔断粒度修复：provider → (provider, model)（2026-10-05，¥0，已完成）
+
+**前序遗留的框架缺口②已收口。**
+
+- **事故**：tokenhub 下 `hy3`（免费）本可用，但 attempt≥2 升级到付费 `deepseek-v4-pro` 得 402×3 → 原按 provider 熔断 → **整个 tokenhub 被判死** → 后续 321 次调用被跳过、整轮作废。
+- **改**：`llm/client.py` 熔断键改为 `provider::model`（失败记录/成功重置/熔断检查全线模型级；新增 `model_circuit_open(p,m)`；**保留** `provider_circuit_open(p)` 为「任一模型熔断」宽口径，供 `run.py` 的「基础设施不可达」回填继续用）。`run.py` 竞速池剔除候选改模型级（**事故直接源头**）；`llm/failover.py` 同步（先解析将用模型再判）。
+- **测试**：新增 `tests/test_circuit_model_granularity.py` 10 例（含事故复现；**变异验证**：键退回 provider 级 → 核心用例必红）；`test_ai_vision.py` / `test_llm_failover.py` 同步到新 API（**不然是假绿**——补丁失效仍会通过）。
+- **提交**：`8f5e7bc`（client 实现）+ `adee193`（新测试）+ `9868693`（failover 实现）+ `1c78004`（既有测试同步），遵第 ⑫ 道分开提交。
+
+---
+
 > 📌 本计划由软件工坊（产品评审员产出 + 主理人汇编，全部结论经磁盘复核）生成，关键决策请项目负责人复核。
