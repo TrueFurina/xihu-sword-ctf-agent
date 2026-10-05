@@ -1,4 +1,4 @@
-# 当前计划（2026-10-01 重建；2026-10-03 更新）
+# 当前计划（2026-10-01 重建；2026-10-03 / 2026-10-05 更新）
 
 > 依据：2026-10-01 磁盘实测（非记忆/转述）。项目定位＝**非竞赛的工程/能力项目**（确定性优先 CTF 静态分析框架 + 可迁移治理资产）。
 > 相关约束见 `.workbuddy/memory/MEMORY.md`；终局复盘见 `deliverables/锐评质检/西湖论剑-项目终局复盘-20260923.md`。
@@ -180,7 +180,8 @@
   - ✅ **primes 已接入 presolve 主链（10-04，`087610f` 实现 / `c008acc` 测试）**：`_try_crypto_primes` 从题面/附件抠 (q, x, r)，再用 **`_recover_primes_n` 由 q 反解 n**（`q=next_prime(∏p_{n-r..n-1})` 由 (n,r) 唯一决定 → 滑窗 + 间隙过滤 + nextprime 自校验；0.8s 得 518，假 q 返回 None）。真实题目对象端到端 24.6s 解出、sha256 与题库真值匹配。这是 **B1 首个真正进主链的产物**。
   - ✅ **mhk2 也已接入 presolve（10-04，`c3677d7` 实现 / `6d11f26` 测试）**：`_mhk2_extract` 从 `output.txt` 认出 `a1/a2`（256 个大整数）+ 335 组 `(c1,c2)` 密文，门槛 n≥64（n<48 攻击本就不成立，拒绝而非白跑），`_try_knapsack_mhk` 600s 墙钟、实测 **146.6s 解出**，sha256 与题库真值匹配。
   - ✅ **至此 B1 已破 2 道（mhk2、primes）全部接入主链**，KNOWN_GAP 两个条目均已摘除；接线状态由新增的 `tests/test_presolve_b1_wiring.py` 盯守（未接线＝只是库、不算能力）。
-  - ⚠️ **KPI 未变**：这两题属 `questions_external`（外部池口径），**不进 `offline_verified=14` 台账**；且属工具链补齐，不代表 LLM 自主推理能力。
+  - ✅ **B1 第三道 cycling 已落地并接入主链（2026-10-05）**：`cycling`（Google CTF 2022，RSA cycling attack）用 RSA 循环攻击解出，flag = `CTF{Recycling_Is_Great}`（sha256 前缀 `acbe3fce`＝题库真值），真题端到端 44.97s 解出、自带加密回验通过；工程化为 `skills/crypto_cycling.py/json`，由 `_try_cycling` 接入 presolve（`_WIRED_SKILL_MODULES` + 任务列表）。提交 `7f17ec1`（实现，含 README 中英 skill 计数 59→60）+ `e9842ef`（测试），**已推送远端**，拆分两次提交过门禁⑫。
+  - ⚠️ **KPI 未变**：三题均属 `questions_external`（外部池口径），**不进 `offline_verified=14` 台账**；且属工具链补齐，不代表 LLM 自主推理能力。
 
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
