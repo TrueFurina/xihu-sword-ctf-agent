@@ -198,6 +198,16 @@
 - 🔴 **踩坑**：父进程残留 `CTF_AGENT_LLM_BASE_URL`（DASCTF 网关）会被 `config.from_env` 采用，但 `print_effective_config_snapshot` 显示 provider 默认端点（**具欺骗性**）→ 真跑前必 `env.pop` 清除（已固化进启动器 `data/results/_b2pilot_launch.py`）。
 - **KPI 未变**（外部池口径，不入台账）。
 
+### 三之三补二、架构根因修复：策略签名「空输出塌缩」（2026-10-05，¥0 改造）
+
+- **病灶（从 B2 证据 `data/results/_b2pilot_real.log` 逐行定位）**：**5/5 题在步骤 3–5 即被同一链路弃题**——「连续同策略签名3次检测：强制切换策略 (action=script)」→ 下一步「同参数重复（script）——判定死循环，止损换题」。
+- **根因**：`execute_script` 只把 **stdout** 作 observation；脚本报错（traceback 进 stderr）或静默计算 → `observation=""`，且 script/command 步 `tool_used=""`（恒空）→ E2 强切 与 同参数重复检测 **共用** 的三元组签名 `(action, observation[:200], tool_used)` **塌缩为常量** `("script","","")`。于是 **LLM 连续写不同算法的解密脚本（正常探索）被误判「同策略空转」**：E2 强切一次（dedup）→ 下一步命中死循环检测 → `break`。**每 attempt 只活约 5 步**（真正的求救信号被当成死循环掐断）。
+- **修法（严格加法，零行为回退）**：`StepRecord` 新增 `plan_fp`（plan 全字段稳定哈希，`json.dumps(sort_keys=True)`+sha256[:12]）；`_strategy_signature` 在观察**无有效载荷**（空 / 仅 `[rc=0]` 前缀）时用 `plan_fp` 参与判重 → **不同请求必得不同签名**；**观察有载荷时行为与修复前完全一致**（不引入「换汤不换药」逃避空间）。E2 强切 与 死循环检测**统一改用 `_strategy_signature`**（原先死循环检测内部另一份 `_step_sig` 复制品，只修 E2 会漏——两处必须同源）。
+- **端点**：`core/phases.py`（`_plan_fingerprint()` + `observe_step` 注入 `plan_fp`）、`core/main_agent.py`（`StepRecord.plan_fp` / `_strategy_signature` / 死循环检测改调用）。
+- **验证**：新增 `tests/test_strategy_signature_no_collapse.py`（9 例：签名语义 / 指纹稳定性 / observe 注入 / 端到端「不同脚本空输出不误杀」+ 对称哨兵「同脚本空输出仍止损」）；**变异验证双向通过**（去掉 plan_fp 分支 → 3 例红；observe 不注入 → 2 例红）；相关套件 **69 passed**（6m29s，含真实 Coppersmith/MHK2 计算）。
+- **预期收益**：直接解开「1 题活不过 5 步」的最上游卡点——这是「主链自主 0→≥1」的前置条件（**待下一轮授权跑批 A/B 配对验证**）。
+- **KPI 未变**（纯控制流修复，不动任何真值源数字）。
+
 
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
