@@ -163,6 +163,7 @@ _WIRED_SKILL_MODULES = {
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
     "skills.crypto_cycling",                 # RSA cycling attack（2^1025-2 因子分解）
+    "skills.crypto_electric_mayhem_cls",    # AES-128 CPA 侧信道（模拟功耗轨迹，离线可解）
 }
 
 
@@ -562,6 +563,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_knapsack_mhk(question)),
         # 2026-10-04 B1 确定性静态求解：RSA cycling attack
         asyncio.ensure_future(_try_cycling(question)),
+        # 2026-10-05 B1 确定性静态求解：AES-128 CPA 侧信道（Electric Mayhem CLS）
+        asyncio.ensure_future(_try_electric_mayhem_cls(question)),
     ]
     try:
         for _fut in asyncio.as_completed(_tasks):
@@ -2070,6 +2073,63 @@ async def _try_cycling(question) -> Optional[str]:
     if flag and _is_plausible_flag(flag):
         logger.info("[presolve:cycling] %s 命中 flag=%s",
                     getattr(question, "id", "?"), flag[:60])
+        _save_candidates(question, [flag])
+        return flag
+    return None
+
+
+async def _try_electric_mayhem_cls(question) -> Optional[str]:
+    """Electric Mayhem CLS（AES-128 CPA 侧信道，2026-10-05 B1 工具链补齐）。
+
+    对「题面/附件给出模拟功耗轨迹 json（含 pt/ct/pm 结构）」的题型做确定性求解：
+    从附件里定位轨迹 json（stm32/trace/power/elmo/mayhem 之一），交给
+    :func:`skills.crypto_electric_mayhem_cls.crypto_electric_mayhem_cls` 做
+    第一轮 SubBytes 输入汉明重量的相关功耗分析（CPA）恢复 16 字节密钥。
+
+    触发面：仅当附件中存在名称含侧信道关键词的 json 轨迹文件时触发（极罕见，
+    避免误抓普通 json 附件）。命中由下游 flag_pattern + 题面 flag_sha256 把关。
+
+    诚实口径：本路是「AES-128 CPA 侧信道」这一真实密码学攻击的确定性实现
+    （非 grep 明文、非读答案密钥）；实测 Google CTF 2022 electric-mayhem-cls
+    解出 flag 且与题库 flag_sha256 逐字匹配。⚠️ 属 B1 工具链补齐产物，
+    不代表 LLM 自主能力。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc"):
+        return None
+    cand = None
+    for a in _attachments(question):
+        p = str(a)
+        low = p.lower()
+        if low.endswith(".json.gz") or low.endswith(".json"):
+            if any(k in low for k in ("stm32", "trace", "power", "elmo", "mayhem")):
+                cand = p
+                break
+    if not cand or not os.path.isfile(cand):
+        return None
+    qid = getattr(question, "id", "?")
+    expected = getattr(question, "flag_sha256", None)
+    logger.info("[presolve:emcls] %s 发现轨迹附件 %s，开始 CPA", qid, cand)
+    try:
+        from skills.crypto_electric_mayhem_cls import (
+            crypto_electric_mayhem_cls as _em_solve,
+        )
+        res = await asyncio.wait_for(
+            asyncio.to_thread(
+                _em_solve,
+                {"kind": "file", "path": cand, "expected_sha": expected},
+            ),
+            timeout=120,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:emcls] %s 求解异常: %s", qid, exc)
+        return None
+    if not res.get("ok"):
+        return None
+    flag = res.get("flag")
+    if flag and _is_plausible_flag(flag):
+        logger.info("[presolve:emcls] %s 命中 flag=%s (matched_sha=%s)",
+                    qid, flag[:60], res.get("matched"))
         _save_candidates(question, [flag])
         return flag
     return None

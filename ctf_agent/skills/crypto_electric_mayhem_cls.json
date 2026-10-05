@@ -1,0 +1,8 @@
+{
+  "name": "crypto_electric_mayhem_cls",
+  "purpose": "Google CTF 2022「Electric Mayhem CLS」题的确定性求解器：AES-128 功耗分析（CPA）侧信道攻击。题目直接给出模拟功耗轨迹（ELMO 模型），无需真实示波器/靶机即可离线求解——第一轮 SubBytes 输入 u=Sbox[pt[i]^key[i]] 的汉明重量与功耗轨迹相关，逐字节 256 候选 Pearson 相关功耗分析取峰值即得密钥。",
+  "input_spec": "params = {'kind': 'file', 'path': <trace json 路径>, 'expected_sha': <可选 flag_sha256>} 或 {'kind': 'solve', 'pt': [bytes...], 'pm': [trace...], 'expected_sha': <可选>}",
+  "output_spec": "crypto_electric_mayhem_cls(params) → {'ok': True, 'flag': 'CTF{...}', 'key_hex': <16字节密钥 hex>, 'matched': <bool，对照 expected_sha>}；未给 expected_sha 时 flag 取 ASCII 解释",
+  "categories": ["crypto", "side-channel", "cpa", "aes"],
+  "version": "1.0"
+}

@@ -181,7 +181,9 @@
   - ✅ **mhk2 也已接入 presolve（10-04，`c3677d7` 实现 / `6d11f26` 测试）**：`_mhk2_extract` 从 `output.txt` 认出 `a1/a2`（256 个大整数）+ 335 组 `(c1,c2)` 密文，门槛 n≥64（n<48 攻击本就不成立，拒绝而非白跑），`_try_knapsack_mhk` 600s 墙钟、实测 **146.6s 解出**，sha256 与题库真值匹配。
   - ✅ **至此 B1 已破 2 道（mhk2、primes）全部接入主链**，KNOWN_GAP 两个条目均已摘除；接线状态由新增的 `tests/test_presolve_b1_wiring.py` 盯守（未接线＝只是库、不算能力）。
   - ✅ **B1 第三道 cycling 已落地并接入主链（2026-10-05）**：`cycling`（Google CTF 2022，RSA cycling attack）用 RSA 循环攻击解出，flag = `CTF{Recycling_Is_Great}`（sha256 前缀 `acbe3fce`＝题库真值），真题端到端 44.97s 解出、自带加密回验通过；工程化为 `skills/crypto_cycling.py/json`，由 `_try_cycling` 接入 presolve（`_WIRED_SKILL_MODULES` + 任务列表）。提交 `7f17ec1`（实现，含 README 中英 skill 计数 59→60）+ `e9842ef`（测试），**已推送远端**，拆分两次提交过门禁⑫。
-  - ⚠️ **KPI 未变**：三题均属 `questions_external`（外部池口径），**不进 `offline_verified=14` 台账**；且属工具链补齐，不代表 LLM 自主推理能力。
+  - ✅ **B1 第四道 electric-mayhem-cls 已落地并接入主链（2026-10-05）**：`electric-mayhem-cls`（Google CTF 2022，AES-128 功耗分析 CPA 侧信道）用 numpy 相关功耗分析（HW(Sbox[pt^key]) 逐字节 256 候选 Pearson 相关）解出，flag = `CTF{W0ckAwocKaWoCka1}`（sha256 = `408e722c…`＝题库真值），真题 50 条模拟轨迹（1806 样本/条）端到端解出；工程化为 `skills/crypto_electric_mayhem_cls.py/json`，由 `_try_electric_mayhem_cls` 接入 presolve（提交 + 推送，拆分实现/测试两次提交，过门禁⑫）。
+    - 🔴 **纠正旧判**：此前「electric-mayhem×2 皆空 tgz→需靶机」不准确——实证复核（2026-10-05）：**cls 三方数据齐全**（elmo.tgz 118KB 真迹 / firmware.tgz 49KB 真 firmware / stm32f0_aes.json.gz 788KB 含 1806 样本模拟轨迹）＝**纯模拟轨迹离线可解**，无需靶机；**pqc** 的 `firmware.tgz`(25B)/`stm32f0_kyber512.json.gz`(27B) 才是占位符文本（`../challenge/...`），缺 firmware+model → 结构性残缺、离线不可做；**abc-arm-and-amd** 为跨架构 shellcode（chal-aarch64/chal-x86-64 + libc），可构造 payload 但本机无 qemu/WSL **不可执行验证** → 按诚实口径「未运行验证、不算解出」。
+  - ⚠️ **KPI 未变**：四题均属 `questions_external`（外部池口径），**不进 `offline_verified=14` 台账**；且属工具链补齐，不代表 LLM 自主推理能力。
 
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
