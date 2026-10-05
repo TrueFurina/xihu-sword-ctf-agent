@@ -228,6 +228,30 @@
   - **两处框架缺口（待修，未改）**：① provider 熔断（401/402/403）未计入 `mechanism_terminated`、`interpretable` 未置 false；② 熔断粒度是 **provider** 而非 model，一个付费模型的 402 会连带杀死同源免费模型。
   - 证据：`data/results/heldout/G_p2b2fix_tokenhub_20261005_163543/` 与 `G_p2b2prefix_tokenhub_20261005_165820/`（gitignored）；日志 `data/results/_ab_{fix,prefix}_hy3.log`；两次被 402 污染的跑批已落 `_INVALID_*.md` 标记。
 
+### 三之三补三、轻量模型覆盖失效修复 + qwen 受控 A/B（2026-10-05，¥0）
+
+- **🔴 key 根因（用户纠正，已证实用户正确）**：上一轮把 qwen 的 `HTTP400 Access denied, account not in good standing` 误判为「账号级封锁」；实际是环境变量 `DASHSCOPE_API_KEY` 里装的是一把**坏 key**（`sk-ws-H.PMPEYIE.…`）。用户给出的活 key（`sk-ws-H.PREIRXE.…`，全长记于 `.workbuddy/memory/2026-10-04.md:188`）复测 **6 模型全 200**。教训：**provider 报「账号异常」先怀疑 key 取值来源**，别急着给 provider 判死刑。
+- **🔴 轻量模型覆盖失效（A/B 二度作废的真因，本次修真）**：
+  - **根因**：`run.py:167` 主链路 `model = model_override or get_model_for_attempt(attempt, provider)` **显式传 provider** → 命中 `llm/client.py:552` 的 **provider 分支**，其 `attempt < upgrade_after_attempts(2)` 时 **直接 `return default_model`**（= `_resolve_provider_defaults(provider)[1]`），**既不读 `CTF_AGENT_{PROVIDER}_MODEL` 也不读 `CTF_AGENT_LIGHT_MODEL`**。→ 启动器把 qwen「钉到免费档 `qwen3.7-plus`」被**静默丢弃**，仍打默认 `qwen3.7-flash`（其免费额度耗尽）→ 403 → provider 级熔断 → 整轮作废。（`_resolve_settings` 本会尊重该 env，但 `model` 已被 `run.py` 填成非空 → 永不触发。）
+  - **修法**：provider 分支 attempt<upgrade 时先读 `CTF_AGENT_{PROVIDER}_MODEL` 再回退 default；与 `_resolve_settings` 优先级一致（专属 env > provider 默认）；仅在显式设置该 env 时生效，**不改变** attempt≥upgrade 无重型可升时回退 default 的既有语义。
+  - **提交**：`fbd9449`（实现）/ `e9f5bfe`（回归测试，7 例；变异验证：去修复→2 例红）。
+  - **端点证据**：探针 `get_model_for_attempt(0,'qwen')` 由 `'qwen3.7-flash'` → `'qwen3.7-plus'`。
+- **✅ 顺带修复 shipped 回归**：`76d0450`（presolve sha256 权威旁路，**已推送**）引入后，`tests/test_qr_matrix.py::test_default_flag_pattern_blocks_nonflag_prefix` 因构造题面带**匹配真值哈希** → 被正解放行 → 全量套件 **1 failed（928 passed）**。修正＝该用例改用 `flag_sha256=None` 纯隔离诱饵守卫 + 新增对称锁 `test_sha256_bypass_releases_real_flag`（锁 76d0450 行为防回退）；变异验证：禁用 `_matches_expected_sha256` → 新锁红。提交 `3fc23f1`（测试）。**全量套件回到全绿（929 passed / 16 skipped）**。
+- **受控 A/B（qwen3.7-plus 双钉、同 5 题、同配置、冷黑板；唯一变量＝策略签名修复）**：
+  | 指标 | 修复后(fix) | 修复前(prefix) |
+  |---|---|---|
+  | 解出 | 0/5 | 0/5 |
+  | by_error | race_abandon×3 + budget_exceeded×2 | race_abandon×3 + budget_exceeded×2 |
+  | mechanism_terminated | 5 | 5 |
+  | token | 416,586 | 368,141 |
+  | 步数 / 强切 / 幻觉步 | 84 / 7 / 15 | 71 / 7 / 15 |
+  | `同参数重复（script）` | 6 | 1 |
+  | `同参数重复（reason）` | 0 | 0 |
+- **诚实结论**：
+  - 两臂 **0/5 且 by_error 完全一致**；`强切(7)`/`幻觉步(15)` 两臂相同，仅步数(84/71)与 `script` 死循环数(6/1)有差。**该差异方向与预期相反**（修复本应减少 script 塌缩误判），且 **n=1 次运行/臂 + qwen 温度 0.1 仍非确定**（E2 强切会改写提示词→轨迹随之分叉）→ **不可归因于本修复**，**A/B 对修复收益仍无正向证据**（与 hy3 上「干净零结果」一致）。
+  - 🔴🔴 **第三次坐实瓶颈归因**：deepseek（作废）/ hy3（0/5）/ **qwen3.7-plus（0/5）**三模型一致 0 解出，且每题烧到 **74–91K token ≈ 满预算**才停 → **钱/时间/这条架构缺陷都不是瓶颈，模型能力才是**。
+  - 两句框架缺口仍在（provider 熔断未计入 `mechanism_terminated` / 熔断粒度为 provider 而非 model）——本次 fix 臂 `mechanism_terminated=5` 说明 race/budget 已正确归类，但熔断类仍未识别（本次两臂均无熔断，故未复现）。
+- 证据：`data/results/heldout/G_p2b2fix_qwen_20261005_181603/` 与 `G_p2b2prefix_qwen_20261005_183233/`（gitignored）；日志 `data/results/_ab_{fix,prefix}_qwen_plus.log`；两次 qwen 污染跑批（`..._174809` 免费额度耗尽、`..._175830` 覆盖失效仍打 flash）已落 `_INVALID_*.md` 标记。
 
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
