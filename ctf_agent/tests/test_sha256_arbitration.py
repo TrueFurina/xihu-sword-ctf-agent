@@ -111,5 +111,72 @@ class TestKeyboardPathGate(unittest.TestCase):
         self.assertEqual(self._run_kb(None), "flag{CLCKOUTHK}")
 
 
+# --------------------------------------------------------------------------
+# 2026-10-05 flag_pattern 声明有误修复：宽 pattern + sha256 兜底
+#
+# 背景：外部题池 38/40 题 flag_pattern 沿用默认 `flag{}`，而 google-ctf 真 flag
+# 实为 `CTF{...}` → 声明 pattern 在 output 里定位不到真 flag。修复：声明 pattern
+# 未匹配且本题带 sha256 真值时，退回宽 pattern 扫描 + sha256 仲裁。
+# 变异验证：删掉 phases.extract_flag 中的 _broad_sha256_flag 兜底 → 恢复用例 FAIL。
+# --------------------------------------------------------------------------
+CTF_TRUTH = hashlib.sha256("CTF{RealFlag}".encode()).hexdigest()
+
+
+class TestBroadPatternSha256Fallback(unittest.TestCase):
+    def _ctx_wrong_pattern(self, flag_sha256):
+        ctx = _ctx(flag_sha256=flag_sha256)
+        ctx.question.flag_pattern = r"flag\{[^}]+\}"  # 声明有误（与真值 CTF{} 不符）
+        return ctx
+
+    def test_wrong_declared_pattern_recovers_true_flag(self):
+        ctx = self._ctx_wrong_pattern(CTF_TRUTH)
+        out = "server returned CTF{RealFlag}"
+        self.assertEqual(
+            extract_flag(SimpleNamespace(checker=None), ctx, {"output": out}),
+            "CTF{RealFlag}")
+        self.assertFalse(ctx._extract_failed)
+
+    def test_broad_fallback_skips_decoy_and_finds_true(self):
+        # 输出含诱饵在前 → 宽扫描命中诱饵但 sha256 不符 → 继续找到真值
+        ctx = self._ctx_wrong_pattern(CTF_TRUTH)
+        out = "note: CTF{Decoy} and also CTF{RealFlag}"
+        self.assertEqual(
+            extract_flag(SimpleNamespace(checker=None), ctx, {"output": out}),
+            "CTF{RealFlag}")
+
+    def test_no_truth_does_not_enable_fallback(self):
+        # 无 sha256 真值 → 兜底不启用，行为不变（不误纳），返回 None
+        ctx = self._ctx_wrong_pattern(None)
+        out = "server returned CTF{RealFlag}"
+        self.assertIsNone(
+            extract_flag(SimpleNamespace(checker=None), ctx, {"output": out}))
+
+    def test_declared_pattern_still_wins_when_matching(self):
+        # 回归：声明 pattern 能匹配时走原路径，兜底不介入（真值不符 → 确定性拒绝）
+        ctx = _ctx(flag_sha256=TRUTH)
+        out = "keyboard decoded: flag{CLCKOUTHK}"
+        self.assertIsNone(
+            extract_flag(SimpleNamespace(checker=None), ctx, {"output": out}))
+
+
+class TestBroadFlagHelper(unittest.TestCase):
+    def test_helper_returns_none_without_truth(self):
+        from core.phases import _broad_sha256_flag
+        ctx = _ctx(flag_sha256=None)
+        self.assertIsNone(_broad_sha256_flag(ctx, "CTF{RealFlag}"))
+
+    def test_helper_finds_sha256_verified_token(self):
+        from core.phases import _broad_sha256_flag
+        ctx = _ctx(flag_sha256=CTF_TRUTH)
+        self.assertEqual(
+            _broad_sha256_flag(ctx, "junk CTF{nope} then CTF{RealFlag} end"),
+            "CTF{RealFlag}")
+
+    def test_helper_ignores_non_flag_text(self):
+        from core.phases import _broad_sha256_flag
+        ctx = _ctx(flag_sha256=CTF_TRUTH)
+        self.assertIsNone(_broad_sha256_flag(ctx, "no braces here at all"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
