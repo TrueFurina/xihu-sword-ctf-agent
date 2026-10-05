@@ -304,6 +304,29 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
         except Exception:  # noqa: BLE001 - 预检失败降级 LLM 推理
             pass
         out = await loop.run(question, solve_once, max_retries=_cfg.max_retries)
+        # ── 诚实化回填（2026-10-05）：provider 熔断(401/402/403) 根因还原 ──
+        # 实测：provider 熔断后 ai_chat 连续返回 None → 主 Agent 退化成
+        # race_abandon / budget_exceeded（自身失败模式），掩盖「基础设施不可达」
+        # 真因 → 报告被误读为「Agent 能力失败」。熔断已打开即 provider 永久死亡
+        # （直至换 key），故将退化的失败桶回填为 provider_circuit_open；该类别落入
+        # TRUNCATED_ERROR_CATEGORIES → 报告置 interpretable=False，不污染能力率。
+        # 仅对失败桶回填；presolve 直出(solved, error=None) 不受影响。失败开放。
+        try:
+            from llm.client import provider_circuit_open
+            from core.error_taxonomy import relabel_circuit_breaker
+            _err = out.get("error")
+            if _err and provider_circuit_open(provider):
+                _old_cat = _err.get("category")
+                _new_cat = relabel_circuit_breaker(_old_cat, True)
+                if _new_cat != _old_cat:
+                    _err["category"] = _new_cat
+                    _err["detail"] = (
+                        f"provider={provider} 熔断(401/402/403)已打开，根因为基础设施不可达，"
+                        f"非 Agent 能力失败；原终态={_old_cat}。"
+                        f"{_err.get('detail') or ''}"
+                    )
+        except Exception:  # noqa: BLE001 - 回填失败绝不阻塞解题
+            pass
         # ── P0 修复（2026-09-19 heldout 首测实证）：本题自身真值优先仲裁 ──
         # 旧逻辑只查 build_solver 启动时加载的 data/questions 混合集答案表；
         # heldout（data/questions_real/）等其它目录题不在表内 → 主 Agent/内部预扫
