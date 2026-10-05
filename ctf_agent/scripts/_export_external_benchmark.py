@@ -195,6 +195,36 @@ python judge_external_westlake.py --results results.json
 """
 
 
+def _answer_in_attachment(att_paths: list[str], truth_sha256: str, root: Path) -> bool:
+    """附件里是否直接含答案（2026-10-06 抽验发现的重要缺陷类别）。
+
+    实测：部分题的"附件"其实是答案文件（名为 flag 的附件）或官方 writeup 归档，
+    求解器一 grep 就中——这不是考题而是答案泄漏，会把外部基准的"外部真题"标签
+    变成注水。故导出时必须逐题标注，��费评测方识别。
+    """
+    # 同源实现，避免两处口径漂移；按文件路径加载以兼容"直接跑脚本"与"被导入"两种方式
+    import importlib.util as _ilu
+    _sp = Path(__file__).resolve().parent / "_stratify_external_benchmark.py"
+    _spec = _ilu.spec_from_file_location("_stratify_mod", _sp)
+    _mod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    matches_truth = _mod.matches_truth
+    import re as _re
+    flag_re = _re.compile(rb"[A-Za-z0-9_]{1,20}\{[^}\s]{4,120}\}")
+    for rel in att_paths:
+        fp = (root / rel)
+        if not fp.is_file():
+            continue
+        try:
+            raw = fp.read_bytes()
+        except OSError:
+            continue
+        for cand in flag_re.findall(raw):
+            if matches_truth(cand, truth_sha256):
+                return True
+    return False
+
+
 def _resolve(att: str, root: Path | None = None) -> Path | None:
     """把题面里的附件路径解析成本地绝对路径；附件路径相对 ctf_agent/ 根。"""
     base = root or ROOT
@@ -274,6 +304,11 @@ def collect(include_trained: bool = True, src: Path | None = None,
                 entry["attachment"] = atts[0]
             else:
                 entry["attachments"] = atts
+        if atts and _answer_in_attachment(atts, truth, base):
+            # 诚实标注：这不是"载荷完整"的好事，而是"答案就在附件里"的泄漏信号
+            entry["answer_directly_in_attachment"] = True
+            entry["benchmark_warning"] = ("附件中直接包含答案（答案文件或 writeup 归档），"
+                                          "评测时必须剔除或单列，否则测的是读文件而非解题")
         if qid in trained:
             entry["trained_in_westlake"] = True
         problems[qid] = entry
