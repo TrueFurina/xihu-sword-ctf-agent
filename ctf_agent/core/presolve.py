@@ -261,6 +261,32 @@ def _is_plausible_flag(flag: str) -> bool:
 _SHA256_HEX_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
+def _matches_expected_sha256(question, cand: str) -> bool:
+    """候选 flag 是否等于本题声明的真值（flag_sha256 占位）之 sha256。
+
+    2026-10-05 根因修复（B1 flag_pattern 闸误杀真解）：题面 `flag_pattern` 是
+    **元数据**，可能声明有误——外部题池 38/40 题沿用 `Question` 默认
+    `flag\\{[^}]+\\}`，而 google-ctf 真 flag 实为 `CTF{...}`。此时 `_run_presolve`
+    主入口（及 `_try_flag_scan` / 黑板缓存）的格式闸会在 `_passes_answer_check`
+    之前，把**经 sha256 可证的真 flag** 当诱饵丢弃 → B1 三题（cycling/cls/lcg）
+    主链白干。
+
+    本函数给出「sha256 命中即真值」的**权威旁路**：题面声明了 `flag_sha256`
+    且候选哈希相符 → 认定真 flag，任何 `flag_pattern` 闸不得否决。sha256
+    抗碰撞，命中即真值，逻辑上不可能误纳——不削弱「无真值时的诱饵守卫」
+    （无 `flag_sha256` 或哈希不符 → 返回 False，闸门行为完全不变）。
+    """
+    try:
+        exp = getattr(question, "expected_sha256", None)
+        if not exp:
+            return False
+        import hashlib
+
+        return hashlib.sha256(str(cand).encode("utf-8")).hexdigest() == str(exp).lower()
+    except Exception:  # noqa: BLE001 - 任何异常都不旁路（fail-closed，宁严不松）
+        return False
+
+
 def _attachment_multi_candidate(question, cap: int = 2) -> bool:
     """附件中是否存在 ≥2 个**不同** flag 候选（2026-10-03 假命中治理）。
 
@@ -355,7 +381,10 @@ async def _try_flag_scan(question, registry) -> Optional[str]:
             _fp = str(getattr(question, "flag_pattern", "") or "").strip()
             if _fp:
                 try:
-                    if not re.search(_fp, flag, re.IGNORECASE):
+                    # 2026-10-05：题面 pattern 声明有误（默认 flag{} vs 真 CTF{}）时，
+                    # 经 sha256 可证的真 flag 不得被格式闸丢弃（见 _matches_expected_sha256）。
+                    if (not re.search(_fp, flag, re.IGNORECASE)
+                            and not _matches_expected_sha256(question, flag)):
                         logger.debug(
                             "[presolve:flag_scan] %s 命中但不符合本题 flag_pattern=%s，丢弃(疑似诱饵): %s",
                             getattr(question, "id", "?"), _fp, flag[:60])
@@ -498,7 +527,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
                     # 后一测试按同 qid 读到，绕过了 answers 校验）。未过校验 → 落入引擎
                     # 路径重算（引擎路径有完整的 pattern+答案把关）。
                     _fp = str(getattr(question, "flag_pattern", "") or "").strip()
-                    _pattern_ok = (not _fp) or bool(re.search(_fp, _cf, re.IGNORECASE))
+                    _pattern_ok = ((not _fp) or bool(re.search(_fp, _cf, re.IGNORECASE))
+                                   or _matches_expected_sha256(question, _cf))
                     if _pattern_ok and _passes_answer_check(question, _cf, answers):
                         logger.info("[presolve:blackboard] %s 黑板缓存命中 flag=%s",
                                     _qid, str(_cf)[:40])
@@ -583,7 +613,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
                 # 真相校验失败。仅拒绝非匹配候选，绝不收窄已匹配的真 flag，
                 # 不影响既有 14/15 / 44/93 直出（真 flag 必匹配本题 pattern）。
                 _fp = str(getattr(question, "flag_pattern", "") or "").strip()
-                if _fp and not re.search(_fp, _r, re.IGNORECASE):
+                if (_fp and not re.search(_fp, _r, re.IGNORECASE)
+                        and not _matches_expected_sha256(question, _r)):
                     logger.debug(
                         "[presolve] %s 命中但不符合本题 flag_pattern=%s，丢弃(疑似诱饵): %r",
                         getattr(question, "id", "?"), _fp, _r)
