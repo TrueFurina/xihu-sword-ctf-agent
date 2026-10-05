@@ -343,6 +343,18 @@ def _supervision_stats(ctx: AgentContext) -> dict:
     }
 
 
+def internal_presolve_enabled() -> bool:
+    """题首确定性预扫是否启用（默认开）。
+
+    关闭方式：环境变量 CTF_AGENT_INTERNAL_PRESOLVE=off/0/false。
+    用途：量测「纯 LLM 独立贡献」——solver 层的 --presolve-skip 只跳过 solver 级预扫，
+    主 Agent 内部的题首预扫仍会跑，附件直扫命中的题会被当确定性答案直接提交。
+    口径纪律：确定性直扫与 LLM 贡献必须能分开记账，否则会把前者记成后者。
+    """
+    return os.getenv("CTF_AGENT_INTERNAL_PRESOLVE", "on").strip().lower() not in (
+        "off", "0", "false")
+
+
 class MainAgent:
     """主解题 Agent：Plan-Act-Observe 循环。"""
 
@@ -492,19 +504,29 @@ class MainAgent:
         # 原入口手工 flag_scan/crypto_auto 收敛为 core.presolve.presolve，按序
         # flag_scan → crypto_auto → math_engine → 关键词 fast_solve；命中即直接
         # 出答案，杜绝模型幻觉（web2/reverse_js 实测第一步就编 flag 被拦截）。
-        try:
-            from core.presolve import presolve
-            from eval.cases import preset_answers
+        # 内部预扫开关（2026-10-06 新增）：CTF_AGENT_INTERNAL_PRESOLVE=off 时跳过题首确定性
+        # 预扫，用于量测「纯 LLM 独立贡献」——此前只有 solver 层 --presolve-skip，主 Agent
+        # 内部的预扫仍会跑：附件直扫命中的题会被当确定性答案直接提交，LLM 贡献无法单独计量
+        # （实测外部真题 5 题探针：2 题被附件直扫秒解，不关开关就会把它们记成 LLM 能力）。
+        if not internal_presolve_enabled():
+            logger.info("[%s] 内部预扫已按 CTF_AGENT_INTERNAL_PRESOLVE=off 关闭（纯 LLM 口径）",
+                        getattr(question, "id", "?"))
+        else:
+            try:
+                from core.presolve import presolve
+                from eval.cases import preset_answers
 
-            _pre = await presolve(question, registry=self.registry, sandbox=self.sandbox,
-                                  answers=preset_answers([question]))
-            if _pre:
-                logger.info("[%s] 确定性预扫命中: %s",
-                            getattr(question, "id", "?"), _pre[:60])
-                ctx.candidate_flag = _pre
-                ctx.solved_by_presolve = True  # 2026-08-24 诚实化：标记静态分析器直出，零 LLM
-        except Exception as _exc:  # noqa: BLE001 - 预扫失败不阻塞主流程
-            logger.warning("[%s] 确定性预扫异常: %s", getattr(question, "id", "?"), _exc)
+                _pre = await presolve(question, registry=self.registry, sandbox=self.sandbox,
+                                      answers=preset_answers([question]))
+                if _pre:
+                    logger.info("[%s] 确定性预扫命中: %s",
+                                getattr(question, "id", "?"), _pre[:60])
+                    ctx.candidate_flag = _pre
+                    # 2026-08-24 诚实化：标记静态分析器直出，零 LLM
+                    ctx.solved_by_presolve = True
+            except Exception as _exc:  # noqa: BLE001 - 预扫失败不阻塞主流程
+                logger.warning("[%s] 确定性预扫异常: %s",
+                               getattr(question, "id", "?"), _exc)
         # 墙钟硬止损起点（2026-08-20 锐评 P0-2）：solve() 入口记 monotonic 时间，
         # 每步检查 elapsed，超 per_question_wallclock 即 break + 标记 wallclock_timeout。
         # G1/G5（2026-09-29 接入运行时）：为每题建持久 shell 工作区（cwd 跨步保留 +
