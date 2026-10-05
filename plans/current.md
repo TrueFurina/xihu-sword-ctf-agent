@@ -210,6 +210,23 @@
 - ⛔ **A/B 验证受阻——本次跑批作废（2026-10-05 16:21，`G_p2b2fix_20261005_162123`）**：真跑进行到中途 DeepSeek 返回 **HTTP 402 Insufficient Balance** → llm.client **熔断**。计数：成功 `200 OK` **12** 次 / `402` **3** 次 / 熔断跳过 **316** 次。⇒ 5 题仅第 1 题（idea）拿到少量真实调用（34,343 token），其余 4 题 token 均 = **1,806**（纯开销、**零真实 LLM 调用**）。报告的 `0/5` 与 `by_error=wrong_direction×3+extract_fail×2` 全是「LLM 返回空 → observation 空 → 签名判重」的人工产物，**不得引用**；已在该目录落 `_INVALID_余额耗尽.md` 标记。**架构修复的真实效果仍未验证**。
 - 🔴 **暴露评测框架缺口**：`integrity.interpretable=true` / `mechanism_terminated=0` **未识别 provider 熔断**——把「316 次调用被跳过」当成「已尝试未解出」。建议：provider 永久故障（401/402/403 熔断）应计入 `mechanism_terminated` / 令 `interpretable=false`，否则「余额耗尽」会被静默当成「能力不足」。（**待修复，未改**）
 - 🔴 **预算硬约束**：DeepSeek 账户余额已耗尽 → **在充值或换可用 provider 并获授权前，无法再进行任何真跑**。
+- 🟡 **换免费源 + 受控 A/B（2026-10-05 16:5x–17:1x，用户「用千问那个免费的」→ 探针实测后改选 tokenhub）**：
+  - **provider 探针（¥0）**：`qwen`(DashScope) = **HTTP400 账号状态异常/欠费**（7 模型全挂，含 qwen-flash/turbo 免费档）；`deepseek`=402、`baidu`=403、`glm`=429、`siliconflow`=402；**存活＝ark / tokenhub / xfyun / moonshot**。→ 用户选定 **tokenhub**。
+  - 🔴 **二次踩坑**：tokenhub 免费档**只有轻量 `hy3`**；`attempt≥2` 升级到的重型 `deepseek-v4-pro` **需后付费→402**，而熔断器是 **provider 级** → 一次 402 把整个 provider 判死（321 次跳过）。**修法**：启动器把 `CTF_AGENT_TOKENHUB_{HEAVY,MODEL}` 双双钉到 `hy3`（¥0 绕过）。
+  - **受控 A/B（同模型 hy3、同 5 题、同配置、冷黑板；唯一变量＝本修复）**：两臂各 1 次运行（各约 20 min，¥0）。
+    | 指标 | 修复后(fix) | 修复前(prefix) |
+    |---|---|---|
+    | 解出 | 0/5 | 0/5 |
+    | by_error | wallclock×4 + budget_exceeded×1 | race_abandon×2 + wallclock×2 + budget_exceeded×1 |
+    | mechanism_terminated | 1 | 3 |
+    | wallclock 截断 | 4 | 2 |
+    | token | 192,992 | 312,078 |
+    | **行为计数（步/监督/幻觉/兜底）** | **38/10/7/29** | **38/10/7/29（完全一致）** |
+  - 🔴 **诚实结论＝该 A/B 在 hy3 上是「干净零结果」**：两臂**死循环判定全为 `reason`、`script` 塌缩两臂均未出现** → **修复针对的病理在此模型上根本不发作**；两臂行为计数逐项相同（hy3 近似确定性解码）→ **修复在本模型上行为惰性、未带来任何解出增量**。
+  - ⇒ **修复仍是「正确但潜伏」的缺陷修补**（单测+双向变异背书）；**其收益无法在唯一可用的免费模型上演示**——要验证需「会触发空输出的模型（deepseek）」+「多次重复以取得统计功效（n=5、单次运行无功效）」。
+  - 🔴🔴 **更重要的旁证**：即便有可用的 LLM、每题 300s 墙钟 + 40–90K token，hy3 仍 **0/5** → 再次坐实「**钱/时间/这条架构缺陷都不是瓶颈，模型能力才是**」。
+  - **两处框架缺口（待修，未改）**：① provider 熔断（401/402/403）未计入 `mechanism_terminated`、`interpretable` 未置 false；② 熔断粒度是 **provider** 而非 model，一个付费模型的 402 会连带杀死同源免费模型。
+  - 证据：`data/results/heldout/G_p2b2fix_tokenhub_20261005_163543/` 与 `G_p2b2prefix_tokenhub_20261005_165820/`（gitignored）；日志 `data/results/_ab_{fix,prefix}_hy3.log`；两次被 402 污染的跑批已落 `_INVALID_*.md` 标记。
 
 
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
