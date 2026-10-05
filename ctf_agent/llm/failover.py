@@ -54,7 +54,7 @@ def ai_chat_failover(
     - provider=None 且 FAILOVER=1：按 _failover_order 依次尝试白名单源，
       跳过已熔断者，返回首个非空响应；全部失败返回 None。
     """
-    from llm.client import ai_chat, get_model_for_attempt, provider_circuit_open
+    from llm.client import ai_chat, get_model_for_attempt, model_circuit_open
 
     # 竞速/显式 provider：不劫持，保持原语义
     if provider:
@@ -71,12 +71,14 @@ def ai_chat_failover(
     order = _failover_order()
     tried: list[str] = []
     for p in order:
-        if provider_circuit_open(p):
-            logger.info("failover: provider=%s 已熔断，跳过", p)
+        # 2026-10-05：按**模型粒度**判定熔断（同 run.py 竞速池修复）——先确定本 provider
+        # 将要使用的模型，再判该模型是否熔断。避免同 provider 下一个付费模型故障，
+        # 把本来可用的轻量模型一并跳过。
+        model_for_p = model or get_model_for_attempt(attempt, provider=p)
+        if model_circuit_open(p, model_for_p):
+            logger.info("failover: provider=%s model=%s 已熔断，跳过", p, model_for_p)
             continue
         tried.append(p)
-        # 保留按 attempt 升级重型的语义（per-provider 映射）
-        model_for_p = model or get_model_for_attempt(attempt, provider=p)
         out = ai_chat(
             messages, system=system, temperature=temperature,
             max_tokens=max_tokens, model=model_for_p, provider=p,
