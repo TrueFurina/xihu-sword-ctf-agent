@@ -578,6 +578,16 @@ def get_model_for_attempt(attempt: int, provider: Optional[str] = None) -> str:
             }
             if provider in heavy_map:
                 return heavy_map[provider]
+        # 轻量档覆盖（2026-10-05 修复）：显式 provider 时此前 attempt<upgrade 直接返回
+        # provider 默认轻量模型，**忽略** CTF_AGENT_{PROVIDER}_MODEL —— 导致「把免费源钉到
+        # 指定模型」静默失效（qwen3.7-plus 被丢弃 → 仍打默认 qwen3.7-flash，其免费额度耗尽
+        # 403 → provider 级熔断 → 整轮跑批作废）。与 _resolve_settings 的优先级保持一致：
+        # 显式 provider 专属 env > provider 默认模型。仅在 attempt<upgrade 时生效，
+        # 不改变 attempt>=upgrade 无重型可升时回退 default_model 的既有语义。
+        if attempt < config.upgrade_after_attempts:
+            light = os.getenv(f"CTF_AGENT_{provider.upper()}_MODEL", "").strip()
+            if light:
+                return light
         return default_model
     if attempt >= config.upgrade_after_attempts:
         return config.heavy_model
