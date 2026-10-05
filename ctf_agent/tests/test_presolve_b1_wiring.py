@@ -179,5 +179,70 @@ def test_presolve_lcg_solves_real_problem():
     assert hashlib.sha256(flag.encode()).hexdigest() == truth
 
 
+# --------------------------------------------------------------------------
+# 4) 主入口端到端 + flag_pattern 闸（2026-10-05 根因修复回归）
+#
+# 背景：外部题池 38/40 题沿用默认 flag_pattern=`flag\{[^}]+\}`，而 google-ctf
+# 真 flag 实为 `CTF{...}`。presolve 主入口（core/presolve.py）在格式闸处会把
+# 不符 pattern 的候选当诱饵丢弃 → B1 三题（cycling/cls/lcg）主链白干。
+# 修复：题面声明 flag_sha256 且候选哈希相符时，旁路格式闸（sha256 抗碰撞，
+# 命中即真值）。以下用例覆盖「真值放行」与「无真值仍守闸」两侧。
+# --------------------------------------------------------------------------
+def test_matches_expected_sha256_predicate():
+    """旁路谓词：sha256 命中放行；无真值 / 哈希不符 → 不放行（fail-closed）。"""
+    import hashlib as _hl
+
+    class _Q:
+        expected_sha256 = _hl.sha256(b"CTF{abc}").hexdigest()
+
+    class _QNone:
+        expected_sha256 = None
+
+    class _QBad:
+        expected_sha256 = "not-a-sha256"
+
+    assert P._matches_expected_sha256(_Q(), "CTF{abc}") is True
+    assert P._matches_expected_sha256(_Q(), "CTF{xyz}") is False
+    assert P._matches_expected_sha256(_QNone(), "CTF{abc}") is False
+    assert P._matches_expected_sha256(_QBad(), "CTF{abc}") is False
+
+
+@pytest.mark.slow
+def test_presolve_main_entry_bypasses_wrong_flag_pattern():
+    """主入口端到端：人为把 pattern 改回错误的 `flag{}`，真值 sha256 仍应放行。
+
+    变异验证：删掉主入口的 `and not _matches_expected_sha256(...)` → 本用例 FAIL
+    （presolve 返回 None，真 flag 被格式闸丢弃）。
+    """
+    import asyncio
+
+    q = _load(CYCLING_QID)
+    assert q is not None, f"题库里找不到 {CYCLING_QID}"
+    truth = str(getattr(q, "flag_sha256", "") or "")
+    assert truth, "本题应有 flag_sha256 真值"
+    # 模拟「元数据声明有误」：pattern 与真 flag（CTF{}）不符
+    q.flag_pattern = r"flag\{[^}]+\}"
+    flag = asyncio.run(P.presolve(q, force=True))
+    assert flag, "主入口格式闸丢弃了经 sha256 可证的真 flag（旁路未生效）"
+    assert hashlib.sha256(flag.encode()).hexdigest() == truth
+
+
+@pytest.mark.slow
+def test_presolve_main_entry_pattern_guard_intact_without_sha():
+    """无 sha256 佐证时，格式闸仍丢弃不符 pattern 的候选（诱饵守卫不被削弱）。
+
+    变异验证：把旁路谓词改成恒 True → 本用例 FAIL（假 flag 通过格式闸）。
+    """
+    import asyncio
+
+    q = _load(CYCLING_QID)
+    assert q is not None, f"题库里找不到 {CYCLING_QID}"
+    q.flag_pattern = r"flag\{[^}]+\}"      # 与真 flag（CTF{}）不符
+    q.flag_sha256 = None                   # 无真值可证
+    q.flag = None
+    flag = asyncio.run(P.presolve(q, force=True))
+    assert flag is None, f"无 sha256 佐证的 CTF{{}} 不应通过错误 pattern 闸，却得到 {flag!r}"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
