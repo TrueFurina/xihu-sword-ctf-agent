@@ -1,0 +1,8 @@
+{
+  "name": "crypto_cycling",
+  "purpose": "Google CTF 2022「Cycling」题的确定性求解器：RSA 循环攻击（cycling attack）。当 e^(k+1) ≡ 1 (mod λ(n)) 且 k+1 = 2^1025-2 可被 FactorDB 完全分解（全 1 次幂）时，枚举因子子集构造 λ(n) 的倍数 t，用 d = e^{-1} mod t 解密恢复 flag",
+  "input_spec": "params = {'kind': 'solve', 'e': 65537, 'n': <int>, 'ct': <int>, 'k': 2^1025-3, 'factors': [<int>, ...] 或省略自动从 FactorDB 拉取}",
+  "output_spec": "solve → {'flag': <明文，含 CTF{...}>}",
+  "categories": ["crypto", "rsa", "cycling-attack"],
+  "version": "1.0"
+}

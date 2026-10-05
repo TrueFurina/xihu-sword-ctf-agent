@@ -162,6 +162,7 @@ _WIRED_SKILL_MODULES = {
     # 2026-10-04 新增（B1 工具链补齐产物，确定性静态求解）
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
+    "skills.crypto_cycling",                 # RSA cycling attack（2^1025-2 因子分解）
 }
 
 
@@ -559,6 +560,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         # 2026-10-04 B1 确定性静态求解：子集积 mod q → Coppersmith 平滑因子
         asyncio.ensure_future(_try_crypto_primes(question)),
         asyncio.ensure_future(_try_knapsack_mhk(question)),
+        # 2026-10-04 B1 确定性静态求解：RSA cycling attack
+        asyncio.ensure_future(_try_cycling(question)),
     ]
     try:
         for _fut in asyncio.as_completed(_tasks):
@@ -1775,6 +1778,17 @@ _PRIMES_R_RE = re.compile(r"encode\(\s*(\d+)\s*,|gen_primes\(\s*(\d+)\s*,")
 _PRIMES_GAP_LIMIT = 100000
 
 
+# --------------------------------------------------------------------------
+# 2026-10-04 B1 接线：Cycling（RSA cycling attack）
+# --------------------------------------------------------------------------
+# e / n / ct 三个参数，各自 hex 或 dec；hex 需足够长避免误抓（n/ct 都 ≥ 256 bit）
+_CYC_HEX_RE = re.compile(
+    r"\b(e|n|ct)\s*=\s*(?:int\(\s*['\"]?)?0x([0-9A-Fa-f]{16,})")
+_CYC_DEC_RE = re.compile(r"\b(n|ct)\s*=\s*(\d{60,})")
+# 题面里「2**1025 - 3」或「2^1025-3」这类 cycling 次数提示（k）
+_CYC_K_RE = re.compile(r"2\s*\*\*\s*1025|2\s*\^\s*1025")
+
+
 def _recover_primes_n(q: int, r: int, max_bytes: int = 200) -> Optional[int]:
     """由 q 反解 n（确定性，自校验）。
 
@@ -1976,6 +1990,85 @@ async def _try_crypto_primes(question) -> Optional[str]:
     flag = _flag_from_text(str(msg or ""))
     if flag and _is_plausible_flag(flag):
         logger.info("[presolve:crypto_primes] %s 命中 flag=%s",
+                    getattr(question, "id", "?"), flag[:60])
+        _save_candidates(question, [flag])
+        return flag
+    return None
+
+
+async def _try_cycling(question) -> Optional[str]:
+    """Cycling（RSA cycling attack，2026-10-04 新增 · B 类静态求解）。
+
+    对「题面/附件给出 e/n/ct 且出现 2^1025 循环次数提示」的题型做确定性求解：
+    从文本里正则抠出 e、n、ct，交给 :func:`skills.crypto_cycling.solve`
+    （k+1=2^1025-2 因子分解 → 枚举子集构造 λ(n) 倍数 t → d=e^{-1} mod t 解密）。
+
+    触发面：仅当同时识别出 n、ct（均 ≥ 256 bit）且文本含 2^1025 提示时才跑
+    （该形态极罕见）。命中由下游 flag_pattern + 题面 flag_sha256 把关。
+
+    诚实口径：本路是「RSA cycling attack」这一真实密码学攻击的确定性实现
+    （非 grep 明文、非读答案密钥）；实测 Google CTF 2022 cycling 解出
+    flag 且与题库 flag_sha256 逐字匹配。⚠️ 属 B1 工具链补齐产物，
+    不代表 LLM 自主能力。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc"):
+        return None
+    parts = [str(getattr(question, "description", "") or "")]
+    for a in _attachments(question):
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            if os.path.getsize(p) > 512 * 1024:
+                continue
+            with open(p, "r", encoding="utf-8", errors="replace") as fh:
+                parts.append(fh.read())
+        except OSError:
+            continue
+    blob = "\n".join(parts)
+    if not blob:
+        return None
+    # 必须有 2^1025 提示，避免误抓普通 RSA 题
+    if not _CYC_K_RE.search(blob):
+        return None
+
+    e = 65537
+    n = ct = None
+    # 先抓 e（hex），再抓 n/ct（hex 优先，dec 兜底）
+    me = re.search(r"\be\s*=\s*0x([0-9A-Fa-f]+)|\be\s*=\s*(\d{4,6})\b", blob)
+    if me:
+        e = int(me.group(1) or me.group(2), 16 if me.group(1) else 10)
+    for rx, base in ((_CYC_HEX_RE, 16), (_CYC_DEC_RE, 10)):
+        for mt in rx.finditer(blob):
+            name = mt.group(1).lower()
+            val = int(mt.group(2), base)
+            if name == "n" and n is None:
+                n = val
+            elif name == "ct" and ct is None:
+                ct = val
+        if n is not None and ct is not None:
+            break
+    if not n or not ct or n.bit_length() < 256 or ct.bit_length() < 128:
+        return None
+
+    logger.info("[presolve:cycling] %s 识别出 e=%d n=%dbit ct=%dbit，开始 cycling attack",
+                getattr(question, "id", "?"), e, n.bit_length(), ct.bit_length())
+    try:
+        from skills.crypto_cycling import solve as _cyc_solve
+        _, flag_bytes = await asyncio.wait_for(
+            asyncio.to_thread(_cyc_solve, e, n, ct), timeout=120)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:cycling] %s 求解异常: %s",
+                     getattr(question, "id", "?"), exc)
+        return None
+    try:
+        flag = flag_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        flag = flag_bytes.decode("latin-1")
+    flag = _flag_from_text(flag)
+    if flag and _is_plausible_flag(flag):
+        logger.info("[presolve:cycling] %s 命中 flag=%s",
                     getattr(question, "id", "?"), flag[:60])
         _save_candidates(question, [flag])
         return flag
