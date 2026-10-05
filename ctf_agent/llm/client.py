@@ -55,47 +55,78 @@ _LLM_HTTP_SEMAPHORE = threading.BoundedSemaphore(8)
 _LAST_USAGE: dict = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
 
-# ── Provider 故障熔断（P0 热修复 2026-08-21 17:10 赛后落地）───────────
+# ── Provider/Model 故障熔断（P0 热修复 2026-08-21；2026-10-05 粒度细化到 model）──
 # 正式赛深坑：deepseek 402 余额耗尽 / qwen 403 免费额度耗尽 / 千帆 401 key 失效，
 # Agent 在坏 provider 上空转数小时 0 产出。此处对"永久性"故障（401/402/403）
-# 连续计数，达阈值即熔断该 provider，竞速池/主求解器后续不再调用它；
+# 连续计数，达阈值即熔断，竞速池/主求解器后续不再调用它；
 # 429 限流属暂时性，不触发熔断（只让路）。失败开放原则不变：熔断后返回 None。
+#
+# 🔴 2026-10-05 缺陷修复：原熔断键为 provider（`{provider: ...}`），导致
+#   「同一 provider 下的付费模型 402」把「同源免费模型」一起判死。
+#   实测 tokenhub：hy3 免费可用，但 attempt≥2 升级到付费 deepseek-v4-pro 得 402 ×3
+#   → 整个 tokenhub 被熔断 → 后续 321 次调用被跳过、整轮作废。
+#   现键改为 `provider::model`：故障只熔断「出事的那一个模型」，同 provider 其他模型不受影响。
+#   兼容：`provider_circuit_open(provider)` 保留为「该 provider 下任一模型已熔断」的宽口径，
+#   供 run.py 的「基础设施不可达」回填继续使用；**竞速池跳过候选必须用** `model_circuit_open`。
 _PROVIDER_CIRCUIT_FAIL_LIMIT = 3  # 连续 401/402/403 达 3 次即熔断
-_PROVIDER_CIRCUITS: dict[str, dict] = {}  # {provider: {"fails": int, "open": bool}}
+_CIRCUITS: dict[str, dict] = {}  # {"provider::model": {"fails": int, "open": bool}}
 _CIRCUIT_LOCK = threading.Lock()
+_CIRCUIT_SEP = "::"
 
 
-def _circuit_state(provider: str) -> dict:
+def _circuit_key(provider: str, model: str = "") -> str:
+    """熔断键：provider::model（model 为空时即 provider:: ，退化为 provider 粒度）。"""
+    return f"{provider}{_CIRCUIT_SEP}{model or ''}"
+
+
+def _circuit_state(key: str) -> dict:
     with _CIRCUIT_LOCK:
-        return dict(_PROVIDER_CIRCUITS.get(provider, {"fails": 0, "open": False}))
+        return dict(_CIRCUITS.get(key, {"fails": 0, "open": False}))
+
+
+def model_circuit_open(provider: str, model: str = "") -> bool:
+    """精确判定：该 (provider, model) 是否已熔断（401/402/403 连续失败达阈值）。
+
+    这是**竞速池剔除候选**应使用的判定——只跳过真正出事的模型，不牵连同 provider 其他模型。
+    """
+    return _circuit_state(_circuit_key(provider, model)).get("open", False)
 
 
 def provider_circuit_open(provider: str) -> bool:
-    """该 provider 是否已熔断（401/402/403 连续失败达阈值）。"""
-    return _circuit_state(provider).get("open", False)
+    """宽口径：该 provider 下**任一模型**是否已熔断。
+
+    保留给「基础设施不可达」回填（run.py）使用：一个 provider 上只要有模型永久故障，
+    本次运行的失败就可能源于基础设施。⚠️ 竞速池跳过候选**不要**用本函数，
+    否则会重现「付费模型拖死免费模型」的缺陷——那要用 `model_circuit_open`。
+    """
+    prefix = f"{provider}{_CIRCUIT_SEP}"
+    with _CIRCUIT_LOCK:
+        return any(k.startswith(prefix) and v.get("open")
+                   for k, v in _CIRCUITS.items())
 
 
-def _circuit_record_failure(provider: str, status_code: int) -> None:
-    """记录一次永久性失败（401/402/403）；达阈值打开熔断。"""
+def _circuit_record_failure(provider: str, model: str, status_code: int) -> None:
+    """记录一次永久性失败（401/402/403）；达阈值打开该 (provider, model) 的熔断。"""
     if status_code not in (401, 402, 403):
         return  # 429/4xx 其他/5xx 不熔断（暂时性或可恢复）
+    key = _circuit_key(provider, model)
     with _CIRCUIT_LOCK:
-        st = _PROVIDER_CIRCUITS.setdefault(
-            provider, {"fails": 0, "open": False})
+        st = _CIRCUITS.setdefault(key, {"fails": 0, "open": False})
         st["fails"] += 1
         if st["fails"] >= _PROVIDER_CIRCUIT_FAIL_LIMIT and not st["open"]:
             st["open"] = True
             logger.warning(
-                "🔴 provider=%s 连续 %d 次永久故障(401/402/403)，已熔断——"
-                "后续请求将直接跳过该源（剩余存活源自动接管）",
-                provider, st["fails"],
+                "🔴 provider=%s model=%s 连续 %d 次永久故障(401/402/403)，已熔断——"
+                "后续请求将直接跳过该模型（同 provider 其他模型与剩余存活源照常接管）",
+                provider, model or "(默认)", st["fails"],
             )
 
 
-def _circuit_record_success(provider: str) -> None:
-    """成功调用重置失败计数（半开恢复：后续成功即关闭熔断）。"""
+def _circuit_record_success(provider: str, model: str = "") -> None:
+    """成功调用重置该 (provider, model) 的失败计数（半开恢复：后续成功即关闭熔断）。"""
+    key = _circuit_key(provider, model)
     with _CIRCUIT_LOCK:
-        st = _PROVIDER_CIRCUITS.get(provider)
+        st = _CIRCUITS.get(key)
         if st:
             st["fails"] = 0
             st["open"] = False
@@ -104,14 +135,14 @@ def _circuit_record_success(provider: str) -> None:
 def reset_circuits() -> None:
     """清空全部熔断状态（赛前 preflight / 换 key 后调用）。"""
     with _CIRCUIT_LOCK:
-        _PROVIDER_CIRCUITS.clear()
-    logger.info("已清空全部 LLM provider 熔断状态")
+        _CIRCUITS.clear()
+    logger.info("已清空全部 LLM provider/model 熔断状态")
 
 
 def circuit_summary() -> dict:
-    """熔断状态快照（供状态检查/报告）。"""
+    """熔断状态快照（供状态检查/报告）。键为 `provider::model`（结构同旧版：dict of dict）。"""
     with _CIRCUIT_LOCK:
-        return {p: dict(v) for p, v in _PROVIDER_CIRCUITS.items()}
+        return {k: dict(v) for k, v in _CIRCUITS.items()}
 
 
 
@@ -290,7 +321,7 @@ def ai_chat(
             return None
         # P0 熔断检查（2026-08-21）：provider 已熔断则直接跳过（不空转烧时间）
         _prov = settings.get("provider", "")
-        if _prov and provider_circuit_open(_prov):
+        if _prov and model_circuit_open(_prov, settings.get("model", "")):
             logger.warning(
                 "provider=%s 已熔断（连续 401/402/403），本次调用直接跳过", _prov)
             return None
@@ -303,7 +334,7 @@ def ai_chat(
         if content is None:
             logger.warning("LLM 返回了空内容")
         else:
-            _circuit_record_success(_prov)
+            _circuit_record_success(_prov, settings.get("model", ""))
         return content
     except Exception as exc:  # noqa: BLE001 - 失败开放：任何异常都不外抛
         logger.warning("AI 调用失败（fail-open 返回 None）: %s", exc)
@@ -370,7 +401,7 @@ def ai_vision(
         logger.warning("ai_vision: 未配置 API Key，视觉能力不可用")
         return None
     _prov = settings.get("provider", "")
-    if _prov and provider_circuit_open(_prov):
+    if _prov and model_circuit_open(_prov, settings.get("model", "")):
         logger.warning("ai_vision: provider=%s 已熔断（连续 401/402/403），跳过", _prov)
         return None
     content, _ = _post_chat(
@@ -378,7 +409,7 @@ def ai_vision(
         temperature=temperature, max_tokens=max_tokens, settings=settings,
     )
     if content is not None:
-        _circuit_record_success(_prov)
+        _circuit_record_success(_prov, settings.get("model", ""))
     return content
 
 
@@ -408,7 +439,7 @@ def ai_chat_with_usage(
             )
             return None, dict(_ZERO)
         _prov = settings.get("provider", "")
-        if _prov and provider_circuit_open(_prov):
+        if _prov and model_circuit_open(_prov, settings.get("model", "")):
             logger.warning(
                 "provider=%s 已熔断（连续 401/402/403），本次调用直接跳过", _prov)
             return None, dict(_ZERO)
@@ -419,7 +450,7 @@ def ai_chat_with_usage(
             settings=settings,
         )
         if content is not None:
-            _circuit_record_success(_prov)
+            _circuit_record_success(_prov, settings.get("model", ""))
         return content, usage
     except Exception as exc:  # noqa: BLE001 - 失败开放：任何异常都不外抛
         logger.warning("AI 调用失败（fail-open 返回 None）: %s", exc)
@@ -805,7 +836,8 @@ def _post_chat(
                 len(messages), max_tokens, body,
             )
             # P0 熔断（2026-08-21）：401/402/403 为永久性故障，连续计数达阈值即熔断
-            _circuit_record_failure(settings.get("provider", ""), sc)
+            _circuit_record_failure(
+                settings.get("provider", ""), settings.get("model", ""), sc)
             return None, dict(_ZERO)
         except Exception as exc:  # noqa: BLE001 - 失败开放
             # 瞬时网络异常（read timeout / connect error）退避重试；其它直接失败开放

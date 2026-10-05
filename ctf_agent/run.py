@@ -559,10 +559,20 @@ def build_race_solver(use_mock: bool = False, is_correct=None,
             # P0 熔断过滤（2026-08-21 赛后落地）：solver 名形如 "moonshot:kimi-k2.6" /
             # "deepseek" / "qwen:qwen3.8-max"，首段即 provider。已熔断（401/402/403
             # 连续达阈值）的源直接剔除，避免坏源空转拖慢竞速、把墙钟烧在死路上。
-            from llm.client import provider_circuit_open
+            from llm.client import model_circuit_open, provider_circuit_open
+
+            def _solver_broken(_name: str) -> bool:
+                # 2026-10-05：按**模型粒度**判定熔断（solver 名形如 "provider:model"，
+                # 亦可能为裸 "provider"）。避免同 provider 下一个付费模型 402 把
+                # 免费模型一起剔除——这正是 tokenhub「hy3 可用却被整轮跳过」的根因。
+                if ":" in _name:
+                    _p, _m = _name.split(":", 1)
+                    return model_circuit_open(_p, _m)
+                return provider_circuit_open(_name)
+
             live_solvers = {
                 name: solver for name, solver in solvers.items()
-                if not provider_circuit_open(name.split(":")[0])
+                if not _solver_broken(name)
             }
             if not live_solvers:
                 logger.warning("[%s] 全部 LLM provider 已熔断——竞速无可用源", question.id)
