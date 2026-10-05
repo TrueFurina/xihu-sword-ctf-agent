@@ -207,6 +207,9 @@
 - **验证**：新增 `tests/test_strategy_signature_no_collapse.py`（9 例：签名语义 / 指纹稳定性 / observe 注入 / 端到端「不同脚本空输出不误杀」+ 对称哨兵「同脚本空输出仍止损」）；**变异验证双向通过**（去掉 plan_fp 分支 → 3 例红；observe 不注入 → 2 例红）；相关套件 **69 passed**（6m29s，含真实 Coppersmith/MHK2 计算）。
 - **预期收益**：直接解开「1 题活不过 5 步」的最上游卡点——这是「主链自主 0→≥1」的前置条件（**待下一轮授权跑批 A/B 配对验证**）。
 - **KPI 未变**（纯控制流修复，不动任何真值源数字）。
+- ⛔ **A/B 验证受阻——本次跑批作废（2026-10-05 16:21，`G_p2b2fix_20261005_162123`）**：真跑进行到中途 DeepSeek 返回 **HTTP 402 Insufficient Balance** → llm.client **熔断**。计数：成功 `200 OK` **12** 次 / `402` **3** 次 / 熔断跳过 **316** 次。⇒ 5 题仅第 1 题（idea）拿到少量真实调用（34,343 token），其余 4 题 token 均 = **1,806**（纯开销、**零真实 LLM 调用**）。报告的 `0/5` 与 `by_error=wrong_direction×3+extract_fail×2` 全是「LLM 返回空 → observation 空 → 签名判重」的人工产物，**不得引用**；已在该目录落 `_INVALID_余额耗尽.md` 标记。**架构修复的真实效果仍未验证**。
+- 🔴 **暴露评测框架缺口**：`integrity.interpretable=true` / `mechanism_terminated=0` **未识别 provider 熔断**——把「316 次调用被跳过」当成「已尝试未解出」。建议：provider 永久故障（401/402/403 熔断）应计入 `mechanism_terminated` / 令 `interpretable=false`，否则「余额耗尽」会被静默当成「能力不足」。（**待修复，未改**）
+- 🔴 **预算硬约束**：DeepSeek 账户余额已耗尽 → **在充值或换可用 provider 并获授权前，无法再进行任何真跑**。
 
 
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
