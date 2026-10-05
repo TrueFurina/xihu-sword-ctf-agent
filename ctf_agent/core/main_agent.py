@@ -75,6 +75,41 @@ class StepRecord:
     error_category: Optional[str] = None  # 错误分类（如有）
     tool_used: Optional[str] = None   # 使用的工具名（如有）
     duration_ms: int = 0
+    # 2026-10-05：计划指纹（observe_step 由 plan 稳定哈希得到）。仅用于「策略签名
+    # 去重」——当 observation 无有效载荷（空输出/仅 `[rc=0]` 前缀）时替代它参与判重，
+    # 修复「不同脚本空输出 → 三元组塌缩 → 误判死循环弃题」（见 _strategy_signature）。
+    plan_fp: str = ""
+
+
+_RC_ONLY_RE = re.compile(r"^\[rc=-?\d+\]\s*$")
+
+
+def _strategy_signature(step) -> tuple:
+    """步骤「策略签名」——E2 强制切换 与 死循环检测 **共用**（2026-10-05 精修）。
+
+    2026-10-03（P2 ⑤）已把签名从「仅 action 名」扩到三元组
+    `(action, observation[:200], tool_used)`，以放行「换算法/参数/输出」的正常探索。
+    但该三元组在 **script/command 步观察无有效载荷**时仍会塌缩为常量：
+
+      * `execute_script` 只把 **stdout** 作 observation；脚本报错（traceback 进 stderr）
+        或静默计算 → `output=""` → `observation=""`；且 script/command 步不设 `tool_used`
+        （恒为 ""）→ 三元组恒 `("script", "", "")`。
+
+    于是 **LLM 连续写不同算法的解密脚本（正常探索）** 被误判为「同策略死循环」：
+    E2 强切一次（dedup）→ 下一步签名仍塌缩 → 立即命中下方硬止损 `break` 弃题。
+    2026-10-05 B2 实证：5/5 题在步骤 3–5 即被此链路弃题（每 attempt 只活 ~5 步）。
+
+    修复：观察**无有效载荷**时，用 **plan 指纹**（`plan_fp`，plan 全字段稳定哈希）
+    参与判重 → 不同请求必得不同签名；**观察有载荷时行为与修复前完全一致**，
+    故不引入「换汤不换药」的逃避空间（真正同请求同输出仍被判重）。
+    """
+    action = str(getattr(step, "action", "") or "")
+    obs = str(getattr(step, "observation", "") or "")
+    tool = str(getattr(step, "tool_used", "") or "")
+    payload = _RC_ONLY_RE.sub("", obs).strip()
+    if payload:
+        return (action, obs[:200], tool, "")          # 有载荷：与修复前同构（不含指纹）
+    return (action, "<no-payload>", tool, str(getattr(step, "plan_fp", "") or ""))
 
 
 @dataclass
@@ -676,14 +711,7 @@ class MainAgent:
                 # tool_used)，与下方"同参数重复检测"对齐：observation 实质不同（换算法/
                 # 参数/输出）不算重复；真死循环（同动作+同输出前缀+同工具）仍被拦截。
                 if len(ctx.steps) >= 3:
-                    _sigs = [
-                        (
-                            getattr(s, "action", ""),
-                            (getattr(s, "observation", "") or "")[:200],
-                            getattr(s, "tool_used", None) or "",
-                        )
-                        for s in ctx.steps[-3:]
-                    ]
+                    _sigs = [_strategy_signature(s) for s in ctx.steps[-3:]]
                     _sig0 = _sigs[0]
                     # 同一签名只强切一次：重复触发会让 E2 屏蔽下方硬止损路径
                     # （同参数重复检测 → presolve 兜底 → 止损 break），实测导致烧穿预算。
@@ -711,11 +739,11 @@ class MainAgent:
                 _dup_thresh = 5 if _is_web else 3
                 if len(ctx.steps) >= _dup_thresh:
                     _window = ctx.steps[-_dup_thresh:]
-                    def _step_sig(s):
-                        return (str(getattr(s, "action", "")),
-                                str(getattr(s, "observation", ""))[:200],
-                                str(getattr(s, "tool_used", "")))
-                    if all(_step_sig(s) == _step_sig(_window[0]) for s in _window):
+                    # 2026-10-05 架构根因修复：判重维度与上方 E2 强切**同源**——
+                    # 统一用 _strategy_signature（观察无有效载荷时以 plan 指纹区分），
+                    # 修复「不同脚本空输出 → 三元组塌缩 → 误判死循环弃题」。
+                    if all(_strategy_signature(s) == _strategy_signature(_window[0])
+                           for s in _window):
                         # 2026-08-21 攻坚（解出数优先）+ P1-3 收敛（赛后）：死循环前
                         # 先强制确定性兜底——统一走 core.presolve（flag_scan → crypto_auto
                         # → math_engine → fast_solve）。若入口已嗅探过（同附件只嗅探一次），

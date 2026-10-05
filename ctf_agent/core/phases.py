@@ -321,10 +321,31 @@ def _truncate_preserve_tail(text: str, max_len: int) -> str:
     return text[:head_len] + f"\n...[截断{len(text)-max_len}字符]...\n" + text[-tail_len:]
 
 
+def _plan_fingerprint(plan: dict) -> str:
+    """计划指纹（12-hex）。
+
+    2026-10-05 架构根因修复：`execute_script` 只把 **stdout** 作 observation；脚本报错
+    （traceback 进 stderr）或静默计算 → `output=""` → `observation=""`，且 script/command
+    步不设 `tool_used`（恒 ""）→ 策略签名三元组塌缩为常量 `("script", "", "")`。
+    于是 LLM 连续写**不同算法**的解密脚本（正常探索）被误判「同策略死循环」→ 弃题
+    （B2 实证 5/5 题在步骤 3–5 即被此链路误杀）。
+
+    指纹对 plan **全字段**做稳定哈希（keys 排序、非字符串字段 str 化）→ 不同请求必得
+    不同指纹；供 `StepRecord.plan_fp` 在「观察无有效载荷」时替代 observation 参与判重。
+    """
+    try:
+        _blob = json.dumps(plan, sort_keys=True, ensure_ascii=False, default=str)
+    except Exception:  # noqa: BLE001 - 指纹计算失败不阻塞主循环
+        _blob = repr(plan)
+    import hashlib
+    return hashlib.sha256(_blob.encode("utf-8", "surrogatepass")).hexdigest()[:12]
+
+
 def observe_step(agent, ctx: AgentContext, plan: dict, act: dict) -> StepRecord:
     """解析执行结果，生成结构化步骤记录。原 MainAgent._observe。"""
     kind = act.get("kind", "reason")
     output = act.get("output", "") or ""
+    _pf = _plan_fingerprint(plan)   # 2026-10-05：计划指纹，供策略签名判重（见 _strategy_signature）
     if kind == "tool":
         # P0修复（2026-08-21）：工具失败时传递ERR_TOOL_FAILURE，让死循环/升级逻辑生效
         _err = ERR_TOOL_FAILURE if act.get("error") else None
@@ -334,6 +355,7 @@ def observe_step(agent, ctx: AgentContext, plan: dict, act: dict) -> StepRecord:
             observation=_truncate_preserve_tail(str(output), 6000),
             tool_used=act.get("tool"),
             error_category=_err,
+            plan_fp=_pf,
         )
     if kind == "script":
         _obs = _truncate_preserve_tail(str(output), 3000) if output else ""
@@ -344,6 +366,7 @@ def observe_step(agent, ctx: AgentContext, plan: dict, act: dict) -> StepRecord:
             action=_action,
             observation=_obs,
             error_category=ERR_TOOL_FAILURE if act.get("error") else None,
+            plan_fp=_pf,
         )
     if kind == "reason":
         if (agent.registry is not None or agent.sandbox is not None) and ctx.steps:
@@ -354,14 +377,16 @@ def observe_step(agent, ctx: AgentContext, plan: dict, act: dict) -> StepRecord:
                     action="reason",
                     observation=str(output)[:500],
                     error_category=ERR_STUCK_LOOP,
+                    plan_fp=_pf,
                 )
         return StepRecord(
             stage=plan.get("stage", STAGE_RECON),
             action="reason",
             observation=str(output)[:500],
             error_category=ERR_HALLUCINATION if not output else None,
+            plan_fp=_pf,
         )
-    return StepRecord(observation=str(output)[:500])
+    return StepRecord(observation=str(output)[:500], plan_fp=_pf)
 
 
 async def supervise_step(agent, ctx: AgentContext) -> SupervisionVerdict:
