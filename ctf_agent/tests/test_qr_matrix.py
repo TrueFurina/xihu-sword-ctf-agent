@@ -191,11 +191,18 @@ def test_presolve_handler_solves_real_question():
 
 
 def test_default_flag_pattern_blocks_nonflag_prefix():
-    r"""根因回归：只带 Question 默认 flag_pattern（flag\{[^}]+\}）时，
-    presolve 的诱饵守卫必须把 csawctf{...} 判为诱饵 → 返回 None。
+    r"""根因回归：题面**无真值**（flag_sha256=None）+ 只带 Question 默认
+    flag_pattern（flag\{[^}]+\}）时，presolve 的诱饵守卫必须把 csawctf{...}
+    判为诱饵 → 返回 None。
 
-    锁住 2026-10-01 端到端假红的因果链：本路解出的是非 `flag{` 前缀，
-    必须由题目自带足够宽的 flag_pattern 放行（守卫本身是设计行为，不改）。
+    锁住 2026-10-01 端到端假红的因果链：本路解出的是非 `flag{` 前缀，若题面
+    不带真值哈希，必须由守卫拦下（守卫本身是设计行为，不改）。
+
+    ⚠️ 2026-10-05 修订：本用例此前带 `flag_sha256=_REAL_SHA`，断言「守卫拦下」。
+    但 `76d0450` 引入「题面 sha256 命中即放行」的权威旁路（sha256 抗碰撞，命中即
+    真值）后，带**匹配真值哈希**的候选会被正解放行 —— 该断言遂与本意冲突（既有的
+    真 flag 反被格式闸丢弃正是 76d0450 要修的 bug）。故本用例改为**不带真值哈希**，
+    以纯粹隔离诱饵守卫；sha256 放行行为另由 `test_sha256_bypass_releases_real_flag` 锁定。
     """
     if not _REAL_ATT.exists():
         pytest.skip("NYU 题库未落地（gitignore）")
@@ -204,10 +211,29 @@ def test_default_flag_pattern_blocks_nonflag_prefix():
     from eval.cases import Question
 
     q = Question(id="t_qr_default_fp", title="t", category="forensics",
-                 description="qr", flag=None, flag_sha256=_REAL_SHA,
+                 description="qr", flag=None, flag_sha256=None,
                  attachments=[str(_REAL_ATT)])
     assert q.flag_pattern == _DECOY_DEFAULT_PATTERN      # 前提：默认值即诱饵守卫
     assert asyncio.run(ps.presolve(q, force=True)) is None
+
+
+def test_sha256_bypass_releases_real_flag():
+    r"""对称锁（对应 `76d0450`）：题面声明**匹配的真值哈希**时，即便默认
+    flag_pattern 不匹配（csawctf{...} vs flag\{[^}]+\}），presolve 也必须由
+    sha256 权威旁路放行 —— 防再次回退成「求解器解得对、真 flag 却被格式闸丢弃」。
+    """
+    if not _REAL_ATT.exists():
+        pytest.skip("NYU 题库未落地（gitignore）")
+    import asyncio
+    from core import presolve as ps
+    from eval.cases import Question
+
+    q = Question(id="t_qr_sha_bypass", title="t", category="forensics",
+                 description="qr", flag=None, flag_sha256=_REAL_SHA,
+                 attachments=[str(_REAL_ATT)])
+    got = asyncio.run(ps.presolve(q, force=True))
+    assert got is not None, "sha256 命中即真值，格式闸不得否决"
+    assert hashlib.sha256(got.encode()).hexdigest() == _REAL_SHA
 
 
 # ------------------------------------------------------------------ 变异
