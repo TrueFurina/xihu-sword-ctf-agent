@@ -255,6 +255,22 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
         _usage_box = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         _usage_box["question_id"] = question.id  # 步级硬停需要题号定位 budget.usage
         _usage_tok = _usage_cv.set(_usage_box)
+        _recorded = False
+
+        def _record_usage_once():
+            # 2026-10-06 修复（记账诚实化）：原实现把 token 记账放在 try/finally **之外**，
+            # 于是「被评测层墙钟取消（asyncio.wait_for → CancelledError）」或
+            # 「BudgetExceeded 早返回」这两条路径根本执行不到记账 → 报告恒记 0 token，
+            # 误导「钱/配额够不够、到底有没有真跑」的判断（glm 三题 180s/0token 即此因；
+            # 实测日志同题有多次 HTTP 200，token 却为 0）。改到 finally 内统一记账，
+            # once 守卫保证正常路径不重复记账。
+            nonlocal _recorded
+            if _recorded:
+                return
+            _recorded = True
+            est = _usage_box["total_tokens"] or (len(str(hint or "")) // 4 + 200)
+            budget.record(question.id, est)
+
         try:
             out = await agent.solve(question, attempt=attempt, hint=hint, correction=correction)
         except BudgetExceeded as _be:
@@ -273,10 +289,9 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
             }
         finally:
             _usage_cv.reset(_usage_tok)
-        # token 记账（P1-2 修复 2026-08-21）：优先用真实 usage 累计值，
-        # 回退到长度估算（仅当无真实 usage 记录时）——让预算熔断基于真实数据。
-        est = _usage_box["total_tokens"] or (len(str(hint or "")) // 4 + 200)
-        budget.record(question.id, est)
+            # token 记账（P1-2 修复 2026-08-21，2026-10-06 移入 finally）：
+            # 优先用真实 usage 累计值，回退到长度估算（仅当无真实 usage 记录时）。
+            _record_usage_once()
         return out
 
     async def solver(question, attempt, correction=None):
