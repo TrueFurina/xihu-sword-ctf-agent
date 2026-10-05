@@ -253,6 +253,18 @@
   - 两句框架缺口仍在（provider 熔断未计入 `mechanism_terminated` / 熔断粒度为 provider 而非 model）——本次 fix 臂 `mechanism_terminated=5` 说明 race/budget 已正确归类，但熔断类仍未识别（本次两臂均无熔断，故未复现）。
 - 证据：`data/results/heldout/G_p2b2fix_qwen_20261005_181603/` 与 `G_p2b2prefix_qwen_20261005_183233/`（gitignored）；日志 `data/results/_ab_{fix,prefix}_qwen_plus.log`；两次 qwen 污染跑批（`..._174809` 免费额度耗尽、`..._175830` 覆盖失效仍打 flash）已落 `_INVALID_*.md` 标记。
 
+### 三之三补四、provider 熔断根因回填修复（2026-10-05，¥0）
+
+- **🔴 缺口（前序两处框架缺口之①，已坐实但未改）**：`llm/client.py:293-296` 当 provider 熔断（连续 3 次 401/402/403，`_PROVIDER_CIRCUIT_FAIL_LIMIT=3`）打开时 `ai_chat` 直接返回 `None` → 主 Agent 退化成 `race_abandon` / `budget_exceeded` / `solver_exception` 等自身失败模式 → 报告 `summarize`（`benchmark.py:273-291`）把这类计入 `MECHANISM_TERMINATED` 且 `interpretable=True` → 被误读为「Agent 能力失败」。**真因是基础设施（账号/余额/key）不可达**。
+- **🔴 实证触发**：2026-10-05 DeepSeek 余额耗尽（402）与 qwen 坏 key（403）两次跑批均触发 provider 级熔断，4–5 题**零真实 LLM 调用**却被报告为 `mechanism_terminated=0` + `interpretable=True` + `by_error=wrong_direction×3+extract_fail×2`（空返回的人工产物），**把「基础设施不可达」粉饰成「已尝试未解出」**。
+- **最小诚实修复（¥0，失败开放）**：
+  - `core/error_taxonomy.py`：`TRUNCATED_ERROR_CATEGORIES` 新增 `provider_circuit_open`（→ 报告层 `interpretable=False`，不污染能力率）；新增常量 `PROVIDER_CIRCUIT_OPEN` 与 `relabel_circuit_breaker(error_category, circuit_open)`——仅当 `circuit_open=True` 且原桶 ∈ `{race_abandon, budget_exceeded, solver_exception}` 时回填为 `provider_circuit_open`；`None`（已解出）/ `provider_error` / `hallucination` 等原样返回；`circuit_open=False` 原样返回（不误伤）。`NON_RETRYABLE_CATEGORIES` 注释明确不含此类（**不改重试层短路语义**）。
+  - `run.py` `build_solver` 的 `solver(q, attempt, correction=None)` 内，`loop.run(...)` 之后、P0 真值仲裁之前插入回填块：读 `provider_circuit_open(provider)`，若真则把终态桶回填并改写 `detail=「provider=... 熔断(401/402/403)已打开，根因为基础设施不可达，非 Agent 能力失败；原终态=...」`。presolve 直出（`error=None`）不受影响。
+- **测试**：`tests/test_error_taxonomy_circuit.py`（10 例：7 直接 + 3 参数化）——`PROVIDER_CIRCUIT_OPEN in TRUNCATED_ERROR_CATEGORIES`；`relabel_degraded_bucket_when_open[race_abandon|budget_exceeded|solver_exception]`；`relabel_noop_when_closed[...]`；`relabel_solved_none_open`；`relabel_provider_error_open_unchanged`；`relabel_hallucination_open_unchanged`。**变异验证**：临时 `return error_category`（MUTANT）→ 3 例 `test_relabel_degraded_bucket_when_open` 红 → 还原。
+- **提交 SOP（门禁⑫ 拆两次）**：`1315087`（实现）+ `0fc3399`（测试）；六门禁全绿（密钥/诚实/租约 scope 4 元素/快速回归 152 passed/文档一致性/反注水/结构守卫/测试文件守卫）。全量 pytest **940 passed, 16 skipped**（含本段 10 例）。
+- **SSH 推送**：推送前 `ls-remote` 复核远端 `main=d76d82d`（非 stale）；`git push git@github.com:TrueFurina/xihu-sword-ctf-agent.git master:main` → `d76d82d..0fc3399` EXIT=0；推送后 `ls-remote` 复核远端=`0fc3399adfc9739a01ea1cb7dac349d084245585`；`update-ref refs/remotes/origin/main` 同步本地视图，`rev-list --left-right --count origin/main...HEAD = 0 0`。
+- **诚实口径**：本修复只改变「熔断致 0 解出」的**归因标签**（基础设施不可达，非能力失败），**不改变任何解出数 / KPI**（`offline_verified=14` / `real_corpus=93` / `heldout_candidates=2` / `skills=62`）。阻断了「把熔断粉饰成能力失败」的口径漏洞——与 10-04「诚实口径铁律」一致。
+
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
 - **缺口**：台账计 10733 为 ✅ offline_verified，但 `data/race_details/10733.json`、`race_attachments/10733_*`、`data/questions_real/` 条目**三者皆缺** → `_kpi_leak_crossaudit` 报 `missing_corpus=1`。
