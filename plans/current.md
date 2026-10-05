@@ -188,6 +188,16 @@
   - 🔴 **附件完整性重核（2026-10-05，与上文 ⑬ 旧判冲突，以此为准）**：`scripts/_attachment_integrity_audit.py` 实测外部池 **38/40 题附件已是真实文件**，仅 `electric-mayhem-pqc`（firmware.tgz 25B + stm32f0_kyber512.json.gz 27B 占位符）与 `ican-tbelieveit-snotcrypto`（chal.py 20B 占位符）2 道仍残缺——即此前「外部池 21/40 题附件是符号链接占位文本」**已被「跟随软链重抓」修复推翻**。⇒ 文档 §1 的「纯推理 8 题（单文件 chal.py）」与「离线可补算法 3 题（enigma/zip/lcg）」本机现有真实数据，B2 可测分母应据此重算，不得再沿用「12 道空输入」。
   - 🔧 **🔴 重大根因修复：presolve flag_pattern 闸误杀 B1 真解（2026-10-05，提交 `76d0450` 实现 + `9fa15aa` 测试，已推送）**：外部题池 **38/40 题** `flag_pattern` 沿用默认 `flag\{[^}]+\}`，而 google-ctf 真 flag 实为 `CTF{...}` → presolve **三处格式闸**（主入口 `presolve()` / `_try_flag_scan` / 黑板缓存）在 `_passes_answer_check` 之前把经 sha256 可证的真 flag 当诱饵丢弃，导致 cycling/cls/lcg **解得对却主链白干**。修复＝新增 `_matches_expected_sha256()`，题面声明 `flag_sha256` 且候选哈希相符时旁路格式闸（sha256 抗碰撞，命中即真值；无真值/不符则行为完全不变，fail-closed）。测试补「主入口端到端」用例（历史假绿根源：只调 `_try_*` 绕过主入口闸）；**变异验证双向通过**。**同源修复（提交 `dd644a1` 实现 / `6742c55` 测试，已推送）**：`core/phases.py` 主 agent 路径亦用 `flag_pattern` **定位**候选，新增 `_broad_sha256_flag()`——声明 pattern 未匹配且本题带 `flag_sha256` 时退回「宽 pattern 扫描 + sha256 仲裁」（严格加法，无真值/无命中即 None，行为不变），堵住 LLM 路径同类隐患。**KPI 未变**（外部池口径，不入台账）。
 
+### 三之三补、B2 能力测量试点（2026-10-05，≈¥0.46）—— **0/5**
+
+- **题集**：外部公开池**全新批次 21–25**（`idea`/`mceliece`/`otp`/`zkpok`/`filtermaze`，全 crypto；四轮已覆盖 1–20，本批**首次真跑**；均**非 presolve 可解** → 可视为 LLM 自主水位）。
+- **结果＝0/5**，`interpretable=True`（`attempted=5` / `zero_work=0` / `mechanism_terminated=5`，**零基础设施掐断**）；`by_error`: **race_abandon×2 + budget_exceeded×3**。
+- **token**：global **380,676**（idea 52,587 / mceliece 80,147 / otp 86,558 / zkpok 81,331 / filtermaze 80,053）；耗时 2m55s；**4/5 烧到 80K 单题硬顶** → 复现「**钱/预算非瓶颈，架构/能力才是**」。
+- **累计**：外部公开池自主真跑 **0/25**（四轮 0/20 + 本批 0/5）。
+- **证据**：`data/results/heldout/G_p2b2_20261005_151800/`（gitignored）；配置 `deepseek` + 冷黑板 + `E3=ON` + 预算反思 ON + 硬顶 `GLOBAL=400000`/`PER_Q=80000`。
+- 🔴 **踩坑**：父进程残留 `CTF_AGENT_LLM_BASE_URL`（DASCTF 网关）会被 `config.from_env` 采用，但 `print_effective_config_snapshot` 显示 provider 默认端点（**具欺骗性**）→ 真跑前必 `env.pop` 清除（已固化进启动器 `data/results/_b2pilot_launch.py`）。
+- **KPI 未变**（外部池口径，不入台账）。
+
 
 ### 三之四、10733 数据缺口处置 —— ✅ 已补齐（2026-10-03）
 
