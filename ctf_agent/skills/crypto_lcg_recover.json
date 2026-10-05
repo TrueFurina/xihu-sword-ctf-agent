@@ -1,0 +1,8 @@
+{
+  "name": "crypto_lcg_recover",
+  "purpose": "Google CTF 2023「least-common-genominator」题的确定性求解器：从 6 个连续 LCG 输出恢复线性同余发生器参数 (m,c,n)，重放序列重建 RSA 质数因子、分解模数并解密 flag。纯数论，离线纯 Python，无需靶机/靶场。",
+  "input_spec": "params = {'kind': 'dir', 'dir': <含 dump.txt/public.pem/flag.txt 的附件目录>, 'expected_sha': <可选 flag_sha256>} 或 {'kind': 'solve', 'dump_lines': [...], 'pem': <PEM 文本>, 'flag_bytes': <bytes>, 'expected_sha': <可选>}",
+  "output_spec": "crypto_lcg_recover(params) → {'ok': True, 'flag': 'CTF{...}', 'matched': <bool，对照 expected_sha>, 'info': {m,c,n,N,e,n_primes}}；失败返回 {'ok': False, 'error': ...}",
+  "categories": ["crypto", "lcg", "rsa", "linear-congruential"],
+  "version": "1.0"
+}

@@ -164,6 +164,7 @@ _WIRED_SKILL_MODULES = {
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
     "skills.crypto_cycling",                 # RSA cycling attack（2^1025-2 因子分解）
     "skills.crypto_electric_mayhem_cls",    # AES-128 CPA 侧信道（模拟功耗轨迹，离线可解）
+    "skills.crypto_lcg_recover",             # LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
 }
 
 
@@ -565,6 +566,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_cycling(question)),
         # 2026-10-05 B1 确定性静态求解：AES-128 CPA 侧信道（Electric Mayhem CLS）
         asyncio.ensure_future(_try_electric_mayhem_cls(question)),
+        # 2026-10-05 B1 确定性静态求解：LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
+        asyncio.ensure_future(_try_lcg_recover(question)),
     ]
     try:
         for _fut in asyncio.as_completed(_tasks):
@@ -2129,6 +2132,62 @@ async def _try_electric_mayhem_cls(question) -> Optional[str]:
     flag = res.get("flag")
     if flag and _is_plausible_flag(flag):
         logger.info("[presolve:emcls] %s 命中 flag=%s (matched_sha=%s)",
+                    qid, flag[:60], res.get("matched"))
+        _save_candidates(question, [flag])
+        return flag
+    return None
+
+
+async def _try_lcg_recover(question) -> Optional[str]:
+    """least-common-genominator（LCG 参数恢复 → RSA 私钥重建，2026-10-05 B1）。
+
+    触发面：附件目录里**同时**存在 `dump.txt`（LCG 输出）+ `public.pem` + `flag.txt`
+    三件套（该题型独有签名，极罕见，避免误抓普通 dump.txt）。交给
+    :func:`skills.crypto_lcg_recover.crypto_lcg_recover` 从 6 个连续 LCG 输出
+    恢复 (m,c,n)，重放序列重建 8 个 512-bit 质数 → 分解 N → 解密 flag。
+
+    命中由 skill 内部 `N == PEM.N` 自校验 + 下游 flag_pattern/flag_sha256 双重把关。
+
+    诚实口径：LCG 参数恢复是经典数论的确定性实现（非 grep 明文、非读答案密钥）；
+    实测 Google CTF 2023 least-common-genominator 解出 flag 且与题库 flag_sha256
+    逐字匹配。⚠️ 属 B1 工具链补齐产物，不代表 LLM 自主能力。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc"):
+        return None
+    # 定位「dump.txt + public.pem + flag.txt」同目录三件套
+    target_dir = None
+    for a in _attachments(question):
+        p = str(a)
+        if os.path.basename(p).lower() != "dump.txt":
+            continue
+        d = os.path.dirname(p)
+        if os.path.isfile(os.path.join(d, "public.pem")) and \
+           os.path.isfile(os.path.join(d, "flag.txt")):
+            target_dir = d
+            break
+    if not target_dir:
+        return None
+    qid = getattr(question, "id", "?")
+    expected = getattr(question, "flag_sha256", None)
+    logger.info("[presolve:lcg] %s 发现 LCG 三件套 %s，开始参数恢复", qid, target_dir)
+    try:
+        from skills.crypto_lcg_recover import crypto_lcg_recover as _lcg_solve
+        res = await asyncio.wait_for(
+            asyncio.to_thread(
+                _lcg_solve,
+                {"kind": "dir", "dir": target_dir, "expected_sha": expected},
+            ),
+            timeout=120,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:lcg] %s 求解异常: %s", qid, exc)
+        return None
+    if not res.get("ok"):
+        return None
+    flag = res.get("flag")
+    if flag and _is_plausible_flag(flag):
+        logger.info("[presolve:lcg] %s 命中 flag=%s (matched_sha=%s)",
                     qid, flag[:60], res.get("matched"))
         _save_candidates(question, [flag])
         return flag
