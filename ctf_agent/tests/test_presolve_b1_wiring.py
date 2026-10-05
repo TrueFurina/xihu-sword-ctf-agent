@@ -44,6 +44,7 @@ pytestmark = pytest.mark.skipif(
 
 MHK2_QID = "ext_gctf2023_mhk2"
 PRIMES_QID = "ext_gctf2023_primes"
+CYCLING_QID = "ext_gctf2022_cycling"
 
 
 def _big(rng, bits=136):
@@ -66,7 +67,8 @@ def _mk_mhk2_blob(n: int, nct: int = 10) -> str:
 def test_b1_skills_are_wired():
     wired = P.wired_skill_modules()
     for mod, fn in (("skills.crypto_knapsack_mhk", "_try_knapsack_mhk"),
-                    ("skills.crypto_primes_subset", "_try_crypto_primes")):
+                    ("skills.crypto_primes_subset", "_try_crypto_primes"),
+                    ("skills.crypto_cycling", "_try_cycling")):
         assert mod in wired, f"{mod} 未接线（只是库，不算能力）"
         assert callable(getattr(P, fn, None)), f"{fn} 未定义"
 
@@ -133,6 +135,18 @@ def test_presolve_primes_solves_real_problem():
     assert q is not None, f"题库里找不到 {PRIMES_QID}"
     truth = str(getattr(q, "flag_sha256", "") or "")
     flag = asyncio.run(P._try_crypto_primes(q))
+    assert flag, "presolve 接线路径未解出 flag"
+    assert hashlib.sha256(flag.encode()).hexdigest() == truth
+
+
+@pytest.mark.slow
+def test_presolve_cycling_solves_real_problem():
+    import asyncio
+
+    q = _load(CYCLING_QID)
+    assert q is not None, f"题库里找不到 {CYCLING_QID}"
+    truth = str(getattr(q, "flag_sha256", "") or "")
+    flag = asyncio.run(P._try_cycling(q))
     assert flag, "presolve 接线路径未解出 flag"
     assert hashlib.sha256(flag.encode()).hexdigest() == truth
 
