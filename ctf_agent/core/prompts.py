@@ -265,6 +265,13 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         # "Note, the flag is 'CTF{XXX}' ..."。用「power traces」会把 PQC（后量子格
         # 密码）错路由进 AES-CPA solver → wrong_direction。
         "where xxx is your recovered key": "crypto_electric_mayhem_cls",
+        # PRIMES（GCTF 2023 · Coppersmith 平滑因子法解素数背包）：题面
+        # "I have prepared a flag for you but unfortunately it has been mangled somehow"
+        # ——「mangled somehow」全题库仅命中本题。
+        # ⚠️ 该题附件 chal.sage 里那句 m = b"CTF{YkDOL...}" 是**别处粘贴的无关示例**
+        # （重算 x 与官方 x 不符，已证）；真值需真解，flag_sha256 登记口径为
+        # 只对 CTF{...} 部分取摘要。
+        "mangled somehow": "crypto_primes_subset",
         "费马": "rsa_fermat_factor", "fermat": "rsa_fermat_factor", "rsa": "rsa_fermat_factor",
         "zip": "zip_chain_decode", "压缩": "zip_chain_decode",
         "base64": "base64_multilayer", "base32": "base64_multilayer",
