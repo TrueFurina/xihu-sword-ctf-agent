@@ -1,0 +1,8 @@
+{
+  "name": "svg_path_text",
+  "purpose": "bzip2/Ascii85 包裹的 SVG path 文本 → 栅格化 → OCR 读出。适用题型：附件为 bzip2 压缩的 Ascii85 文本，解码得到一段 SVG path（M/L/Q/A/Z 指令、浮点坐标），渲染出来是一行文字（通常是 flag）。渲染为纯 Python（解析 path 指令 + 曲线/圆弧展平 + even-odd 异或填充），识别走系统 tesseract（可选依赖，缺失即返回 None）。实测 NYU CTF Bench 2023f-for-floating_points（CSAW-Finals 2023）：floating_points --bzip2--> Ascii85 --> SVG path --> 渲染读出 csawctf{did_you_try_w3schools_path_d=}（与题面 flag_sha256 逐字匹配）。",
+  "input_spec": "params = {'path': bzip2 文件路径 | 'raw': bytes | 'data': SVG path 字符串(最高优先，测试用) | 'ocr': bool(默认 True)}。容器必须为「bzip2(BZh magic) 或 Ascii85 文本」且解码后须为合法 SVG path（以 M/m 起、仅含指令+数字、至少一个 Z、≥12 点），否则返回 None。",
+  "output_spec": "识别出的文本 bytes（多描边粗细各渲染一次，优先返回含 '{}' 者）；容器/path 不合规、tesseract 缺失、或 OCR 无输出 → None（不谎报）。",
+  "categories": ["forensics", "misc", "crypto"],
+  "version": "1.0"
+}

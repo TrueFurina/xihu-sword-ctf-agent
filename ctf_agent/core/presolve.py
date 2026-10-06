@@ -159,6 +159,8 @@ _WIRED_SKILL_MODULES = {
     "skills.ssti_detect",                   # 靶机可达时 SSTI RCE 提取 flag
     # 2026-10-01 新增（确定性静态求解）
     "skills.misc_qr_matrix",                # 数字矩阵 → QR 码解码（纯 Python，版本 1-10）
+    # 2026-10-07 新增（确定性静态求解）：bzip2/Ascii85 包裹的 SVG path → 栅格化 → OCR
+    "skills.svg_path_text",
     # 2026-10-04 新增（B1 工具链补齐产物，确定性静态求解）
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
@@ -589,6 +591,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_reverse_route(question)),
         # 2026-10-01 确定性静态求解：数字矩阵 → QR 码
         asyncio.ensure_future(_try_qr_matrix(question)),
+        # 2026-10-07 确定性静态求解：bzip2/Ascii85 包裹的 SVG path → 栅格化 → OCR
+        asyncio.ensure_future(_try_svg_path_text(question)),
         # 2026-10-04 B1 确定性静态求解：子集积 mod q → Coppersmith 平滑因子
         asyncio.ensure_future(_try_crypto_primes(question)),
         asyncio.ensure_future(_try_knapsack_mhk(question)),
@@ -1806,6 +1810,69 @@ async def _try_qr_matrix(question) -> Optional[str]:
         flag = _flag_from_text(decoded)
         if flag and _is_plausible_flag(flag):
             logger.info("[presolve:qr_matrix] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
+    return None
+
+
+async def _try_svg_path_text(question) -> Optional[str]:
+    """bzip2/Ascii85 包裹的 SVG path → 栅格化 → OCR（2026-10-07 新增 · B 类静态求解）。
+
+    对「附件是 bzip2 压缩的 Ascii85 文本、解码后为 SVG path、渲染出来是一行
+    文字（flag）」的题型做确定性解出：容器解码（skills.svg_path_text）→ 纯
+    Python 栅格化（even-odd 异或填充，正确处理字腔）→ 系统 tesseract OCR。
+
+    诚实口径：本路不做明文嗅探——明文只存在于图形里；渲染为纯 Python 确定性
+    算法，OCR 仅为「读图」，命中仍由下游 flag_pattern + 答案校验（题面提供时）
+    把关，无把握一律不返回。实测 NYU CTF Bench 2023f-for-floating_points 解出
+    csawctf{did_you_try_w3schools_path_d=}，与题面 flag_sha256 逐字匹配。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc", "forensics"):
+        return None
+    attach = _attachments(question)
+    if not attach:
+        return None
+    try:
+        from skills.svg_path_text import decode_container, run as svg_run
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.svg_path_text", exc)
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p) or os.path.getsize(p) > 4 * 1024 * 1024:
+            continue
+        try:
+            with open(p, "rb") as fh:
+                raw = fh.read()
+        except OSError:
+            continue
+        # 廉价的容器预检：非 bzip2 时必须能直接解出合法 SVG path 才继续
+        # （OCR 昂贵，绝不对无关附件盲目开火）
+        if raw[:3] != b"BZh":
+            try:
+                if decode_container(raw) is None:
+                    continue
+            except Exception:  # noqa: BLE001
+                continue
+        try:
+            res = await asyncio.to_thread(svg_run, {"raw": raw})
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:svg_path_text] %s 异常: %s", p, exc)
+            continue
+        if not res:
+            continue
+        decoded = ""
+        for enc in ("utf-8", "latin-1"):
+            try:
+                decoded = res.decode(enc)
+                break
+            except Exception:  # noqa: BLE001
+                continue
+        flag = _flag_from_text(decoded)
+        if flag and _is_plausible_flag(flag):
+            logger.info("[presolve:svg_path_text] %s 命中 flag=%s",
                         getattr(question, "id", "?"), flag[:60])
             _save_candidates(question, [flag])
             return flag
