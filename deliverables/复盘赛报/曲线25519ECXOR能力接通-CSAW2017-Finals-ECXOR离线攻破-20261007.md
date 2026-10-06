@@ -96,13 +96,13 @@ sha256(flag) = 0e063f15a4c24ca6e9d9277225fdf5f8ff7b9ea61d66e0a111eae4919d6a489f
 
 ## 3. 改动
 
-**实现** `core/presolve.py`（+~230）：
+**实现** `core/presolve.py`（+266，含 dispatch 注册）：
 - 新增 `_try_ecxor(question)`，两道门控——① 曲线指纹（附件含 `point_add`+`point_mul`，或题面点名 `curve25519/x25519/25519`）；
   ② 结构指纹（`;` 分隔、每段 base64 解出恰 32 字节）。
 - 内联**自足** Curve25519（RFC8032）算术（`_padd/_pmul/_compress/_decompress`），**不 import 附件代码**；
 - 差分得相对偏移 → 256 基值英文似然定基 → 重建明文 → `_FLAG_RE` 搜 flag，
   有 `flag_sha256` 时逐字校验；命中写事实黑板缓存。
-- 接入 `_tasks` 并发嗅探（第 31 路）。
+- 接入 `_tasks` 并发嗅探组。
 
 **测试** `tests/test_ecxor_presolve.py`：合成正例 1（自造密文，端到端复现）+ 负例 3
 （无曲线指纹 / 随机点无 flag / sha 不符）+ 真题 e2e 1。
