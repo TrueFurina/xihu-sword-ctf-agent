@@ -457,6 +457,40 @@ def ai_chat_with_usage(
         return None, dict(_ZERO)
 
 
+# ── 代码动作兜底（2026-10-06 P1 能力刀）─────────────────────────────
+# 弱模型（glm-4-flash 等）常无视 JSON 动作协议，直接吐 python/bash 代码块
+# 解题（A5 实测：5 题 0/5 里 7 次 JSON 畸形中 3 次是直接吐 ```python``` 脚本）。
+# 此处提取首个代码围栏，包装为 {"action": "script"} 动作，让"写脚本实算"的
+# 尝试真正被沙盒执行（经 AST 校验），而非被当作不可解析丢弃 → 主链空转超时。
+_CODE_FENCE_RE = re.compile(
+    r"```[ \t]*([a-zA-Z0-9_+-]*)[ \t]*\r?\n?(.*?)```", re.DOTALL
+)
+_PY_FENCE_LANGS = {"python", "py", "python3"}
+
+
+def _recover_script_from_code(content: str) -> Optional[dict]:
+    """JSON 解析失败时，从文本提取代码块并当作 script 动作恢复（fail-open 返回 None）。
+
+    - ```python``` / ```py``` / ```python3``` → 加 `python: ` 前缀（沙盒按 Python 执行）
+    - ```bash``` / ```sh``` / ```shell``` → 原样（沙盒按 shell 执行）
+    - 无语言标签 / 其他 → 原样（沙盒 `_looks_like_python` 自动识别）
+
+    提取首个非空代码围栏；无围栏或代码为空 → None（保持原有 fail-open 语义）。
+    """
+    if not isinstance(content, str):
+        return None
+    for _m in _CODE_FENCE_RE.finditer(content):
+        lang = (_m.group(1) or "").strip().lower()
+        code = (_m.group(2) or "").strip()
+        if not code:
+            continue
+        if lang in _PY_FENCE_LANGS:
+            code = "python: " + code
+        return {"action": "script", "code": code, "stage": "exploit",
+                "done": False, "_recovered_from_code": True}
+    return None
+
+
 def ai_chat_json_with_usage(
     messages: list[dict],
     system: Optional[str] = None,
@@ -464,8 +498,15 @@ def ai_chat_json_with_usage(
     max_tokens: int = 2000,
     model: Optional[str] = None,
     provider: Optional[str] = None,
+    recover_script: bool = False,
 ) -> tuple[Optional[dict], dict]:
-    """同 ai_chat_json，额外返回本次调用的真实 token usage（P1-1 记账修正）。"""
+    """同 ai_chat_json，额外返回本次调用的真实 token usage（P1-1 记账修正）。
+
+    recover_script=True（代码动作兜底）：JSON 解析失败但原文含代码围栏时，
+    恢复为 {"action": "script"} 动作——弱模型无视 JSON 协议直接吐代码时，
+    让"写脚本实算"的尝试真正被执行。默认 False，不影响 supervisor/feedback
+    等要求严格 JSON 的调用方。
+    """
     _ZERO = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
     content, usage = ai_chat_with_usage(
         messages, system=system, temperature=temperature, max_tokens=max_tokens,
@@ -480,6 +521,11 @@ def ai_chat_json_with_usage(
         return None, usage
     if obj is None:
         logger.warning("LLM 返回内容无法解析为 JSON 对象")
+        if recover_script:
+            recovered = _recover_script_from_code(content)
+            if recovered is not None:
+                logger.info("代码动作兜底：JSON 失败但含代码围栏，恢复为 script 动作")
+                return recovered, usage
     return obj, usage
 
 
@@ -528,11 +574,13 @@ async def ai_chat_json_async_with_usage(
     max_tokens: int = 2000,
     model: Optional[str] = None,
     provider: Optional[str] = None,
+    recover_script: bool = False,
 ) -> tuple[Optional[dict], dict]:
     """异步版 ai_chat_json_with_usage（真实 token 记账 + 不阻塞事件循环）。"""
     return await _asyncio.to_thread(
         ai_chat_json_with_usage, messages, system=system, temperature=temperature,
         max_tokens=max_tokens, model=model, provider=provider,
+        recover_script=recover_script,
     )
 
 
@@ -569,14 +617,9 @@ def ai_chat_json(
         # 2026-09-01 P1 诊断+恢复：记录原文前 200 字（此前盲点），plan 步尝试从代码围栏恢复 script
         logger.warning("LLM 返回内容无法解析为 JSON 对象（原文前200字）: %s", str(content)[:200])
         if recover_script:
-            import re as _re
-            _cb = _re.search(r"```(?:python|py)?\s*(.*?)\s*```", str(content), _re.DOTALL)
-            if _cb:
-                _code = _cb.group(1).strip()
-                if _code:
-                    _code = _code if _code.startswith("python:") else "python: " + _code
-                    return {"action": "script", "code": _code,
-                            "stage": "exploit", "done": False, "_recovered_from_code": True}
+            recovered = _recover_script_from_code(content)
+            if recovered is not None:
+                return recovered
     return obj
 
 

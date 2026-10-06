@@ -12,15 +12,34 @@ main_agent 原实现一致（提取不重构）。
 from typing import Optional
 
 
+async def _invoke_client(llm_client, system: str, user: str, attempt: int,
+                         recover_script: bool) -> object:
+    """调用注入的 llm_client，兼容只接受 (system, user, attempt) 的旧签名。
+
+    生产路径（run.py build_solver）的 llm_client 已支持 recover_script 形参；
+    测试用的 mock client 多为三参签名——签名不含该形参时退回三参调用，
+    避免传参 TypeError 破坏既有注入方。
+    """
+    import inspect
+
+    try:
+        if "recover_script" in inspect.signature(llm_client).parameters:
+            return await llm_client(system, user, attempt, recover_script=recover_script)
+    except (TypeError, ValueError):  # 无签名（C 扩展/内置）→ 退回三参
+        pass
+    return await llm_client(system, user, attempt)
+
+
 async def llm_json(system: str, user: str, attempt: int, llm_client=None, recover_script: bool = False) -> Optional[dict]:
     """LLM JSON 调用：优先注入 client（dict 直返/str 解析 JSON），否则默认 ai_chat_json。
 
-    recover_script=True 时（仅 plan 步使用）：JSON 解析失败但原文含 python 代码围栏，
-    则当作 script 动作恢复，让 LLM 的"写脚本实算"尝试真正执行，而非被当作不可解析
-    丢弃导致空转/放弃。supervisor/feedback 等要求严格 JSON 的调用方保持默认 False。
+    recover_script=True 时（plan 步 = 动作决策步使用）：JSON 解析失败但原文含代码
+    围栏，则当作 script 动作恢复（代码动作兜底），让 LLM 的"写脚本实算"尝试真正
+    执行，而非被当作不可解析丢弃导致空转/放弃。supervisor/feedback 等要求严格
+    JSON 的调用方保持默认 False。
     """
     if llm_client is not None:
-        out = await llm_client(system, user, attempt)
+        out = await _invoke_client(llm_client, system, user, attempt, recover_script)
         if isinstance(out, dict):
             return out
         if isinstance(out, str):  # 客户端返回文本：尝试解析 JSON
@@ -39,19 +58,12 @@ async def llm_json(system: str, user: str, attempt: int, llm_client=None, recove
             try:
                 return _json.loads(_raw)
             except Exception:  # noqa: BLE001
-                # 2026-09-01 P1：plan 步 JSON 解析失败时，若原文含 python 代码围栏，
-                # 当作 script 动作恢复——让 LLM 的"写脚本实算"尝试真正执行（而非被
-                # 当作不可解析丢弃导致空转/放弃）。仅 recover_script=True 时生效，
-                # 不影响 supervisor/feedback 等要求严格 JSON 的调用方。
+                # 2026-09-01 P1：plan 步 JSON 解析失败时，若原文含代码围栏，
+                # 当作 script 动作恢复（代码动作兜底）。仅 recover_script=True 时
+                # 生效，不影响 supervisor/feedback 等要求严格 JSON 的调用方。
                 if recover_script:
-                    _cb = _re.search(r"```(?:python|py)?\s*(.*?)\s*```", out, _re.DOTALL)
-                    if _cb:
-                        _code = _cb.group(1).strip()
-                        if _code:
-                            _code = _code if _code.startswith("python:") else "python: " + _code
-                            return {"action": "script", "code": _code,
-                                    "stage": "exploit", "done": False,
-                                    "_recovered_from_code": True}
+                    from llm.client import _recover_script_from_code
+                    return _recover_script_from_code(out)
                 return None
         return None
     import os as _os

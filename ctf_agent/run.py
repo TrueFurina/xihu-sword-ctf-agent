@@ -182,13 +182,13 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
 
     _usage_cv: ContextVar = ContextVar("solve_usage", default=None)
 
-    async def llm_client(system, user, attempt):
+    async def llm_client(system, user, attempt, recover_script=False):
         from llm.client import ai_chat_json_async_with_usage
 
         model = model_override or get_model_for_attempt(attempt, provider)
         data, usage = await ai_chat_json_async_with_usage(
             [{"role": "user", "content": user}], system=system,
-            model=model, provider=provider,
+            model=model, provider=provider, recover_script=recover_script,
         )
         box = _usage_cv.get()
         if box is not None:
