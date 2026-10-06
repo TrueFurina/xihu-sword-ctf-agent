@@ -258,6 +258,13 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         #   禁用「LCG」——CSAW m_ster_0f_prn9 也是 LCG 题，会被错带。
         "dumped the first six": "crypto_lcg_recover",
         "common genominator": "crypto_lcg_recover",
+        # FilterRandom（西湖2021 噪声混合双LFSR）：「两个 64 位 LFSR」全库仅本题。
+        "两个 64 位 lfsr": "lfsr_filter_recover",
+        # Electric Mayhem CLS（侧信道功耗 CPA + AES-128）：**必须用能区分同系列 -pqc 的
+        # 短语**——cls 与 pqc 的 description 前两句完全相同，只有 cls 多一句
+        # "Note, the flag is 'CTF{XXX}' ..."。用「power traces」会把 PQC（后量子格
+        # 密码）错路由进 AES-CPA solver → wrong_direction。
+        "where xxx is your recovered key": "crypto_electric_mayhem_cls",
         "费马": "rsa_fermat_factor", "fermat": "rsa_fermat_factor", "rsa": "rsa_fermat_factor",
         "zip": "zip_chain_decode", "压缩": "zip_chain_decode",
         "base64": "base64_multilayer", "base32": "base64_multilayer",
