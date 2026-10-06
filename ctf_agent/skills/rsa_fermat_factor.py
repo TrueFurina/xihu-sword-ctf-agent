@@ -72,9 +72,11 @@ def run(params):
     ns, cs = _collect_pairs(params)
     es = [int(params.get("e", 0))] * len(cs) if not params.get("e1") else None
 
-    # 自动检测攻击类型（按优先级：d已知 > phi已知 > 多模数 > 共模 > 小指数 > Wiener > 费马）
+    # 自动检测攻击类型（按优先级：已知p/q > d已知 > phi已知 > 多模数 > 共模 > 小指数 > Wiener > 费马）
     if not attack:
-        if params.get("d") and n and c:
+        if (params.get("p") or params.get("q")) and n and c:
+            attack = "p_known"
+        elif params.get("d") and n and c:
             attack = "d_known"
         elif params.get("phi") and e and c:
             attack = "phi_known"
@@ -93,7 +95,9 @@ def run(params):
                 attack = "fermat"
 
     # 尝试各种攻击
-    if attack == "d_known":
+    if attack == "p_known":
+        result = _p_known_attack(n, e, c, int(params.get("p") or params.get("q")))
+    elif attack == "d_known":
         result = _d_known_attack(int(params["d"]), c, n)
     elif attack == "phi_known":
         result = _phi_known_attack(
@@ -393,11 +397,153 @@ def _fermat_factor(n: int, e: int, c: int) -> int:
     return None
 
 
+def _p_known_attack(n, e, c, p):
+    """已知单个素因子 p（或 q）→ 求另一素因子 → 求 phi → 解密。
+
+    覆盖 CTF 高频「hint 泄露 p」变体（如 DASCTF 高偶指数 RSA：hint=(e·p+e²)^q mod n
+    可反推分解 n 得 p/q）。当 e 与 phi 不互素（高偶指数 e=2^k）时转 _decrypt_with_phi
+    走降幂+Rabin 还原，而非简单 invert(e,phi)（后者因 gcd≠1 抛异常吞掉返回 None）。
+    """
+    if not (n and p and e and c):
+        return None
+    try:
+        n, e, c, p = int(n), int(e), int(c), int(p)
+    except (TypeError, ValueError):
+        return None
+    if n % p != 0:
+        return None
+    q = n // p
+    if q <= 1 or p <= 1:
+        return None
+    phi = (p - 1) * (q - 1)
+    return _decrypt_with_phi(n, e, c, phi)
+
+
+def _decrypt_with_phi(n, e, c, phi):
+    """已知 n/e/c/phi 解密。
+
+    e 与 phi 互素 → 标准 invert 解密；否则要求 e 是 2 的幂（高偶指数 e=2^k，CTF 高频），
+    走「模 p / 模 q 分别降幂到平方 + 一轮 Rabin 开平方 + CRT 合并候选」还原。
+    """
+    if not (n and e and c and phi):
+        return None
+    try:
+        e, c, phi, n = int(e), int(c), int(phi), int(n)
+    except (TypeError, ValueError):
+        return None
+    g = int(gmpy2.gcd(e, phi))
+    if g == 1:
+        try:
+            d = int(gmpy2.invert(e, phi))
+            return int(gmpy2.powmod(c, d, n))
+        except Exception:
+            return None
+    # 高偶指数：仅覆盖 e=2^k（含奇因子时不在本 skill 范围，交上层/其他攻击）
+    if e & (e - 1) != 0:
+        return None
+    k = e.bit_length() - 1  # e = 2^k
+    # 由 phi 恢复 p,q：p+q = n-phi+1，判别式开方
+    s = n - phi + 1
+    D = s * s - 4 * n
+    if D < 0:
+        return None
+    r = int(gmpy2.isqrt(D))
+    if r * r != D:
+        return None
+    p = (s + r) // 2
+    q = (s - r) // 2
+    if p * q != n or p <= 1 or q <= 1:
+        return None
+    xp = _solve_even_power(c % p, k, p)
+    xq = _solve_even_power(c % q, k, q)
+    if xp is None or xq is None:
+        return None
+    inv_qp = int(gmpy2.invert(q, p))
+    inv_pq = int(gmpy2.invert(p, q))
+    # 返回 int（与 run() 统一契约：由 run() 统一 long_to_bytes）；
+    # 可打印筛选在此内部完成，仅用于从 2×2=4 个 Rabin 候选中挑出真实明文。
+    for a in xp:
+        for b in xq:
+            m = (a * q * inv_qp + b * p * inv_pq) % n
+            try:
+                bs = long_to_bytes(int(m))
+            except Exception:
+                continue
+            if bs and all(32 <= ch < 127 for ch in bs):
+                return int(m)
+    return None
+
+
+def _solve_even_power(c, k, p):
+    """解 x^(2^k) ≡ c (mod p)，p 奇素数。返回 x 候选列表（±），或 None。
+
+    当 p≡3 mod 4（Blum 整数常见，hint 泄露 p 的 RSA 变体）用简化平方根；
+    其他奇素数退化为 Tonelli-Shanks（仅支持 k=1 纯 Rabin；k>1 且 p%4!=3 超常见范围返回 None）。
+    """
+    if k == 0:
+        return [c % p]
+    if p <= 2:
+        return None
+    if p % 4 == 3:
+        # p-1 = 2·t（t 奇）。x^(2^k)=c ⟹ x² ≡ c^d (mod p)，d = 2^(k-1) 在 mod t 的逆
+        t = (p - 1) // 2
+        try:
+            d = int(gmpy2.invert(pow(2, k - 1, t), t))
+        except Exception:
+            return None
+        sq = int(gmpy2.powmod(c % p, d, p))
+        r = int(gmpy2.powmod(sq, (p + 1) // 4, p))
+        if (r * r) % p != sq % p:
+            return None
+        return [r, (p - r) % p]
+    if k == 1:
+        r = _tonelli_shanks(c % p, p)
+        if r is None:
+            return None
+        return [r, (p - r) % p]
+    return None
+
+
+def _tonelli_shanks(n, p):
+    """Tonelli-Shanks：求 x² ≡ n (mod p) 的一个根（p 奇素数，n 为二次剩余）。"""
+    n %= p
+    if int(gmpy2.powmod(n, (p - 1) // 2, p)) != 1:
+        return None
+    if p % 4 == 3:
+        return int(gmpy2.powmod(n, (p + 1) // 4, p))
+    q = p - 1
+    s = 0
+    while q % 2 == 0:
+        q //= 2
+        s += 1
+    z = 2
+    while int(gmpy2.powmod(z, (p - 1) // 2, p)) == 1:
+        z += 1
+    m = s
+    c = int(gmpy2.powmod(z, q, p))
+    t = int(gmpy2.powmod(n, q, p))
+    r = int(gmpy2.powmod(n, (q + 1) // 2, p))
+    while t != 0 and t != 1:
+        i = 0
+        tp = t
+        while tp != 1 and i < m:
+            tp = int(gmpy2.powmod(tp, 2, p))
+            i += 1
+        if i == m:
+            return None
+        b = int(gmpy2.powmod(c, 1 << (m - i - 1), p))
+        r = (r * b) % p
+        c = int(gmpy2.powmod(b, 2, p))
+        t = (t * c) % p
+        m = i
+    return r
+
+
 def suggest_steps(description=None, attachments=None):
     """给出解题步骤建议。"""
     return [
         "提取 RSA 参数 n/e/c/phi/d（从附件或题目描述；题目给出 phi 或 d 时直接解密）",
-        "判断攻击类型：已知d→直接解密；已知phi→直接解密；多组(n,c)→先试共享素数gcd再试Hastad广播；同n两组(e,c)→共模；e小→小指数（跨模爆破k）；d小→Wiener；p≈q→费马",
+        "判断攻击类型：已知d→直接解密；已知phi→直接解密；已知 p 或 q（hint 泄露 p）→ 直接分解求另一素因子与 phi，e 为 2 的幂（高偶指数）时走降幂+模平方根还原（Rabin 式），无需 invert(e,phi)；多组(n,c)→先试共享素数gcd再试Hastad广播；同n两组(e,c)→共模；e小→小指数（跨模爆破k）；d小→Wiener；p≈q→费马",
         "执行对应攻击脚本恢复明文 m",
         "long_to_bytes(m) 转 flag",
         "脚本执行失败/输出为空时：检查参数是否从附件正确提取（文件可能有多行数据），修正参数后重试，不要原样重跑",
