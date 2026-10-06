@@ -95,6 +95,32 @@ def run(params):
                 attack = "fermat"
 
     # 尝试各种攻击
+    # 2026-10-06 加异常兜底：任一攻击分支抛异常时**优雅返回 None**而非冒泡。
+    # 实测原缺陷：ezRSA（真·L2 层）走 path/text 输入时 _collect_pairs 只从 dict 取
+    # n1/c1…，文本里的数字对没被解析 → len(ns)<2 → 误落默认费马分支 →
+    # `_fermat_factor` 内 `pow(c, d, n)` 遇 n=0 抛
+    # `ValueError: pow() 3rd argument cannot be 0` 整个 skill 崩掉。
+    # 诚实兜底：解不出就返回 None（不谎报），不抛异常打断 agent 主链。
+    try:
+        result = _dispatch_attack(attack, params, n, e, c, ns, cs, es)
+    except Exception:  # noqa: BLE001 - 任一攻击异常即放弃本次求解，返 None
+        result = None
+
+    if result is not None:
+        try:
+            return long_to_bytes(result)
+        except Exception:
+            return None
+    return None
+
+
+def _dispatch_attack(attack, params, n, e, c, ns, cs, es=None):
+    """按attack 名分派到具体攻击实现（2026-10-06 自 run() 抽出以便加兜底）。
+
+    `es`（各模数对应 e）保留为可选参数：当前各攻击实现统一用单一 e，
+    未来若支持每组不同 e 时从这里接入。
+    """
+    del es  # 目前未使用，显式声明避免误用
     if attack == "p_known":
         result = _p_known_attack(n, e, c, int(params.get("p") or params.get("q")))
     elif attack == "d_known":
@@ -132,12 +158,10 @@ def run(params):
         # 默认费马分解
         result = _fermat_factor(n, e, c)
 
-    if result is not None:
-        try:
-            return long_to_bytes(result)
-        except Exception:
-            return None
-    return None
+    # 只返回 int/None，**不**在此处转 bytes —— 转换统一由 run() 负责。
+    # （2026-10-06 修：此函数原先自己 long_to_bytes 一次，run() 又转一次 →
+    #   long_to_bytes(bytes) 抛异常 → 被兜底吞成 None，费马分解能力静默失效。）
+    return result
 
 
 def _phi_known_attack(phi: int, e: int, c: int, n: int = 0) -> int:
