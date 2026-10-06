@@ -958,39 +958,85 @@ def _repair_json(text: str) -> str:
     return text
 
 
+def _balanced_brace_end(text: str, start: int) -> int:
+    """从 text[start]（须为 '{'）起做花括号平衡匹配，返回匹配 '}' 的索引。
+
+    正确处理字符串字面量内的花括号与转义字符；用于从 prose 中夹带的
+    JSON 片段里精确切出完整对象（避免 `find`/`rfind` 跨多个对象或
+    字符串内花括号错位）。无匹配返回 -1。
+    """
+    if start < 0 or text[start] != "{":
+        return -1
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if esc:
+            esc = False
+            continue
+        if ch == "\\":
+            esc = True
+            continue
+        if ch == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return i
+    return -1
+
+
 def _extract_json_object(content: str) -> Optional[dict]:
-    """从 LLM 文本中提取 JSON 对象：剥离代码围栏，必要时截取首尾花括号。"""
+    """从 LLM 文本中提取 JSON 对象（鲁棒版，fail-open 返回 None）。
+
+    依次尝试：① 整段直解析 ② 剥离 markdown 代码围栏（围栏可在文本任意
+    位置、带任意语言标签、前后有 prose 解释）③ 花括号平衡扫描（对每个
+    '{' 找匹配 '}'，正确处理嵌套对象与字符串内的花括号），每段候选再经
+    `_repair_json` 兜底修复一次。
+
+    目标：让弱模型（如 glm-4-flash）吐出的「prose + 围栏/废话包裹的
+    JSON」也能被解析为合法动作，避免主链在动作解析层空转超时。
+    """
     if not isinstance(content, str):
         return None
 
-    text = content.strip()
-    if text.startswith("```"):  # 剥离 markdown 代码围栏
-        lines = [line for line in text.splitlines() if not line.strip().startswith("```")]
-        text = "\n".join(lines).strip()
+    candidates: list[str] = []
 
-    try:
-        parsed = json.loads(text)
-        return parsed if isinstance(parsed, dict) else None
-    except json.JSONDecodeError:
-        pass
+    # ① 整段直解析
+    candidates.append(content.strip())
 
-    start = text.find("{")
-    end = text.rfind("}")
-    if start != -1 and end > start:
-        candidate = text[start : end + 1]
+    # ② markdown 代码围栏（任意位置、任意语言标签、前后可能有 prose）
+    for _m in re.finditer(r"```[a-zA-Z]*\s*\n?(.*?)\n?```", content, re.DOTALL | re.IGNORECASE):
+        candidates.append(_m.group(1).strip())
+
+    # ③ 花括号平衡扫描：对每个 '{' 找匹配 '}'，收集候选（跳过过短片段）
+    for start in (i for i, ch in enumerate(content) if ch == "{"):
+        end = _balanced_brace_end(content, start)
+        if end != -1 and end - start > 1:
+            candidates.append(content[start : end + 1])
+
+    # 逐候选尝试：先直解析，失败再经 _repair_json 修复一次
+    for cand in candidates:
+        cand = cand.strip()
+        if not cand:
+            continue
         try:
-            parsed = json.loads(candidate)
-            return parsed if isinstance(parsed, dict) else None
+            parsed = json.loads(cand)
         except json.JSONDecodeError:
-            pass
-        # 修复 pass（P0 顺手 2026-08-21）：尾逗号/单引号 key/残缺尾部 →
-        # 轻量 repair 后再试一次；失败仍返回 None（保持原有 fail-open）。
-        repaired = _repair_json(candidate)
-        if repaired != candidate:
+            repaired = _repair_json(cand)
+            if repaired == cand:
+                continue
             try:
                 parsed = json.loads(repaired)
-                return parsed if isinstance(parsed, dict) else None
             except json.JSONDecodeError:
-                pass
+                continue
+        if isinstance(parsed, dict):
+            return parsed
 
     return None
