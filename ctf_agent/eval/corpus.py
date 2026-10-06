@@ -32,6 +32,10 @@ __all__ = [
     "fitness_score",
     "load_corpus",
     "corpus_report",
+    "partition_measurable",
+    "skip_reason",
+    "apply_corpus_gate",
+    "applicable_corpus_summary",
 ]
 
 # 全仓题库目录（择优去重时的默认扫描范围）
@@ -118,6 +122,66 @@ def fitness_score(q: Any) -> tuple:
     """
     h = attachment_health(q)
     return (h.existing, int(has_truth(q)))
+
+
+def skip_reason(q: Any) -> Optional[str]:
+    """返回该题应从跑批中剔除的原因，可跑则返回 None。
+
+    两类缺陷都属**数据缺失**，不是能力缺失：
+      - ``"no_input"``：登记了附件但磁盘上一个都不存在（input-less）。
+        跑必然空转烧满预算再失败，直接跳过可省下真跑批 token。
+      - ``"no_truth"``：无 flag_sha256 也无 flag 明文，解出也无法校验，
+        计入分母只会制造不可复核的分数。
+    """
+    if not has_input(q):
+        return "no_input"
+    if not has_truth(q):
+        return "no_truth"
+    return None
+
+
+def partition_measurable(questions: Iterable[Any]) -> tuple:
+    """把题目分成「可跑」与「应剔除」两组（纯函数，便于单测）。
+
+    Returns:
+        (keep, skipped)：keep 为可跑题列表；
+        skipped 为 [(question, reason)]，reason 见 skip_reason()。
+    """
+    keep, skipped = [], []
+    for q in questions or []:
+        reason = skip_reason(q)
+        if reason:
+            skipped.append((q, reason))
+        else:
+            keep.append(q)
+    return keep, skipped
+
+
+def apply_corpus_gate(questions: Iterable[Any],
+                      include_unmeasurable: bool = False) -> tuple:
+    """评测入库闸门：按可测性过滤题目（纯函数，CLI 与测试共用）。
+
+    Args:
+        questions: 原始题目列表。
+        include_unmeasurable: True 则原样返回（对照测量用）。
+
+    Returns:
+        (keep, unmeasurable, raw_n)：
+        keep=参与跑批的题；unmeasurable=[(q, reason)]；raw_n=原始题数。
+    """
+    raw = list(questions or [])
+    keep, unmeasurable = partition_measurable(raw)
+    if include_unmeasurable:
+        return raw, unmeasurable, len(raw)
+    return keep, unmeasurable, len(raw)
+
+
+def applicable_corpus_summary(unmeasurable: Sequence[tuple]) -> dict:
+    """把 [(q, reason)] 汇总成 {reason: count}（供日志/报告打印）。"""
+    out: dict = {}
+    for _q, reason in unmeasurable or []:
+        out[reason] = out.get(reason, 0) + 1
+    return out
 
 
 def load_corpus(roots: Optional[Sequence[str]] = None,

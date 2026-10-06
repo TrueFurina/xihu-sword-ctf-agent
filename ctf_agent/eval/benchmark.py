@@ -9,6 +9,21 @@
 用法：
     python -m eval.benchmark --questions-dir data/questions --mock     # Mock 链路（仅回归统计框架连通性）
     python -m eval.benchmark --questions-dir data/questions            # 真实链路（主 Agent 全链路）
+    python -m eval.benchmark --corpus                                  # 跨全部题库择优去重（推荐）
+    python -m eval.benchmark --include-unmeasurable                    # 恢复旧行为：不剔除不可测题
+
+**题库口径闸门（2026-10-07）**：
+默认会剔除「不可测」题再跑批——
+  - ``no_input``：登记了附件但磁盘上一个都不存在（input-less）。这类题跑必然
+    空转烧满预算再 0 分，是**数据缺失而非能力缺失**，还会白白吃掉跑批 token。
+  - ``no_truth``：无 flag_sha256 也无 flag 明文，解出也无法校验，计入分母只会
+    制造不可复核的分数。
+剔除数量与原因会在日志中以 WARNING 打印；需对照测量时用 ``--include-unmeasurable``
+恢复旧行为。判定口径统一在 ``eval/corpus.py``（单一真相源）。
+
+参考数据：``data/questions`` 50 题里 27 题 input-less；``--corpus`` 跨库去重后
+210 道 unique 题中 186 道可计入分母。详见
+``logs/corpus_measurability_layer_20261007.md``。
 
 **口径声明（2026-08-22 锐评整改）**：
 - 真实模式（非 --mock）solver 已接入 run.build_solver(use_mock=False)——
@@ -355,6 +370,15 @@ def _run_benchmark_safely(args, questions, solver, use_mock: bool, race_controll
 def main() -> None:
     parser = argparse.ArgumentParser(description="CTF-Agent 题库评测（解出率优先）")
     parser.add_argument("--questions-dir", default="data/questions")
+    # 2026-10-07 题库口径（数据见 logs/corpus_measurability_layer_20261007.md）：
+    #   data/questions 50 题里 27 题附件已失效（指向已删的 data/attachments/ 或
+    #   外部机器路径），属 **input-less**——跑必然空转烧满预算再 0 分。
+    #   这不是能力缺失，却污染分母且白烧 token（用户预算上限 ¥2），故默认跳过。
+    parser.add_argument("--corpus", action="store_true",
+                        help="跨全部 data/questions* 目录加载并按附件可用度择优去重"
+                             "（eval.corpus.load_corpus），替代单目录 --questions-dir")
+    parser.add_argument("--include-unmeasurable", action="store_true",
+                        help="不跳过 input-less / 无真值题（恢复旧行为，用于对照测量）")
     parser.add_argument("--results-dir", default="data/results")
     parser.add_argument("--mock", action="store_true", help="使用 Mock 求解器（数字禁止引用，仅回归）")
     parser.add_argument("--provider", default="deepseek",
@@ -381,10 +405,36 @@ def main() -> None:
 
     from eval.cases import load_questions, preset_answers
 
-    questions = load_questions(args.questions_dir)
+    # ── 题库加载（2026-10-07 口径收口）──────────────────────────────
+    # 单目录模式用 load_questions；--corpus 用跨库择优去重。
+    _load_plan = "cross-corpus(load_corpus)" if args.corpus \
+        else "single-dir(%s)" % args.questions_dir
+    if args.corpus:
+        from eval.corpus import load_corpus
+        questions = [e.question for e in load_corpus()]
+    else:
+        questions = load_questions(args.questions_dir)
     if not questions:
-        logger.warning("题库为空，请先往 %s 放入题目 JSON", args.questions_dir)
+        logger.warning("题库为空：%s", _load_plan)
         return
+
+    # 可测性分层：input-less / 无真值题默认跳过（省 token + 分母诚实）。
+    # 纯函数闸门（可单测）：tests/test_benchmark_corpus_gate.py
+    from eval.corpus import applicable_corpus_summary, apply_corpus_gate
+    questions, _unmeasurable, _raw_n = apply_corpus_gate(
+        questions, include_unmeasurable=args.include_unmeasurable)
+    if _unmeasurable and args.include_unmeasurable:
+        logger.warning("已按 --include-unmeasurable 恢复全部 %d 题（含 %d 道不可测题）",
+                       _raw_n, len(_unmeasurable))
+    elif _unmeasurable:
+        logger.warning(
+            "题库口径：剔除 %d/%d 道不可测题 %s —— 这些题缺输入或真值，"
+            "跑必然 0 分且不计入解题率（免烧预算）。明细见 eval.corpus.skip_reason；"
+            "需保留用 --include-unmeasurable",
+            len(_unmeasurable), _raw_n,
+            applicable_corpus_summary(_unmeasurable))
+    logger.info("题库加载方式=%s 有效分母=%d", _load_plan, len(questions))
+
     if args.limit and args.limit > 0:
         questions = questions[: args.limit]
 
@@ -467,7 +517,18 @@ def main() -> None:
         # 还原干净的 solved_by 归因与可复现的 robust/union 口径。
         # 注意：retries 内的同题 presolve 跳过（dedup）仍保留——那是单题维度
         # 的正确语义，与跨 provider 的对象复用是两回事。
-        _questions = load_questions(args.questions_dir)
+        # 与上方主加载保持一致：同样走可测性分层，否则 per-provider 重加载会
+        # 把已剔除的 input-less 题放回来（前后分母不一致 + 白烧预算）。
+        if args.corpus:
+            from eval.corpus import load_corpus
+            _questions = [e.question for e in load_corpus()]
+        else:
+            _questions = load_questions(args.questions_dir)
+        if not args.include_unmeasurable:
+            _questions, _skipped_here, _ = apply_corpus_gate(_questions)
+            if _skipped_here:
+                logger.info("per-provider 重加载：同样剔除 %d 道不可测题",
+                            len(_skipped_here))
         if args.limit and args.limit > 0:
             _questions = _questions[: args.limit]
         _solver = build_solver(use_mock=False, provider=prov, validate_locally=True,
