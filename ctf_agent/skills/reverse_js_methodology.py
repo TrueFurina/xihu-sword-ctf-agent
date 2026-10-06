@@ -49,9 +49,30 @@ def _locate_suspicious(code: str) -> list:
     return hits
 
 
+def _find_node():
+    """在 PATH 中查找 node（纯 Python，替代原 os.popen('where node')）。
+
+    2026-10-06 为通过 AST 沙箱改写：os.popen 属禁止调用（可执行任意命令）。
+    本函数原**只用于探测 node 是否存在**（后续并未真正 exec，见下方注释），
+    用纯 Python 遍历 PATH 完全等价且无高危。Windows 下需试 .exe/.cmd 等后缀。
+    """
+    exts = ("", ".exe", ".cmd", ".bat") if os.name == "nt" else ("",)
+    for d in (os.environ.get("PATH") or "").split(os.pathsep):
+        if not d:
+            continue
+        for ext in exts:
+            cand = os.path.join(d, "node" + ext)
+            try:
+                if os.path.isfile(cand) and os.access(cand, os.X_OK):
+                    return cand
+            except OSError:
+                continue
+    return None
+
+
 def _try_node_exec(path: str, code: str) -> dict:
     """尝试 node 动态执行（无 node 时降级提示）。"""
-    node = os.popen("where node 2>nul").read().strip() if os.name == "nt" else None
+    node = _find_node()
     if not node:
         return {"executed": False, "reason": "node 未安装——降级为静态分析（无则加勉）"}
     # 谨慎：不执行未知脚本，仅报告 node 可用
