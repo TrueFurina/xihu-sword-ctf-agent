@@ -26,7 +26,12 @@ from __future__ import annotations
 # 也不含 None（解出）。混入它们会让告警天天响、沦为噪音。
 TRUNCATED_ERROR_CATEGORIES = frozenset({
     "budget_exceeded",      # 预算耗尽（token/步数）——2026-09-22 held-out 17 池的主因
-    "wallclock_timeout",    # 墙钟先到，确定性工具链没机会跑完
+    "wallclock_timeout",    # Agent **内部**墙钟止损（题跑过了、用满设计窗口仍没解出）
+                            #   ——2026-10-06 拆分后：由 eval/benchmark 的
+                            #   MECHANISM_TERMINATED_CATEGORIES 从「真·掐断」中排除；
+                            #   保留于此仅为与 budget_exceeded 同构（报告语义由那侧决定）。
+    "wallclock_killed",     # 评测器**外部** wait_for 掐断（Agent 未跑完即被杀，真·infra 故障）
+                            #   ——2026-10-06 从 wallclock_timeout 拆出，**不属**机制终结。
     "race_abandon",         # 预算反思早停
     "solver_exception",     # solver 抛异常
     "not_attempted",        # 显式未尝试
@@ -48,7 +53,8 @@ TRUNCATED_ERROR_CATEGORIES = frozenset({
 # （→ interpretable=False，不污染能力率）。
 NON_RETRYABLE_CATEGORIES = frozenset({
     "budget_exceeded",      # 预算已烧穿，再跑还是 budget_exceeded
-    "wallclock_timeout",    # 墙钟已耗尽，确定性工具链都没机会跑完
+    "wallclock_timeout",    # Agent 内部墙钟已耗尽，重跑同样超限
+    "wallclock_killed",     # 外部评测墙钟掐断：评测墙钟不变 → 重跑无益（2026-10-06 拆分补入）
     "race_abandon",         # 已主动早停（含 budget_reflection ABANDON）
     "solver_exception",     # solver 已抛异常
     "not_attempted",        # 显式未尝试

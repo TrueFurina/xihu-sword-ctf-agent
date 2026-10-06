@@ -45,11 +45,26 @@ from core.error_taxonomy import (  # noqa: E402
 # 2026-09-29 诚实化修复：机制终结 ≠ 被外部掐断。
 # race_abandon / budget_exceeded 是「题跑过了，因预算/反思早停而终态失败」——
 # 属正常判负，不是「基础设施未执行 / 被外部掐断」。把它们与真正的外部故障
-# （wallclock_timeout / solver_exception / 限流 / 无凭证 …）分开，否则所有
+# （solver_exception / 限流 / 无凭证 …）分开，否则所有
 # held-out 报告都被误标 interpretable:false（M2 实测 8 题全真跑过仍被误标）。
-# 注意：NON_RETRYABLE_CATEGORIES 仍必须含这两类以短路重试——此处只改报告语义，
+#
+# 🔴 2026-10-06 wallclock 内外拆分（消除「过度作废」）：原 wallclock_timeout 被
+#   三处产生点共用同一名字，报告层无法区分来路，导致 Agent **用满公平窗口**的真实
+#   测量被当成「被外部掐断」一并作废。现按来源拆成两类：
+#     · wallclock_timeout ← **Agent 内部**墙钟硬止损（main_agent._wallclock_hit /
+#       run.py 竞速墙钟），= 题跑过了、用满设计窗口仍没解出 → **正常判负**，归入本集合；
+#     · wallclock_killed  ← **评测器外部** wait_for 掐断（见 _solve_question），
+#       = Agent 未跑完即被杀（真·infra 故障）→ 留在 TRUNCATED_ERROR_CATEGORIES，
+#       如实标 interpretable:false。
+#   实证依据（A5 held-out 报告）：duration≈180.0s=外部掐断、≈155-160s=内部止损，
+#   此前同名混算使两者全部被作废。
+# 注意：NON_RETRYABLE_CATEGORIES 仍必须含全部三类以短路重试——此处只改报告语义，
 # 不动重试口径（改动最小原则，详见 core/error_taxonomy.py docstring）。
-MECHANISM_TERMINATED_CATEGORIES = frozenset({"race_abandon", "budget_exceeded"})
+MECHANISM_TERMINATED_CATEGORIES = frozenset({
+    "race_abandon",
+    "budget_exceeded",
+    "wallclock_timeout",
+})
 
 
 class BenchmarkResult:
@@ -122,8 +137,13 @@ def run_benchmark(
                     try:
                         output = await asyncio.wait_for(_out, timeout=per_question_wallclock_s)
                     except asyncio.TimeoutError:
-                        output = {"error": {"category": "wallclock_timeout",
-                                            "detail": f"超过 {per_question_wallclock_s:.0f}s 硬墙钟"}}
+                        # 2026-10-06：评测器**外部**掐断，与 Agent 内部墙钟止损区分。
+                        # 内部止损（wallclock_timeout）走 MECHANISM_TERMINATED_CATEGORIES
+                        # → 视为正常判负、保留可解释性；外部掐断（wallclock_killed）
+                        # = Agent 未跑完即被杀（真 infra 故障）→ 留在 TRUNCATED，
+                        # 如实标 interpretable:false。
+                        output = {"error": {"category": "wallclock_killed",
+                                            "detail": f"超过 {per_question_wallclock_s:.0f}s 硬墙钟（评测器外部掐断）"}}
                         break  # 超时不再重试
                 else:
                     output = _out

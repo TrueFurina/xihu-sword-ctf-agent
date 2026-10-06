@@ -108,7 +108,8 @@ class GoalLogEntry:
 
 # 4 类失败映射（2026-08-22 赛后重锐评 M1.3）：error.category → 失败大类
 FAILURE_CLASS4 = {
-    "wallclock_timeout": "超时",
+    "wallclock_timeout": "超时",       # Agent 内部墙钟止损（自己跑满窗口没解出）
+    "wallclock_killed": "other",       # 评测器外部掐断（infra，非 Agent 失败）
     "tool_failure": "工具调用错",
     "wrong_direction": "决策错",
     "stuck_loop": "决策错",
