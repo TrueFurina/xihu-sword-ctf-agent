@@ -243,6 +243,9 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         # 键序纪律：必须排在下方裸 "rsa" 之前，否则被 RSA catch-all 抢走（同 specialcurve2 陷阱）。
         "逐位加密": "crypto_legendre_phi",
         "模逆": "crypto_modinv_factor",
+        # lowe（CSAW 2018·e=3 无填充 + Y+N 完全立方）：perfect cube 为题面独有短语，
+        # 全题库仅命中本题（零误伤）。禁用「无填充/1536-bit」等泛化表述。
+        "perfect cube": "crypto_pkcs1_padding_oracle",
         "费马": "rsa_fermat_factor", "fermat": "rsa_fermat_factor", "rsa": "rsa_fermat_factor",
         "zip": "zip_chain_decode", "压缩": "zip_chain_decode",
         "base64": "base64_multilayer", "base32": "base64_multilayer",
