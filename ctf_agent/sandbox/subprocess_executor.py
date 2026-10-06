@@ -147,6 +147,11 @@ class SubprocessExecutor(Executor):
     - idle 检测：距上次执行超过 idle_timeout 秒仍无新命令 → 判空闲
     """
 
+    # Windows CreateProcess 命令行长度上限 ~32767 字符：超长 Python 源码无法经
+    # `-c` 传递（实测 33000 字符即抛 FileNotFoundError，crypto 兜底脚本静默失效）。
+    # 超过本阈值时把源码落临时文件执行，语义等价（仍过同一解释器 + AST 校验）。
+    _CMD_LINE_SRC_LIMIT = 24000
+
     def __init__(
         self,
         default_timeout: int = 30,
@@ -189,6 +194,21 @@ class SubprocessExecutor(Executor):
         self._cmd_history.pop(task_id, None)
         self._last_active.pop(task_id, None)
 
+    def _build_python_argv(self, python_src: str):
+        """构造执行 argv；超长源码落临时文件（规避命令行长度上限）。
+
+        Returns:
+            (argv, tmp_path)。tmp_path 非 None 时调用方须在执行后删除。
+        """
+        if len(python_src) <= self._CMD_LINE_SRC_LIMIT:
+            return [sys.executable, "-c", python_src], None
+        import tempfile
+
+        fd, path = tempfile.mkstemp(prefix="ctf_sbx_", suffix=".py")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(python_src)
+        return [sys.executable, path], path
+
     async def run(self, code: str, timeout: int | None = None,
                   task_id: str = "") -> ExecResult:
         """执行代码。
@@ -225,6 +245,7 @@ class SubprocessExecutor(Executor):
         else:
             python_src = None
 
+        _tmp_path: Optional[str] = None
         if python_src is not None:
             # AST 前置校验：危险导入/危险调用直接拒绝（防 AI 生成恶意代码）
             try:
@@ -232,7 +253,8 @@ class SubprocessExecutor(Executor):
             except _SecurityError as exc:
                 logger.warning("沙盒安全校验拦截: %s", exc)
                 return ExecResult(stderr=f"[安全拦截] {exc}", exit_code=-2)
-            argv = [sys.executable, "-c", python_src]
+            # 超长源码落临时文件执行（规避 Windows 命令行长度上限）
+            argv, _tmp_path = self._build_python_argv(python_src)
             stdin_data = None
         else:
             # 支持 shell 命令（含 heredoc 风格脚本）
@@ -289,6 +311,13 @@ class SubprocessExecutor(Executor):
         except Exception as exc:  # noqa: BLE001 - 执行异常兜底
             logger.warning("子进程执行异常: %s", exc)
             return ExecResult(stderr=f"执行异常: {exc}", exit_code=-1)
+        finally:
+            # 超长源码临时文件清理（成功/超时/取消/异常各路径均须删）
+            if _tmp_path:
+                try:
+                    os.remove(_tmp_path)
+                except OSError:
+                    pass
 
     @staticmethod
     def _kill(proc) -> None:

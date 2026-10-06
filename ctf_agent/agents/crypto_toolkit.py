@@ -697,6 +697,106 @@ if _m_pem:
                 elif _sv.isprintable():
                     print("[rsa_small_e_wrap_xor_text] %s" % _sv.decode("utf-8", "ignore"))
 
+# ── 2.8) 编码块（hex/base64）→ 单字节 / 重复密钥 XOR 爆破 ──
+# 布局特征（只看字节结构）：附件为长 hex 或 base64 串，其「解码后的原始字节」仍需
+#   再经 XOR 才可读。两类已确证的公开题型（与题目描述解耦）：
+#   - 单字节 XOR/NOT（babycrypto：base64 → 逐字节取反 0xFF）
+#   - 明文内嵌密钥型重复密钥 XOR（another_xor：plaintext = flag + key + md5(flag+key)，
+#     故存在窗口使 XOR(blob[off:off+L])==0 → 定位 key 长；再由 "flag{" 前缀与密钥
+#     自引用关系传播恢复全 key，末尾 32B hex 作 md5 仲裁）
+# 只在结果含 flag 模式时打印（防幻觉）。
+import base64, binascii
+_FLAGRE = r"(?i)(?:flag|ctf|dasctf)\{[^}\s]{3,120}\}"
+def _scan_flag(_b):
+    _m = re.search(_FLAGRE, _b.decode("latin-1", "ignore"))
+    return _m.group(0) if _m else None
+
+def _xor_bruteforce(_blob):
+    import base64 as _b64m, binascii as _b2am, hashlib as _hmod
+    _n = len(_blob)
+    if _n < 4:
+        return
+    _seen = set()
+
+    def _emit(_lab, _fl):
+        if _fl and _fl not in _seen:
+            _seen.add(_fl)
+            print("[%s] %s" % (_lab, _fl))
+
+    # a) 单字节 XOR（含 0xFF = 逐位取反）
+    for _k in range(256):
+        _emit("xor_single k=0x%02x" % _k, _scan_flag(bytes(_x ^ _k for _x in _blob)))
+    # b) 内嵌密钥型重复密钥 XOR（小体量专有：窗口 XOR==0 定位 key 长）
+    if _n <= 512:
+        for _L in range(2, _n - 5):
+            _off = _n - _L - 32
+            if _off < 5:
+                continue
+            _acc = 0
+            for _x in _blob[_off:_off + _L]:
+                _acc ^= _x
+            if _acc != 0:
+                continue
+            _key = [None] * _L
+            for _i in range(5):
+                _key[_i] = _blob[_i] ^ b"flag{"[_i]
+            for _ in range(_L * 4):
+                _done = True
+                for _i in range(_L):
+                    if _key[_i] is None:
+                        _done = False
+                        continue
+                    _j = (_off + _i) % _L
+                    if _key[_j] is None:
+                        _key[_j] = _blob[_off + _i] ^ _key[_i]
+                if _done:
+                    break
+            if any(_kk is None for _kk in _key):
+                continue
+            _kb = bytes(_key)
+            _pt = bytes(_blob[_i] ^ _kb[_i % _L] for _i in range(_off))
+            _hit = _scan_flag(_pt)
+            if _n - _off - _L == 32:
+                _tail = bytes(_blob[_off + _L + _i] ^ _kb[(_off + _L + _i) % _L]
+                              for _i in range(32))
+                try:
+                    if _hmod.md5(_pt + _kb).hexdigest().encode() == _tail:
+                        _hit = _hit or _scan_flag(_pt)
+                except Exception:
+                    pass
+            if _hit:
+                _emit("xor_repeat_embed L=%d" % _L, _hit)
+    # c) 通用重复密钥 XOR（短密钥、逐列英文打分）
+    if _n <= 512:
+        def _eng(_b):
+            return (sum(1 for _c in _b if _c in b" etaoinshrdluETAOINSHRDLU")
+                    + sum(1 for _c in _b if 32 <= _c < 127))
+        for _L in range(2, min(17, _n)):
+            _kb = bytes(
+                max(range(256),
+                    key=lambda _k, _col=_blob[_p::_L]: _eng(bytes(_x ^ _k for _x in _col)))
+                for _p in range(_L))
+            _pt = bytes(_x ^ _kb[_i % _L] for _i, _x in enumerate(_blob))
+            _emit("xor_repeat L=%d key=%r" % (_L, _kb), _scan_flag(_pt))
+
+for _tk in list(dict.fromkeys(re.findall(r"[A-Za-z0-9+/]{20,}={0,2}", text)))[:16]:
+    if len(_tk) > 6000:
+        continue
+    _blobs2 = []
+    if re.fullmatch(r"[0-9a-fA-F]+", _tk) and len(_tk) % 2 == 0:
+        try:
+            _blobs2.append(binascii.unhexlify(_tk))
+        except Exception:
+            pass
+    if re.fullmatch(r"[A-Za-z0-9+/=]+", _tk):
+        try:
+            _blobs2.append(base64.b64decode(_tk + "=" * (-len(_tk) % 4)))
+        except Exception:
+            pass
+    for _blob in _blobs2:
+        if _blob and 4 <= len(_blob) <= 4096:
+            _xor_bruteforce(_blob)
+
 # ── 3) 纯字母密文（兼容「密文: xxx」前缀行）→ 凯撒 / 维吉尼亚 ──
 cipher_lines = []
 for line in text.splitlines():
