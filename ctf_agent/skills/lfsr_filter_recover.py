@@ -103,6 +103,87 @@ def solve_lfsr_filter(mask1, mask2, out):
     return None
 
 
+# ── SkillManager 统一入口（2026-10-06 补）────────────────────────────
+# 此前本文件只有 solve_lfsr_filter()，缺 run() → SkillManager.load() 直接判
+# 「缺少 run() 函数」加载失败（tools/skill_manager.py:288-291），导致本 skill
+# 长期是 skill_map 孤儿、路由到 None。以下补标准薄包装，**不改核心算法**。
+#
+# 诚实口径：本包装不新增解题能力，只把已实证的 solve_lfsr_filter 暴露给
+# SkillManager。真实数据 data/questions_real/_attachments/crypto/
+# real_crypto_filterrandom/FilterRandom.py 的 ''' 块含 mask1/mask2/2048 位输出。
+import os as _os
+
+
+def _extract_masks_and_out(text: str):
+    """从 FilterRandom.py 源码的 ''' 数据块提取 (mask1, mask2, out)。
+
+    数据块形如：mask1 十进制 / mask2 十进制 / 2048 位 01 串。
+    """
+    block = None
+    for q in ("'''", '"""'):
+        if q in text:
+            parts = text.split(q)
+            if len(parts) >= 2:
+                block = parts[1]
+                break
+    if not block:
+        return None
+    ints, bits = [], None
+    for l in (x.strip() for x in block.strip().splitlines()):
+        if not l:
+            continue
+        if set(l) <= {"0", "1"} and len(l) >= 512:
+            bits = l
+        elif l.isdigit() and len(l) >= 10:
+            ints.append(int(l))
+    if len(ints) < 2 or not bits:
+        return None
+    return ints[0], ints[1], bits
+
+
+def run(params: dict) -> dict:
+    """SkillManager 统一入口：噪声混合双 LFSR 初始状态恢复。
+
+    Args:
+        params: 可给 "path"（FilterRandom.py 附件路径）或 "text"（源码文本），
+            也可直接给 mask1/mask2/out 三元组（out 为 01 串）。
+
+    Returns:
+        {"ok": bool, "flag": str|None, ...}；flag 形如 DASCTF{init1-init2}。
+        未解出时返回 ok=False且 flag=None（**不谎报**）。
+    """
+    if not isinstance(params, dict):
+        return {"ok": False, "flag": None, "error": "params 必须是 dict"}
+
+    m1, m2, out = params.get("mask1"), params.get("mask2"), params.get("out")
+    if not (m1 and m2 and out):
+        text = params.get("text")
+        if not text and params.get("path"):
+            p = str(params["path"])
+            try:
+                if not _os.path.isfile(p) or _os.path.getsize(p) > 2 * 1024 * 1024:
+                    return {"ok": False, "flag": None, "error": "附件不存在或过大"}
+                with open(p, "r", encoding="utf-8", errors="ignore") as fh:
+                    text = fh.read()
+            except OSError:
+                return {"ok": False, "flag": None, "error": "附件读取失败"}
+        if not text:
+            return {"ok": False, "flag": None, "error": "缺少 path/text/mask 参数"}
+        got = _extract_masks_and_out(str(text))
+        if not got:
+            return {"ok": False, "flag": None, "error": "未能提取 mask1/mask2/out"}
+        m1, m2, out = got
+
+    try:
+        flag = solve_lfsr_filter(int(m1), int(m2), str(out))
+    except Exception as exc:  # noqa: BLE001 - 失败须诚实返回而非抛出
+        return {"ok": False, "flag": None, "error": "求解异常: %s" % exc}
+
+    if not flag:
+        return {"ok": False, "flag": None, "error": "未恢复出初始状态（不谎报）"}
+    return {"ok": True, "flag": flag, "mask1": int(m1), "mask2": int(m2)}
+
+
 if __name__ == "__main__":
     import os
     import sys
