@@ -18,6 +18,8 @@ from scripts._kpi_canonical import (  # noqa: E402
     count_heldout_candidates, count_heldout_runnable_pool,
     count_skills, count_regression_checks,
     check_readme_counts, _DEPRECATED_SUBSET,
+    heldout_status, heldout_budget_ablation, summarize_benchmark_report,
+    check_readme_heldout,
 )
 
 
@@ -248,6 +250,115 @@ def test_readme_count_check_skips_when_corpus_absent():
     print("✓ test_readme_count_check_skips_when_corpus_absent")
 
 
+# ── held-out 实测状态：机器派生（禁止手写「已测量 / 未测量」）─────────────────
+def test_heldout_status_is_machine_derived():
+    """held-out 状态必须机器派生（读 benchmark_report.json），不得手写状态词。
+
+    背景：README 曾手写「0/10 未测量」而实测早已完成——**手写状态词本身就是漂移**。
+    """
+    st = heldout_status()
+    assert st.get("measured") is True, \
+        "held-out 报告缺失——应能读 ctf_agent/heldout_evidence/ 或 data/results 下的 benchmark_report.json"
+    assert st["pool_total"] > 0 and st["pool_total"] == count_heldout_candidates(), \
+        (f"报告池数 {st['pool_total']} ≠ select_candidates 能力分母 "
+         f"{count_heldout_candidates()}（同一池出现两套数字）")
+    assert st["solved_total"] <= st["pool_total"], "解出数大于池内题数（计数通道错乱）"
+    assert st["solved_by_presolve"] + st["solved_by_llm"] <= st["solved_total"], \
+        "分渠道解出数之和大于总解出数（by_solved_by 口径错乱）"
+    assert st["tokens_global_total"] > 0, "token 消耗为 0（疑读到空/残缺报告）"
+    print(f"✓ test_heldout_status_is_machine_derived (pool={st['pool_total']} "
+          f"solved={st['solved_total']} presolve={st['solved_by_presolve']} "
+          f"llm={st['solved_by_llm']})")
+
+
+def test_summarize_benchmark_report_follows_input():
+    """【防硬编码】summarize 是纯函数：输出必须随输入报告变化，而不是写死的常量。"""
+    fake = {
+        "summary": {
+            "total": 3, "solved": 2,
+            "by_solved_by": {
+                "presolve": {"total": 1, "solved": 1},
+                "main_agent_llm": {"total": 2, "solved": 1},
+            },
+            "tokens": {"global_total": 12345},
+        },
+        "results": [{"error": "budget_exceeded"}, {"error": None}, {"error": "hallucination"}],
+    }
+    st = summarize_benchmark_report(fake, "fake.json")
+    assert st["report"] == "fake.json"
+    assert st["pool_total"] == 3 and st["solved_total"] == 2
+    assert st["solved_by_presolve"] == 1 and st["solved_by_llm"] == 1
+    assert st["llm_attempted"] == 2
+    assert st["tokens_global_total"] == 12345
+    assert st["budget_exceeded"] == 1, "budget_exceeded 必须按 results[].error 逐条计数"
+    print("✓ test_summarize_benchmark_report_follows_input")
+
+
+def test_readme_heldout_green_on_live_repo():
+    """活仓库两份 README 的 held-out 实测声明必须与机器派生真值一致（空列表 = 绿）。"""
+    hits = check_readme_heldout()
+    assert hits == [], "README held-out 声明漂移：\n  - " + "\n  - ".join(hits)
+    print("✓ test_readme_heldout_green_on_live_repo")
+
+
+def test_readme_heldout_bites_when_truth_moves():
+    """【变异】真值一移动（如重跑成 9/10），README 手写数字必须立刻变红。"""
+    moved = {"measured": True, "report": "x.json", "pool_total": 10, "solved_total": 9,
+             "solved_by_presolve": 1, "solved_by_llm": 8, "llm_attempted": 9,
+             "tokens_global_total": 1, "budget_exceeded": 0}
+    hits = check_readme_heldout(status=moved, ablation={"available": False})
+    assert hits, "真值移动后仍未报红——held-out 锚点未真正绑定机器真值（假闸门）"
+    assert any("9" in h for h in hits), f"未命中漂移数字 9：{hits}"
+    print(f"✓ test_readme_heldout_bites_when_truth_moves ({len(hits)} hits)")
+
+
+def test_readme_heldout_bites_on_synthetic_drift():
+    """【变异】合成 README 里 held-out 数字写错 → 必须红；写对 → 必须绿（不误报）。"""
+    status = {"measured": True, "report": "x.json", "pool_total": 2, "solved_total": 2,
+              "solved_by_presolve": 1, "solved_by_llm": 1, "llm_attempted": 1,
+              "tokens_global_total": 8220, "budget_exceeded": 0}
+    abl = {"available": True,
+           "baseline": {"report": "a.json", "pool_total": 2, "solved_total": 2,
+                        "solved_by_presolve": 1, "solved_by_llm": 1, "llm_attempted": 1,
+                        "tokens_global_total": 100, "budget_exceeded": 3},
+           "doubled": {"report": "b.json", "pool_total": 2, "solved_total": 2,
+                       "solved_by_presolve": 1, "solved_by_llm": 1, "llm_attempted": 1,
+                       "tokens_global_total": 200, "budget_exceeded": 0}}
+    good_en = (
+        "| LLM reasoning on the held-out pool | pool **2 / 2** solved "
+        "— **LLM autonomous reasoning 1 / 2** |\n"
+        "> Doubling the token budget (`100 → 200`) drove `budget_exceeded` (`3 → 0`).\n"
+    )
+    good_zh = (
+        "| held-out 池上的 LLM 自主推理 | 池内 **2 / 2** 解出 —— **LLM 自主推理 1 / 2** |\n"
+        "> 预算翻倍 `100 → 200` 后 `budget_exceeded` 从 `3 → 0`。\n"
+    )
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "README.md").write_text(good_en, encoding="utf-8")
+        (root / "README.zh.md").write_text(good_zh, encoding="utf-8")
+        # 正样本：数字全对 → 绿（证明不会误报）
+        assert check_readme_heldout(readme_root=root, status=status, ablation=abl) == [], \
+            "held-out 数字全对却报红（误报）"
+        # 变异：池内解出数写错 → 必须红
+        (root / "README.md").write_text(
+            good_en.replace("**2 / 2** solved", "**9 / 2** solved"), encoding="utf-8")
+        hits = check_readme_heldout(readme_root=root, status=status, ablation=abl)
+        assert hits, "池内解出数写错（9≠2）却未报红——变异漏检"
+        assert any("9" in h for h in hits), f"未命中漂移数字 9：{hits}"
+    print("✓ test_readme_heldout_bites_on_synthetic_drift")
+
+
+def test_readme_heldout_skips_when_unmeasured():
+    """【防误报】未实测（无报告）时跳过而非误报——此时 README 应写「未测量」，无数字可校验。"""
+    unmeasured = {"measured": False, "report": None, "pool_total": 0, "solved_total": 0,
+                  "solved_by_presolve": 0, "solved_by_llm": 0, "llm_attempted": 0,
+                  "tokens_global_total": 0, "budget_exceeded": 0}
+    hits = check_readme_heldout(status=unmeasured, ablation={"available": False})
+    assert hits == [], f"未实测时误报 RED（宁漏勿误）：{hits}"
+    print("✓ test_readme_heldout_skips_when_unmeasured")
+
+
 if __name__ == "__main__":
     test_offline_verified_matches_machine_truth()
     test_real_corpus_is_recursive_json_count()
@@ -262,4 +373,10 @@ if __name__ == "__main__":
     test_readme_count_check_green_on_synthetic_consistent()
     test_readme_count_check_bites_on_synthetic_drift()
     test_readme_count_check_skips_when_corpus_absent()
+    test_heldout_status_is_machine_derived()
+    test_summarize_benchmark_report_follows_input()
+    test_readme_heldout_green_on_live_repo()
+    test_readme_heldout_bites_when_truth_moves()
+    test_readme_heldout_bites_on_synthetic_drift()
+    test_readme_heldout_skips_when_unmeasured()
     print("\nALL KPI CANONICAL TESTS PASSED")
