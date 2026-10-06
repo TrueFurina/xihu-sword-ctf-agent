@@ -30,7 +30,10 @@ from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from eval.cases import load_questions  # noqa: E402
+from eval.cases import load_questions  # noqa: E402,F401（兼容旧引用）
+from eval.corpus import (  # noqa: E402
+    DEFAULT_ROOTS, load_corpus, measurable,
+)
 from core.prompts import infer_skill_require  # noqa: E402
 from tools.skill_manager import SkillManager  # noqa: E402
 from tools.registry import ToolRegistry  # noqa: E402
@@ -38,7 +41,7 @@ from tools.skill_dispatch import (  # noqa: E402
     AUTO_CALLABLE, extract_flag, iter_candidate_params,
 )
 
-DATASETS = ("data/questions", "data/questions_real", "data/questions_external")
+DATASETS = DEFAULT_ROOTS  # 单一真相源：去重/择优顺序统一由 eval.corpus 定义
 PER_CALL_TIMEOUT = 180  # 单题单 skill 调用上限（秒）
 
 
@@ -46,41 +49,24 @@ def _sha(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
-def _att_score(q):
-    """副本质量分：附件是否真实可用。
+def load_all(measurable_only: bool = True):
+    """跨题库取 unique 题（去重/择优统一走 eval.corpus.load_corpus）。
 
-    ⚠️ 实测发现（2026-10-07）：题库存在 **id 重复但质量不齐** 的副本——
-    data/questions 里的 real_crypto_ezrsa 等指向已失效的绝对路径
-    （E:/Program/Cybersecurity/比赛真题/...，全部 exists=0），
-    而 data/questions_real 里同 id 的副本附件完整可用。
-    按 id 先到先得去重会选中**坏副本**，制造「能力未兑现」的假象。
-    故去重时必须挑附件真实存在的那个。
+    2026-10-07 修订：删掉脚本内私有的 _att_score 实现，改用共享层，
+    避免判定口径再次漂移（此前正是两份实现不一致导致假象）。
+
+    Args:
+        measurable_only: 只保留可计入分母的题（有输入且真值）。
+            input-less 题（附件已失效）跑必然 0 分，属数据缺失而非能力
+            缺失，计入分母只会稀释真实解题率。
     """
-    atts = getattr(q, "attachments", None) or []
-    if not atts:
-        return (-1, 0)
-    if isinstance(atts, str):
-        atts = [atts]
-    ok = sum(1 for a in atts if os.path.isfile(str(a)))
-    return (1 if ok == len(atts) else 0, ok)
-
-
-def load_all():
-    """跨数据集按 id 去重，**优先保留附件真实存在的副本**。"""
-    best = {}
-    for d in DATASETS:
-        try:
-            qs = load_questions(d)
-        except Exception as e:  # noqa: BLE001
-            print("[skip] %s: %s" % (d, e))
-            continue
-        for q in qs or []:
-            k = getattr(q, "id", None) or getattr(q, "title", None)
-            if k not in best or _att_score(q) > _att_score(best[k][1]):
-                best[k] = (d, q)
-    dupes = sum(1 for _k, _v in best.items())
-    print("去重后题数: %d" % dupes)
-    return list(best.values())
+    entries = load_corpus()
+    kept = [e for e in entries if (not measurable_only) or measurable(e.question)]
+    print("题库 unique 题数: %d" % len(entries))
+    if measurable_only:
+        print("可计分母(有输入+真值): %d，剔除 input-less/无真值: %d"
+              % (len(kept), len(entries) - len(kept)))
+    return [(e.source, e.question) for e in kept]
 
 
 async def try_one(registry, sm, q, skill_name, timeout=PER_CALL_TIMEOUT):

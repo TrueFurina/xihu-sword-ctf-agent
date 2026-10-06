@@ -63,8 +63,16 @@ AUTO_CALLABLE = _PATH_SKILLS | _DIR_SKILLS | _NUMERIC_SKILLS
 #   比对 → 本该得分的题判失败。改为**非贪婪**到第一个 ``}`` 即止。
 # 取最短闭合的代价：flag 内部若含 ``}`` 会被截断——CTF flag 惯例不含该系统性
 #   风险远低于贪婪版本必错的尾缀污染。
-_FLAG_RE = re.compile(rb"(?:flag|FLAG|Flag|ctf|CTF|DASCTF|dasctf)"
-                      rb"\{[ -~]{1,200}?\}")
+#
+# 2026-10-07 二次修正（前缀截断 bug）：原先前缀是**固定词表**
+#   ``(?:flag|FLAG|Flag|ctf|CTF|DASCTF|dasctf)``，当 flag 前缀是词表中某词的
+#   **后缀**时会吃掉前半截——实测 CSAW-Quals 2023 真题解出
+#   ``csawctf{1_d1dnt_kn0w_th1s_w0uld_w0rk}``，词表中的 ``ctf`` 在 ``csaw`` +
+#   ``ctf{`` 中间就匹配上了，抽出 ``ctf{...}`` → sha256 不匹配，**真解被判假阳**。
+#   改为：``{`` 之前允许 1–20 个字母/数字/下划线作为前缀（覆盖任意比赛前缀），
+#   花括号内不允许空白与 ``}``（避免吃掉跨行噪音）。
+#   假阳由下游 sha256 真值校验兜底，不会污染评分。
+_FLAG_RE = re.compile(rb"[A-Za-z0-9_]{1,20}\{[^}\s]{1,200}?\}")
 
 
 def extract_flag(out: Any) -> Optional[str]:
