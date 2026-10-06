@@ -90,6 +90,28 @@ class TestExtractFlagNotGreedy(unittest.TestCase):
         self.assertEqual(
             self.extract_flag("CTF{a}b} trailing"), "CTF{a}")
 
+    def test_competition_prefix_not_truncated(self):
+        """★ 真实缺陷（2026-10-07）：比赛前缀不得被固定词表吃掉。
+
+        CSAW-Quals 2023 真题解出 ``csawctf{...}``——旧版固定词表里的 ``ctf``
+        会在 ``csaw`` + ``ctf{`` **中间**匹配上，抽出 ``ctf{...}``
+        → sha256 不匹配，**真解被误判为假阳**（实测本该 +1 题）。
+        """
+        got = self.extract_flag(b"csawctf{1_d1dnt_kn0w_th1s_w0uld_w0rk}")
+        self.assertEqual(got, "csawctf{1_d1dnt_kn0w_th1s_w0uld_w0rk}")
+        # 前缀由任意字母数字组成时都应完整保留
+        self.assertEqual(self.extract_flag("hkcert23{abc}"), "hkcert23{abc}")
+        self.assertEqual(self.extract_flag("picoCTF{x_1}"), "picoCTF{x_1}")
+
+    def test_brace_without_alnum_prefix_is_not_flag(self):
+        """放宽前缀后不得滥用：裸 ``{...}`` 不是 flag。"""
+        self.assertIsNone(self.extract_flag("no-{}-here"))
+        self.assertIsNone(self.extract_flag("dict = {a: 1}"))
+
+    def test_whitespace_inside_braces_is_rejected(self):
+        """花括号内含空白的不算 flag（防止吃掉整段 JSON 噪音）。"""
+        self.assertIsNone(self.extract_flag("x{a b c}"))
+
 
 class TestNumericParamExtraction(unittest.TestCase):
     """② ③ 提取正确性 + fail-closed。"""
