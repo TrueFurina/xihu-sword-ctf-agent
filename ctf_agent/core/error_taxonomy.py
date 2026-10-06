@@ -63,10 +63,18 @@ NON_RETRYABLE_CATEGORIES = frozenset({
 PROVIDER_CIRCUIT_OPEN = "provider_circuit_open"
 
 # 会「假扮」成 Agent 自身失败的退化终态桶（仅在 provider 熔断打开时回填）。
+# 🔴 2026-10-06 扩充：原只有 {race_abandon, budget_exceeded, solver_exception}，
+#   实测漏判 wrong_direction——moonshot kimi-k2.6 余额耗尽（HTTP 429 伪装永久故障）
+#   熔断打开后，主 Agent 拿不到任何 LLM 响应，监督裁决退化为「同参数重复→死循环止损」
+#   落 wrong_direction；该桶不在退化集合 → 报告照标 interpretable=True，把
+#   「基础设施彻底不可达」冒充成「Agent 能力测量」（复现实证：熔断已打开，run.py
+#   relabel 未命中，报告 tokens=1806 兜底值 + interpretable=true）。wrong_direction
+#   与 race_abandon 同属「LLM 死掉后 Agent 空转出的自身失败假象」，必须一并回填。
 _CIRCUIT_DEGRADED_BUCKETS = frozenset({
     "race_abandon",
     "budget_exceeded",
     "solver_exception",
+    "wrong_direction",
 })
 
 
@@ -77,7 +85,7 @@ def relabel_circuit_breaker(error_category, circuit_open: bool) -> str:
     - error_category 为 None（已解出）/ 不在退化桶内（如 provider_error 本身已是
       基础设施类、hallucination 等）→ 原样返回。
     - 仅当 circuit_open=True 且 error_category ∈ {race_abandon, budget_exceeded,
-      solver_exception} 时返回 PROVIDER_CIRCUIT_OPEN。
+      solver_exception, wrong_direction} 时返回 PROVIDER_CIRCUIT_OPEN。
     """
     if not circuit_open:
         return error_category
