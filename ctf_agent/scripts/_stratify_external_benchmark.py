@@ -100,6 +100,17 @@ def stratify(bench_path: Path, att_root: Path) -> dict:
                 cand_count += 1
                 if matches_truth(c, truth):
                     direct_hit = True
+            # 裸答案候选（2026-10-06 实锤补漏）：FLAG_RE 要求 `xxx{...}` 花括号形态，
+            # 而部分题的答案是没有花括号的纯明文（如 `80`/`Cisc0`/`145`/32 位 hex），
+            # 会被整题漏掉 → 答案明明躺在附件里却被判成 L2「纯推理层」，污染能力分母。
+            # 仅对 <=4KB 附件做（真答案文件都是几十字节），不对 pcap/二进制全文做无意义比对；
+            # 仍走 matches_truth 精确摘要比对，且未命中不计入 cand_count（不影响 L1/L2 判定）。
+            if len(raw) <= 4096:
+                for c in [raw.strip()] + [ln.strip() for ln in raw.splitlines()]:
+                    if c and matches_truth(c, truth):
+                        direct_hit = True
+                        cand_count += 1
+                        break
         if not atts:
             level = "L3_no_payload"          # 题面本就无附件
         elif scanned == 0:
