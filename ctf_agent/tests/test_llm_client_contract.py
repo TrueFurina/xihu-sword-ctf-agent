@@ -60,7 +60,8 @@ def test_ai_chat_json_async_with_usage_works(monkeypatch):
     _USAGE = {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}
 
     def fake_ai_chat_json_with_usage(messages, system=None, temperature=0.1,
-                                     max_tokens=2000, model=None, provider=None):
+                                     max_tokens=2000, model=None, provider=None,
+                                     recover_script=False):
         return {"action": "reason"}, dict(_USAGE)
 
     monkeypatch.setattr(llm_client, "ai_chat_json_with_usage", fake_ai_chat_json_with_usage)
