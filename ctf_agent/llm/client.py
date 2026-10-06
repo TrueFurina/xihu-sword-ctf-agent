@@ -105,10 +105,44 @@ def provider_circuit_open(provider: str) -> bool:
                    for k, v in _CIRCUITS.items())
 
 
-def _circuit_record_failure(provider: str, model: str, status_code: int) -> None:
-    """记录一次永久性失败（401/402/403）；达阈值打开该 (provider, model) 的熔断。"""
-    if status_code not in (401, 402, 403):
-        return  # 429/4xx 其他/5xx 不熔断（暂时性或可恢复）
+# 429 伪装成永久性故障的响应体标记（2026-10-06 修复）：
+# 实测 moonshot kimi-k2.6 账号余额耗尽/停用，网关返回 **HTTP 429 +
+# `type":"exceeded_current_quota_error"` / "is suspended due to insufficient balance"**。
+# 原逻辑把一切 429 当"瞬时限流"放行 → 主 Agent 264 次 429 空转烧满墙钟，产出
+# `wrong_direction` 假结果（与 deepseek 402 同类 artifact）。这类 429 与 402 同属
+# **永久性**（不充值/换 key 不恢复），必须参与熔断 + 走 provider_circuit_open 诚实回填。
+# 真正的限流 429（如 "max RPM: 3, please try again"）不含这些标记，仍按瞬时处理。
+_PERMANENT_429_MARKERS = (
+    "insufficient balance",     # moonshot: is suspended due to insufficient balance
+    "exceeded_current_quota",   # moonshot: exceeded_current_quota_error
+    "suspended due to",         # 账号被停用
+    "arrearage",                # 欠费（腾讯百炼/阿里百炼）
+    "account overdue",          # 千帆 account_overdue
+    "欠费", "余额不足", "账户余额",
+)
+
+
+def _is_permanent_429_failure(body: str) -> bool:
+    """判定 429 响应体是否属**永久性**故障（余额耗尽/账号停用）而非瞬时限流。
+
+    纯函数，便于单测。仅凭响应体文本判据：命中任一 marker 即判永久。
+    空体/None → False（保守，宁可当瞬时也不误熔断活跃 provider）。
+    """
+    if not body:
+        return False
+    low = body.lower()
+    return any(m in low for m in _PERMANENT_429_MARKERS)
+
+
+def _circuit_record_failure(provider: str, model: str, status_code: int,
+                            body: str = "") -> None:
+    """记录一次永久性失败（401/402/403，或伪装成 429 的余额耗尽/账号停用）；
+    达阈值打开该 (provider, model) 的熔断。"""
+    permanent = status_code in (401, 402, 403) or (
+        status_code == 429 and _is_permanent_429_failure(body)
+    )
+    if not permanent:
+        return  # 真正的瞬时限流(429)/4xx 其他/5xx 不熔断（暂时性或可恢复）
     key = _circuit_key(provider, model)
     with _CIRCUIT_LOCK:
         st = _CIRCUITS.setdefault(key, {"fails": 0, "open": False})
@@ -116,9 +150,9 @@ def _circuit_record_failure(provider: str, model: str, status_code: int) -> None
         if st["fails"] >= _PROVIDER_CIRCUIT_FAIL_LIMIT and not st["open"]:
             st["open"] = True
             logger.warning(
-                "🔴 provider=%s model=%s 连续 %d 次永久故障(401/402/403)，已熔断——"
+                "🔴 provider=%s model=%s 连续 %d 次永久故障(status=%s)，已熔断——"
                 "后续请求将直接跳过该模型（同 provider 其他模型与剩余存活源照常接管）",
-                provider, model or "(默认)", st["fails"],
+                provider, model or "(默认)", st["fails"], status_code,
             )
 
 
@@ -878,9 +912,11 @@ def _post_chat(
                 sc, settings.get("model", ""),
                 len(messages), max_tokens, body,
             )
-            # P0 熔断（2026-08-21）：401/402/403 为永久性故障，连续计数达阈值即熔断
+            # P0 熔断（2026-08-21；2026-10-06 扩充）：401/402/403 为永久性故障，
+            # **伪装成 429 的余额耗尽/账号停用**（exceeded_current_quota / insufficient
+            # balance）同属永久性——一并连续计数，达阈值即熔断，防 Agent 在死账号上空转。
             _circuit_record_failure(
-                settings.get("provider", ""), settings.get("model", ""), sc)
+                settings.get("provider", ""), settings.get("model", ""), sc, body)
             return None, dict(_ZERO)
         except Exception as exc:  # noqa: BLE001 - 失败开放
             # 瞬时网络异常（read timeout / connect error）退避重试；其它直接失败开放
