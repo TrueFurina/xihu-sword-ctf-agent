@@ -22,13 +22,15 @@ def test_provider_circuit_open_in_truncated():
     assert PROVIDER_CIRCUIT_OPEN in TRUNCATED_ERROR_CATEGORIES
 
 
-@pytest.mark.parametrize("cat", ["race_abandon", "budget_exceeded", "solver_exception"])
+@pytest.mark.parametrize("cat", ["race_abandon", "budget_exceeded", "solver_exception",
+                                 "wrong_direction"])
 def test_relabel_degraded_bucket_when_open(cat):
     """熔断打开时，退化的 Agent 失败桶回填为 provider_circuit_open。"""
     assert relabel_circuit_breaker(cat, True) == PROVIDER_CIRCUIT_OPEN
 
 
-@pytest.mark.parametrize("cat", ["race_abandon", "budget_exceeded", "solver_exception"])
+@pytest.mark.parametrize("cat", ["race_abandon", "budget_exceeded", "solver_exception",
+                                 "wrong_direction"])
 def test_relabel_noop_when_closed(cat):
     """熔断未打开 → 原样返回，不误伤。"""
     assert relabel_circuit_breaker(cat, False) == cat
@@ -47,3 +49,22 @@ def test_relabel_provider_error_open_unchanged():
 def test_relabel_hallucination_open_unchanged():
     """hallucination 是 Agent 行为（有 LLM 响应）→ 熔断打开也不回填。"""
     assert relabel_circuit_breaker("hallucination", True) == "hallucination"
+
+
+def test_wrong_direction_relabeled_when_circuit_open():
+    """回归锁（2026-10-06）：熔断打开时 wrong_direction 必须回填为 provider_circuit_open。
+
+    复现实证：moonshot kimi-k2.6 余额耗尽（HTTP 429 伪装永久故障）→ 熔断打开 →
+    主 Agent 拿不到 LLM 响应 → 监督裁决退化为「同参数重复→死循环止损」落
+    wrong_direction。修复前该桶不在退化集合 → 报告误标 interpretable=True
+    （tokens=1806 兜底值）。修复后须回填，使报告置 interpretable=False。
+    """
+    assert relabel_circuit_breaker("wrong_direction", True) == PROVIDER_CIRCUIT_OPEN
+    # 熔断未打开的真·方向错不回归（保留换路重试的价值）
+    assert relabel_circuit_breaker("wrong_direction", False) == "wrong_direction"
+
+
+def test_wrong_direction_not_in_mechanism_terminated():
+    """wrong_direction 不是机制终结——回填后方可落入 TRUNCATED（本节已隐式保证）。"""
+    from core.error_taxonomy import TRUNCATED_ERROR_CATEGORIES
+    assert PROVIDER_CIRCUIT_OPEN in TRUNCATED_ERROR_CATEGORIES

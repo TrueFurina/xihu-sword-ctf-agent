@@ -180,3 +180,30 @@ def test_summarize_interpretable_when_all_attempted_and_clean():
     assert s["solved"] == 1
     # no_output 仍如实记录在 by_error（信息性），但不影响可解释性判定
     assert s["by_error"] == {"no_output": 1}
+
+
+def test_summarize_circuit_open_wrong_direction_not_interpretable():
+    """全链回归锁（2026-10-06）：熔断打开 + wrong_direction → 回填后报告不可解释。
+
+    真因：moonshot kimi-k2.6 余额耗尽（HTTP 429 伪装永久故障）→ 熔断打开 → 主 Agent
+    拿不到 LLM 响应 → 监督裁决退化为「同参数重复→死循环止损」落 wrong_direction。
+    修复前该桶不在退化集合，run.py 的 relabel 未命中 → 报告 tokens=1806（兜底值）
+    却标 interpretable=True，把「基础设施彻底不可达」冒充成能力测量。
+
+    本测试锁死全链：relabel(wrong_direction, circuit_open=True) → provider_circuit_open
+    → summarize → truncated=1、interpretable=False。
+    """
+    from eval.benchmark import summarize
+    from core.error_taxonomy import relabel_circuit_breaker
+
+    raw = _mk_result("dead_provider", "crypto", error="wrong_direction",
+                     duration_ms=40249, retries=3)
+    # 模拟 run.py 的熔断根因回填（circuit_open=True）
+    raw.error = relabel_circuit_breaker(raw.error, True)
+    s = summarize([raw])
+    ig = s["integrity"]
+
+    assert ig["truncated"] == 1, "provider_circuit_open 须落入 truncated"
+    assert ig["truncated_ids"] == ["dead_provider"]
+    assert ig["interpretable"] is False, "熔断打开的 run 不得作为能力率引用"
+    assert s["solve_rate"] == 0.0
