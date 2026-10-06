@@ -79,6 +79,10 @@ class TemplateBank:
             "2b. 【确定性 skill 触发】A/B 字符序列→调 morse_ab_decode skill（摩斯解码+UUID定位）；"
             "key:/data: 格式或八进制/多层编码→调 vigenere_decode skill（自动提取+解密）；"
             "JPEG 尾部异常/多文件头→调 jpeg_png_embedded skill（嵌入图片提取）",
+            "2c. 【复数乘法群 RSA 变体·specialcurve 类】附件含'复数乘法群/点加(x3=x1*x2-y1*y2)/高斯整数群/类 RSA'字样"
+            "→ 这是 RSA 换群（定义在复数域的群运算），**不是椭圆曲线、不是离散对数**，严禁按 ECC 方向处理；"
+            "直接调 crypto_complex_mult_group skill（factordb 分解 n → 解 e 使 2^e≡norm(HINT) → 群幂逆元还原 M=(x,y)），"
+            "已有现成已验证 skill，不要自己从头写群运算。",
             "3. 【一键直出·最高优先】直接调用 crypto_auto 工具（参数 attachments 传附件绝对路径列表），"
             "它会自动嗅探 RSA 参数（已知phi/逆元、Hastad 广播 e 爆破、共模、费马、Wiener、small_e）并执行确定性攻击，"
             "同时尝试哈希爆破与多层编码，命中即返回 flag（实测 ExcitingInverse/ezRSA 秒解，无需自己写攻击脚本）；"
