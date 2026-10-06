@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Optional, Sequence
 
@@ -31,6 +32,7 @@ __all__ = [
     "measurable",
     "fitness_score",
     "load_corpus",
+    "answer_book",
     "corpus_report",
     "partition_measurable",
     "skip_reason",
@@ -182,6 +184,83 @@ def applicable_corpus_summary(unmeasurable: Sequence[tuple]) -> dict:
     for _q, reason in unmeasurable or []:
         out[reason] = out.get(reason, 0) + 1
     return out
+
+
+_SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _looks_like_sha256(value: Any) -> bool:
+    """值是否形如 sha256 十六进制串（即「占位答案」而非明文 flag）。"""
+    return bool(value) and bool(_SHA256_HEX_RE.match(str(value).strip().lower()))
+
+
+def _plain_flag(q: Any) -> Optional[str]:
+    """取 q 的**明文** flag；flag 字段是 sha256 占位时返回 None。
+
+    实测（2026-10-07）：同一 id 在不同数据集形态不同——questions_real 把 flag
+    存成 sha256 占位串，questions 存明文。占位串一旦进明文答案表，任何
+    「候选 == expected」的路径必然失配，等于把正确 flag 判成幻觉枪毙。
+    """
+    flag = getattr(q, "flag", None)
+    if not flag:
+        return None
+    prop = getattr(type(q), "flag_is_placeholder", None)
+    if isinstance(prop, property):
+        try:
+            if q.flag_is_placeholder:
+                return None
+        except Exception:  # noqa: BLE001 - 轻量对象无此 property
+            pass
+    if _looks_like_sha256(flag):
+        return None
+    return str(flag)
+
+
+def answer_book(roots: Optional[Sequence[str]] = None) -> tuple:
+    """跨数据集构造**答案表**：((id → 明文 flag), (id → Question))。
+
+    与 load_corpus 的关键差异：**这里是并集，不是择优去重**。
+    题库里同一道题在多个数据集存在副本，答案可能只写在其中一个副本上
+    （实测：data/questions 单库只有 49 条答案，跨库并集有 169 条）。
+    若走择优去重会丢掉仅存在于被淘汰副本上的答案。
+
+    为什么答案表要尽量全（2026-10-07 实证）：
+    run.py 的 per-question 精确校验只在「题在答案表内」时生效。
+    既无 flag_sha256（无法自身真值仲裁）、又不在答案表的题，
+    仅剩 is_correct 的**全局跨题集合**把关 → 提交任意其它题的 flag 也会被判对。
+    实测这类逃逸题 6 道（5 道有明文真值），扩表后全部纳入精确校验。
+
+    Returns:
+        (answers, answers_q)：
+        answers={id: flag 明文}；answers_q={id: 带真值的 Question}。
+    """
+    answers: dict = {}
+    answers_q: dict = {}
+    for d in (roots if roots is not None else DEFAULT_ROOTS):
+        try:
+            qs = load_questions(d)
+        except Exception:  # noqa: BLE001 - 单库不可读不阻塞整体
+            continue
+        for q in qs or []:
+            key = getattr(q, "id", None)
+            if key is None:
+                continue
+            key = str(key)
+            # 明文覆盖占位；占位串只在尚无答案时兜底（避免占位挤掉真明文）。
+            flag = _plain_flag(q)
+            if flag is not None:
+                prev = answers.get(key)
+                if prev is None or _looks_like_sha256(prev):
+                    answers[key] = flag
+            if has_truth(q):
+                prev = answers_q.get(key)
+                if prev is None or (
+                        getattr(q, "flag_sha256", None)
+                        and not getattr(prev, "flag_sha256", None)):
+                    answers_q[key] = q
+            elif key not in answers_q:
+                answers_q[key] = q
+    return answers, answers_q
 
 
 def load_corpus(roots: Optional[Sequence[str]] = None,

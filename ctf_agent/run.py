@@ -72,12 +72,15 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     Returns:
         solver callable(question, attempt, correction) -> AgentOutput dict
     """
-    from eval.cases import load_questions, preset_answers
+    from eval.corpus import answer_book
 
-    questions = load_questions("data/questions")
-    answers = preset_answers(questions)
-    # 2026-08-24 真 flag 红线：id→Question 映射，供 sha256 占位题的正确性比对。
-    _answers_q = {str(q.id): q for q in questions}
+    # 答案表（**不可套可测性闸门**）：这里要的是「尽可能全的真值」，用于正确性校验。
+    # 旧实现只读 data/questions 单库 → 仅 49 条答案；跨库并集 169 条，且旧有的 49 条
+    # 全部保留（无回归）。扩表的意义：run.py 的 per-question 精确校验只在题于表内时
+    # 生效，缺表又缺 flag_sha256 的题仅剩 is_correct 全局跨题集合把关，会放行其它题
+    # 的 flag（实测 6 道逃逸题，5 道经此补入）。
+    answers, _answers_q_src = answer_book()
+    _answers_q = {str(k): v for k, v in _answers_q_src.items()}
 
     if use_mock:
         # Mock 模式：直接走 mock_solve（可靠命中预置答案），绕过 LLM 链路
@@ -240,8 +243,12 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
         # 2026-09-01 P1 修正：sha256 占位题（题库仅存 flag_sha256）须用 sha256 比对，
         # 不能拿明文 flag 与占位 sha256 做精确相等——否则 LLM 解出的真 flag 被误判幻觉。
         # 构造精确值集合 + 占位 sha256 集合，O(1) 判定（兼容明文 flag 题）。
-        _valid_exact = {str(q.flag) for q in questions if q.flag}
-        _valid_sha = {str(q.expected_sha256) for q in questions
+        # 2026-10-07 口径修复：集合源从「单库 questions」改为「跨库答案表」
+        # （详见上方 answer_book 注释）。注意这两个集合是**全局跨题**的，只能做粗筛，
+        # 精确裁决由下方「自身真值仲裁 + per-question 答案比对」负责。
+        _valid_exact = {str(q.flag) for q in _answers_q.values()
+                        if getattr(q, "flag", None)}
+        _valid_sha = {q.expected_sha256 for q in _answers_q.values()
                       if getattr(q, "expected_sha256", None)}
         import hashlib as _hl
         def is_correct(flag):  # noqa: E731
@@ -714,6 +721,7 @@ def build_race_solver(use_mock: bool = False, is_correct=None,
 def run_cli(use_mock: bool, category: str | None = None) -> None:
     """CLI 解题模式：加载题库并发求解并打印报表。"""
     from eval.cases import load_questions
+    from eval.corpus import apply_corpus_gate, applicable_corpus_summary
     from scheduler.task_pool import TaskPool
 
     questions = load_questions("data/questions")
@@ -726,6 +734,22 @@ def run_cli(use_mock: bool, category: str | None = None) -> None:
         questions = plan_challenges(questions)
     except Exception:
         pass
+    # 口径闸门（2026-10-07）：data/questions 里 27/50 题附件已失效（input-less），
+    # 这类题必然 0 分却仍会走完整主 Agent 链路烧预算。默认剔除，双分母透明公示。
+    # 对照测量：RAG_CLI_INCLUDE_UNMEASURABLE=1 恢复旧行为。
+    import os as _os
+    _include_unmeas = _os.environ.get("CTF_AGENT_INCLUDE_UNMEASURABLE") == "1"
+    questions, _unmeasurable, _raw_n = apply_corpus_gate(
+        questions, include_unmeasurable=_include_unmeas)
+    if _unmeasurable:
+        if _include_unmeas:
+            logger.warning("（CTF_AGENT_INCLUDE_UNMEASURABLE=1）保留全部 %d 题，"
+                           "含 %d 道不可测题", len(questions), len(_unmeasurable))
+        else:
+            logger.warning("口径闸门：剔除 %d/%d 道不可测题 %s —— 缺输入或真值，"
+                           "跑必然 0 分且不应计入解题率",
+                           len(_unmeasurable), _raw_n,
+                           applicable_corpus_summary(_unmeasurable))
     if not questions:
         logger.warning("题库为空，请检查 data/questions/")
         return
@@ -743,7 +767,16 @@ def run_cli(use_mock: bool, category: str | None = None) -> None:
         print(f"  [{'✓' if ok else '✗'}] {q.id:16s} {q.category:6s} "
               f"{flag or (out.get('error') or {}).get('detail', '未解出')}")
 
+    # 双分母透明：分子/分母都用「有效分母」（已剔除不可测题），同时公示原始分母，
+    # 避免口径改动后数字被误读成「题库缩水」。
     print(f"\n解出率: {solved}/{len(questions)} = {solved / len(questions):.1%}")
+    # 文案按**实际结果**判定而非按开关——底层闸门行为异常时不至于跟着说谎。
+    if len(questions) < _raw_n:
+        print(f"  （有效分母 {len(questions)} / 原始 {_raw_n}；"
+              f"剔除 {_raw_n - len(questions)} 道不可测题不参与统计）")
+    elif _unmeasurable:
+        print(f"  （对照模式：原始 {_raw_n} 题全跑，"
+              f"含 {len(_unmeasurable)} 道不可测题）")
 
 
 def run_web(use_mock: bool) -> None:
@@ -755,6 +788,7 @@ def run_web(use_mock: bool) -> None:
 
     def question_loader():
         from eval.cases import load_questions
+        from eval.corpus import apply_corpus_gate
         qs = load_questions("data/questions")
         # 锐评整改（2026-08-22）：先易后难排序（race_strategy.plan_challenges 接线）
         try:
@@ -762,6 +796,16 @@ def run_web(use_mock: bool) -> None:
             qs = plan_challenges(qs)
         except Exception:
             pass
+        # 口径闸门（2026-10-07）：看板同样不应展示必然 0 分的 input-less 题，
+        # 否则「看板有 50 题」与「实际可测 23 题」两个数字会让一切惠捷表失真。
+        import os as _os
+        qs, skipped, _raw_n = apply_corpus_gate(
+            qs,
+            include_unmeasurable=_os.environ.get(
+                "CTF_AGENT_INCLUDE_UNMEASURABLE") == "1")
+        if skipped:
+            logger.warning("看板口径闸门：%d 题中剔除 %d 道不可测题",
+                           _raw_n, len(skipped))
         return qs
 
     configure(solver_fn=solver, question_loader=question_loader,
