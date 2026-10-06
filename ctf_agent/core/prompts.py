@@ -227,6 +227,13 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
     # 键唯一（2026-08-22 去重）；值全部为 skills/ 目录真实存在的 skill 名
     skill_map = {
         # ── 基础题型（测试赛/赛后 12 真题实证过的 skill）──
+        # 复数乘法群 RSA 变体路由（2026-10-06 M2 纠错）：specialcurve2 实证为复数乘法群类 RSA，
+        # 非椭圆曲线。专属键必须排在裸 "rsa" 通用键之前——infer_skill_require 命中即 return，
+        # 若裸 "rsa" 先命中会抢走路由到整数域 rsa_fermat_factor（对复数群无解）→ wrong_direction。
+        "复数乘法群": "crypto_complex_mult_group", "复乘": "crypto_complex_mult_group",
+        "类 rsa": "crypto_complex_mult_group", "类rsa": "crypto_complex_mult_group",
+        "specialcurve": "crypto_complex_mult_group", "高斯整数": "crypto_complex_mult_group",
+        "高斯整数群": "crypto_complex_mult_group",
         "morse": "morse_decoder", "摩斯": "morse_decoder",
         "费马": "rsa_fermat_factor", "fermat": "rsa_fermat_factor", "rsa": "rsa_fermat_factor",
         "zip": "zip_chain_decode", "压缩": "zip_chain_decode",
@@ -301,13 +308,6 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "小d": "rsa_fermat_factor", "私钥小": "rsa_fermat_factor",
         "逆元": "rsa_fermat_factor", "inverse": "rsa_fermat_factor",
         "phi": "rsa_fermat_factor", "欧拉函数": "rsa_fermat_factor",
-        # ── 复数乘法群 RSA 变体路由（2026-10-06 M2 纠错：specialcurve2 实证为复数乘法群类 RSA，
-        #   非椭圆曲线；原题面关键词在 skill_map 无任何匹配项→skill 未路由→agent 硬推 wrong_direction。
-        #   补触发词指向现成已验证 skill：crypto_complex_mult_group）──
-        "复数乘法群": "crypto_complex_mult_group", "复乘": "crypto_complex_mult_group",
-        "类 rsa": "crypto_complex_mult_group", "类rsa": "crypto_complex_mult_group",
-        "specialcurve": "crypto_complex_mult_group", "高斯整数": "crypto_complex_mult_group",
-        "高斯整数群": "crypto_complex_mult_group",
         "栅栏": "base64_multilayer", "培根": "base64_multilayer",
         # ── 补回有效键（2026-08-22 复核：指向真实存在 skill，不可误删）──
         "坏道": "misc_disk_forensics", "取证": "misc_disk_forensics",
