@@ -66,10 +66,135 @@ _FORBIDDEN_IMPORTS = {
 }
 _FORBIDDEN_CALLS = {
     "eval", "exec", "compile", "__import__",
-    "os.system", "os.popen", "os.exec", "os.spawn",
-    "os.remove", "os.rmdir", "os.unlink",
+    # 命令执行：列全变体（2026-10-06 补漏——原列表只有 os.exec/os.spawn，
+    # `os.execv/execve/execl/execvpe/execlp/execle` 与 `os.spawnv/spawnl/
+    # spawnve/posix_spawn` 等**同名变体全部漏过**，等于形同虚设）。
+    "os.system", "os.popen",
+    "os.exec", "os.execl", "os.execle", "os.execlp", "os.execlpe",
+    "os.execv", "os.execve", "os.execvp", "os.execvpe",
+    "os.spawn", "os.spawnl", "os.spawnle", "os.spawnlp", "os.spawnlpe",
+    "os.spawnv", "os.spawnve", "os.spawnvp", "os.spawnvpe",
+    "os.posix_spawn", "os.posix_spawnp",
+    # 权限 / 进程 / 环境篡改（2026-10-06 探测补漏，均可造成破坏或提权）
+    "os.startfile", "os.kill", "os.setuid", "os.setgid",
+    "os.chmod", "os.chown", "os.lchown", "os.chroot",
+    # 反序列化 RCE：pickle/dill 可直接执行任意代码。
+    # ⚠️ **marshal 不列入禁令**——它是 .pyc 反编译（pyc_decompile skill）的必需
+    # 工具，且 marshal.loads 只还原代码对象、不含reduce 钩子，攻击面与 pickle
+    # 完全不同。2026-10-06 实测：误禁会导致已接线的 pyc_decompile 加载失败。
+    "pickle.loads", "pickle.load", "dill.loads",
     "shutil.rmtree",
 }
+
+# 反序列化模块禁止导入（pickle 族；marshal 见上方说明故不在此列）
+_FORBIDDEN_IMPORTS |= {"pickle", "cPickle", "dill"}
+
+# ── 删除类调用的**受限豁免**（2026-10-06 收窄）────────────────────
+# 背景：`os.remove/rmdir/unlink` 原与 `os.system/exec/spawn` 同列禁止，
+# 导致 4 个 skill 永久无法加载（reverse_angr_solver / reverse_router /
+# reverse_js_methodology / zip_fake_encryption）。实测它们的删除调用
+# **全部只删自己创建的临时文件**（tempfile.NamedTemporaryFile(delete=False)
+# 产出的路径，或自己写出的 `x + ".fixed"`），与「删任意用户文件」风险差一个量级。
+#
+# 收窄策略：**不放开全局禁令**，改为「仅当删除目标可判定为自建临时产物时豁免」：
+#   1. 参数是 `tempfile.*` 调用结果（内联）→ 豁免；
+#   2. 参数是变量名，且该变量在同一函数内**由 tempfile 赋值** → 豁免；
+#   3. 参数是 `<已有字符串>.suffix/.fixed/.tmp` 之类自建后缀拼接 → 豁免。
+# 其余（字面量绝对路径、用户传入路径、库内部文件）**仍然禁止**。
+_SELF_BUILT_SUFFIXES = (".fixed", ".tmp", ".temp", ".bak")
+
+
+def _delete_target_is_self_built(argnode: ast.AST,
+                                 tmp_vars: set) -> bool:
+    """判断 os.remove/unlink/rmdir 的目标参数是否「自己创建的临时产物」。
+
+    仅放行明确可判定为自建临时文件/目录的删除，**字面量路径与用户传入路径
+    一律不放行**（fail-closed：无法判定即视为不可放行）。
+    """
+    # 形态1: os.unlink(tempfile.mkstemp()[1]) 之类内联
+    if isinstance(argnode, ast.Call):
+        fname = getattr(argnode.func, "attr", None) or getattr(argnode.func, "id", None)
+        if fname in ("mkstemp", "mkdtemp", "NamedTemporaryFile",
+                     "TemporaryDirectory"):
+            return True
+        return False
+    # 形态2: 变量在同函数内由 tempfile.* 赋值
+    if isinstance(argnode, ast.Name):
+        return argnode.id in tmp_vars
+    # 形态3: 自建后缀拼接（path + ".fixed"）
+    if isinstance(argnode, ast.BinOp) and isinstance(argnode.op, ast.Add):
+        for side in (argnode.left, argnode.right):
+            if isinstance(side, ast.Constant) and isinstance(side.value, str):
+                if side.value.startswith(".") and side.value.lower() in _SELF_BUILT_SUFFIXES:
+                    return True
+    return False
+
+
+def _collect_tempfile_vars(fn: ast.AST) -> set:
+    """收集函数内「由 tempfile 产出」的变量名。
+
+    需覆盖三种真实写法（本仓 4 个 skill 用到）：
+      ① `p = tempfile.mkstemp()[1]` / `d = tempfile.mkdtemp()`  → 直接赋值
+      ② `with tempfile.NamedTemporaryFile(...) as f: ... ; p = f.name`
+         → 需两跳：先记 with 里的临时文件变量 f，再记 `p = f.name`
+      ③ `with tempfile.TemporaryDirectory() as d:` → 直接记d
+    """
+    out = set()
+    tempfile_names = {"mkstemp", "mkdtemp", "NamedTemporaryFile",
+                      "TemporaryDirectory"}
+
+    def _is_tempfile_call(node: ast.AST) -> bool:
+        return (isinstance(node, ast.Call)
+                and (getattr(node.func, "attr", None)
+                     or getattr(node.func, "id", None)) in tempfile_names)
+
+    # ① 直接赋值 `p = tempfile.mkstemp()[1]` / `d = tempfile.mkdtemp()`
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Assign):
+            val = node.value
+            # 形态 a: p = tempfile.mkstemp()（直接调用）
+            if _is_tempfile_call(val):
+                for tgt in node.targets:
+                    if isinstance(tgt, ast.Name):
+                        out.add(tgt.id)
+            # 形态 b: p = tempfile.mkstemp()[1]（mkstemp 返回二元组，取下标 1）
+            elif isinstance(val, ast.Subscript) and _is_tempfile_call(val.value):
+                for tgt in node.targets:
+                    if isinstance(tgt, ast.Name):
+                        out.add(tgt.id)
+
+    # ③ with ... as f（f 为临时文件对象，可后续 f.name 取路径）
+    #    必须**先于** ② 执行：`p = f.name` 通常写在 with 块内部，
+    #    若单遍按源码顺序遍历，收集到 `p` 时 `f` 尚未入集→ 漏判（实测踩过）。
+    for node in ast.walk(fn):
+        if isinstance(node, (ast.With, ast.AsyncWith)):
+            for item in node.items:
+                if item.optional_vars is not None and _is_tempfile_call(item.context_expr):
+                    if isinstance(item.optional_vars, ast.Name):
+                        out.add(item.optional_vars.id)
+
+    # ② 第二跳 `p = f.name`（f 已在 ③ 中收集）
+    for node in ast.walk(fn):
+        if (isinstance(node, ast.Assign) and isinstance(node.value, ast.Attribute)
+                and node.value.attr == "name"
+                and isinstance(node.value.value, ast.Name)
+                and node.value.value.id in out):
+            for tgt in node.targets:
+                if isinstance(tgt, ast.Name):
+                    out.add(tgt.id)
+
+    # ④ 自建后缀变量：`fixed = path + ".fixed"`（zip_fake_encryption 用法）
+    for node in ast.walk(fn):
+        if (isinstance(node, ast.Assign) and isinstance(node.value, ast.BinOp)
+                and isinstance(node.value.op, ast.Add)):
+            for side in (node.value.left, node.value.right):
+                if (isinstance(side, ast.Constant) and isinstance(side.value, str)
+                        and side.value.startswith(".")
+                        and side.value.lower() in _SELF_BUILT_SUFFIXES):
+                    for tgt in node.targets:
+                        if isinstance(tgt, ast.Name):
+                            out.add(tgt.id)
+    return out
 
 
 @dataclass
@@ -98,6 +223,27 @@ def ast_sandbox_check(source: str) -> ASTCheckResult:
 
     violations = []
 
+    # fail-closed：先按「作用域」为单位收集各作用域内的 tempfile 变量，
+    # 便于判定 os.remove/unlink 的目标是否自建临时产物。
+    # 作用域含 **module 级**——本仓多个 skill 的自检代码位于
+    # `if __name__ == "__main__":` 块内（属 module 而非 function），
+    # 只扫 FunctionDef 会漏判（实测踩过：angr/router 仍 FAIL）。
+    scopes = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Module)):
+            scopes.append(node)
+    fn_tmp_vars = {sc: _collect_tempfile_vars(sc) for sc in scopes}
+
+    def _delete_allowed(call_node: ast.Call) -> bool:
+        """删除类调用是否落在「自建临时产物」豁免范围。"""
+        for fn, tvars in fn_tmp_vars.items():
+            for sub in ast.walk(fn):
+                if sub is call_node:
+                    arg = call_node.args[0] if call_node.args else None
+                    if arg is not None and _delete_target_is_self_built(arg, tvars):
+                        return True
+        return False
+
     for node in ast.walk(tree):
         # 检查 import 语句
         if isinstance(node, ast.Import):
@@ -121,6 +267,13 @@ def ast_sandbox_check(source: str) -> ASTCheckResult:
                 # 检查 os.system / os.popen 等
                 if isinstance(func.value, ast.Name):
                     full_name = f"{func.value.id}.{func.attr}"
+                    # 删除类调用：仅自建临时产物豁免（2026-10-06 收窄）
+                    if full_name in ("os.remove", "os.rmdir", "os.unlink"):
+                        if not _delete_allowed(node):
+                            violations.append(
+                                f"禁止调用: {full_name}()（仅允许删除自建临时文件；"
+                                f"删除字面量/用户传入路径仍禁止）")
+                        continue
                     if full_name in _FORBIDDEN_CALLS:
                         violations.append(f"禁止调用: {full_name}()")
 
