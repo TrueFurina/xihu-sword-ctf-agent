@@ -12,14 +12,18 @@ A. 卡在题源缺失（6 个）—— 目标题附件 MISS / flag_sha256 为空
       经核实是 **L0 送分层**（附件 flag.txt 直含明文答案，sha256 匹配）
       → 即便补上附件，接线也无能力增量。
 
-B. 卡在安全沙箱（5 个）—— AST 沙箱拒绝，SkillManager.load() 直接 FAIL：
-   · reverse_angr_solver / reverse_router → os.unlink()
-   · reverse_js_methodology → os.unlink() + os.popen()
-   · zip_fake_encryption → os.remove()
-   · misc_grid_resample / jpeg_png_embedded → import subprocess
-   （已逐处核实：os.unlink/os.remove 全在 __main__ 自检或删自己产出的临时
-     文件，os.popen 仅探测 node，均非高危 → 疑似沙箱过严，但**改安全策略
-     需人工裁决**，AI 不擅自改。）
+B. 卡在安全沙箱 —— **2026-10-06 已部分收窄**：
+   原禁令把 `os.remove/rmdir/unlink` 与 `os.system/exec/spawn` 同列，导致
+   4 个 skill 永久不可加载。实测这些调用**全部只删自己创建的临时文件**
+   （tempfile.NamedTemporaryFile(delete=False) 产出的路径，或自己写出的
+   `x + ".fixed"`），与「删任意用户文件」风险差一个量级 → 属过严误伤。
+   现已改为「**仅删除自建临时产物时豁免**」，字面量路径 / 用户传入路径
+   **仍然禁止**（fail-closed）。效果：
+   · 已解锁：reverse_angr_solver / reverse_router / zip_fake_encryption
+   · 仍禁止（真高危，不在收窄范围）：reverse_js_methodology（os.popen）、
+     misc_grid_resample（import subprocess）、jpeg_png_embedded（subprocess/shutil）、
+     crypto_complex_mult_group（subprocess/shutil，用于探测外部工具 gp）
+   收窄后它们**仍不具备接线条件**（题源缺失 / 真高危未解禁），故 NOT_WIRABLE 不变。
 
 本测试的作用：**防止后人随手给这些孤儿加 skill_map 键**，造成
 「看起来接了、实际跑不通/没真解」的假水位。
@@ -41,13 +45,13 @@ NOT_WIRABLE = {
     "morse_ab_decode": "唯一有sha 的目标题是 L0 送分层（附件直含明文答案）",
     "reverse_go_apk": "候选题 flag_sha256 全为空",
     "web_target_interact": "需靶机(127.0.0.1:9001/9002) + sha256 空",
-    # B. 安全沙箱拒绝（SkillManager.load 会 FAIL）
-    "zip_fake_encryption": "AST 沙箱禁 os.remove()",
-    "reverse_angr_solver": "AST 沙箱禁 os.unlink()",
-    "reverse_router": "AST 沙箱禁 os.unlink()",
-    "reverse_js_methodology": "AST 沙箱禁 os.unlink()/os.popen()",
-    "misc_grid_resample": "AST 沙箱禁 import subprocess",
-    "jpeg_png_embedded": "AST 沙箱禁 import subprocess/shutil",
+    # B. 安全沙箱（SkillManager.load 会 FAIL）
+    "zip_fake_encryption": "沙箱阻塞已解除（删除类收窄），但目标题附件 MISS+sha 空",
+    "reverse_angr_solver": "沙箱阻塞已解除，但目标题 sha256 为空不可实证",
+    "reverse_router": "沙箱阻塞已解除，但候选题 sha256 为空不可实证",
+    "reverse_js_methodology": "AST 沙箱禁 os.popen()（真高危，不在收窄范围）",
+    "misc_grid_resample": "AST 沙箱禁 import subprocess（真高危）",
+    "jpeg_png_embedded": "AST 沙箱禁 import subprocess/shutil（真高危）",
 }
 
 
@@ -76,26 +80,38 @@ class TestNotWirableOrphans(unittest.TestCase):
             "以下孤儿被接线了，但题源不足/被沙箱拒绝，会造假水位：%r\n"
             "若已补齐题源或沙箱已收窄，请在ALLOW 清单登记并附真解证据。" % wrongly)
 
-    def test_sandbox_blocked_skills_really_fail_to_load(self):
-        """实证：沙箱类孤儿确实无法被 SkillManager 加载（证明阻塞真实存在）。
+    def test_sandbox_state_matches_expectation(self):
+        """实证沙箱状态与本护栏的登记一致（沙箱收窄后应及时更新登记）。
 
-        若将来沙箱收窄使它们可加载了，本测试会失败 → 提示更新 NOT_WIRABLE
-        的阻塞原因（那时它们可能变为可接线候选）。
+        2026-10-06 沙箱收窄后：`os.remove/rmdir/unlink` 改为「仅自建临时产物
+        豁免」，**3 个 skill 因此解锁**（angr/router/zip_fake，它们只删自己
+        创建的临时文件）；`os.popen`/`import subprocess` 等真高危**仍禁止**，
+        故 reverse_js_methodology / grid_resample / jpeg_png_embedded 继续
+        不可加载。
+
+        本用例把「哪些已解锁、哪些仍锁」写成断言 —— 沙箱一旦再变，
+        本测试转红即提示同步更新 NOT_WIRABLE 的阻塞原因。
         """
         import sys
         if _CTF not in sys.path:
             sys.path.insert(0, _CTF)
         from tools.skill_manager import SkillManager
-        sandbox_blocked = [
+        now_unlocked = [
             "zip_fake_encryption", "reverse_angr_solver", "reverse_router",
-            "reverse_js_methodology", "misc_grid_resample", "jpeg_png_embedded",
+        ]
+        still_locked = [
+            "reverse_js_methodology",  # os.popen
+            "misc_grid_resample",      # import subprocess
+            "jpeg_png_embedded",       # import subprocess / shutil
         ]
         sm = SkillManager()
-        loadable = [n for n in sandbox_blocked if sm.load(n)]
-        self.assertEqual(
-            loadable, [],
-            "这些曾被沙箱拒绝的 skill 现在能加载了（沙箱已收窄？）→ "
-            "需重新评估能否接线，并更新 NOT_WIRABLE 阻塞原因：%r" % loadable)
+        became_loadable = [n for n in now_unlocked if sm.load(n)]
+        self.assertEqual(became_loadable, now_unlocked,
+                         "这些 skill 应已被沙箱收窄解锁：%r" % became_loadable)
+        wrongly_loadable = [n for n in still_locked if sm.load(n)]
+        self.assertEqual(wrongly_loadable, [],
+                         "真高危项应仍被禁止（os.popen / import subprocess）：%r"
+                         % wrongly_loadable)
 
     def test_morse_target_is_l0_giveaway(self):
         """诚实护栏：morse_ab_decode 唯一有 sha 的目标题确为 L0 送分层。
