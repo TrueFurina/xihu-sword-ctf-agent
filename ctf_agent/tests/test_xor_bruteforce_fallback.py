@@ -82,3 +82,29 @@ def test_negative_no_flag_no_false_positive():
         path = _write(d, "blob.txt", b64)
         out, err = _run_fallback([path])
     assert "flag{" not in out, f"不应误报 flag: out={out!r} err={err!r}"
+
+
+def test_negative_embedded_key_md5_mismatch_rejected():
+    """负例：结构占位像内嵌密钥型但 md5 尾不吻合 → 必须拒绝。
+
+    防的是「窗口 XOR==0 随机巧合」假阳性（实测 lowe 的 ~270B DER blob 会命中），
+    故段 (b) 改为**强制 md5 仲裁**——破坏末位即应被拒。
+    """
+    flag = b"flag{embedded_key_xor_test}"      # len=27, gcd(27,42)=3 → 密钥可传播完整
+    key = b"A quart jar of oil mixed with zinc oxide!!"
+    ct = bytearray.fromhex(_make_embedded_key_xor(flag, key))
+    ct[-1] ^= 0x01                     # 破坏 md5 尾 → 结构不再自洽
+    with tempfile.TemporaryDirectory() as d:
+        path = _write(d, "encrypted", bytes(ct).hex())
+        out, err = _run_fallback([path])
+    assert "flag{" not in out, f"md5 不吻合时不应 emit: out={out!r}"
+
+
+def test_negative_nonprintable_flag_content_rejected():
+    """负例：结构自洽但 flag 内容非可打印 → 不得 emit（防 [^}\\s] 类误匹配）。"""
+    flag = b"flag{\x80\x81\x82}"       # 非可打印内容，正则应不匹配
+    key = b"A quart jar of oil mixed with zinc oxide!!"
+    with tempfile.TemporaryDirectory() as d:
+        path = _write(d, "encrypted", _make_embedded_key_xor(flag, key))
+        out, err = _run_fallback([path])
+    assert "flag{" not in out, f"非可打印 flag 内容不应 emit: out={out!r}"
