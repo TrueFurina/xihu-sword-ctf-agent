@@ -704,9 +704,10 @@ if _m_pem:
 #   - 明文内嵌密钥型重复密钥 XOR（another_xor：plaintext = flag + key + md5(flag+key)，
 #     故存在窗口使 XOR(blob[off:off+L])==0 → 定位 key 长；再由 "flag{" 前缀与密钥
 #     自引用关系传播恢复全 key，末尾 32B hex 作 md5 仲裁）
-# 只在结果含 flag 模式时打印（防幻觉）。
+# 只在结果含 flag 模式时打印（防幻觉）。flag 内容限定可打印 ASCII（[!-~]），
+# 避免误匹配到 XOR 后残留的非可打印字节（实测 lowe 的 DER blob 曾因此假阳性）。
 import base64, binascii
-_FLAGRE = r"(?i)(?:flag|ctf|dasctf)\{[^}\s]{3,120}\}"
+_FLAGRE = r"(?i)(?:flag|ctf|dasctf)\{[!-~]{3,120}\}"
 def _scan_flag(_b):
     _m = re.search(_FLAGRE, _b.decode("latin-1", "ignore"))
     return _m.group(0) if _m else None
@@ -754,18 +755,19 @@ def _xor_bruteforce(_blob):
             if any(_kk is None for _kk in _key):
                 continue
             _kb = bytes(_key)
+            # 结构校验（严格）：该题型必有 32 字节 md5 尾，且 md5(flag+key) 须吻合。
+            # 否则「窗口 XOR==0」可能只是随机巧合（实测 lowe 的 ~270B DER blob 会命中），
+            # 必须拒绝——md5 碰撞概率 ≈ 0，是唯一可靠仲裁。
+            if _n - _off - _L != 32:
+                continue
             _pt = bytes(_blob[_i] ^ _kb[_i % _L] for _i in range(_off))
-            _hit = _scan_flag(_pt)
-            if _n - _off - _L == 32:
-                _tail = bytes(_blob[_off + _L + _i] ^ _kb[(_off + _L + _i) % _L]
-                              for _i in range(32))
-                try:
-                    if _hmod.md5(_pt + _kb).hexdigest().encode() == _tail:
-                        _hit = _hit or _scan_flag(_pt)
-                except Exception:
-                    pass
-            if _hit:
-                _emit("xor_repeat_embed L=%d" % _L, _hit)
+            _tail = bytes(_blob[_off + _L + _i] ^ _kb[(_off + _L + _i) % _L]
+                          for _i in range(32))
+            try:
+                if _hmod.md5(_pt + _kb).hexdigest().encode() == _tail:
+                    _emit("xor_repeat_embed L=%d" % _L, _scan_flag(_pt))
+            except Exception:
+                pass
     # c) 通用重复密钥 XOR（短密钥、逐列英文打分）
     if _n <= 512:
         def _eng(_b):
