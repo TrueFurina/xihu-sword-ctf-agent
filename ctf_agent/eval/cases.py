@@ -32,6 +32,39 @@ logger = logging.getLogger(__name__)
 # 算 sha256 与之比对——既保持本地自检自洽，又保证明文 flag 永不进 git 历史。
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
+# 规范类别集（权威来源：scripts/ingest_external_ctf.py 的 VALID_CATS）。
+# 外部题源（NYU/CSAW、cybench 等）会产出别名拼写，如 rev（逆向）、forensics（取证）。
+# 若不在加载层归一化，下游按 `== "reverse"` / `in ("crypto","pwn","reverse")` 硬判的
+# presolve 路由、兜底链、heavy 模型升级、步数预算会对这些题**全部失效**——即
+# 「能力存在但不可达」的系统性缺口（2026-10-07 实测：41 道外部题受影响）。
+CANONICAL_CATEGORIES = ("web", "crypto", "misc", "reverse", "pwn")
+
+# 别名 → 规范类别。forensics→misc 与本地库把取证题（如 real_misc_longjian*_forensics*）
+# 标为 misc 的既有约定一致；反向映射 rev→reverse 与 scripts/fetch_google_ctf.py 的
+# CAT_MAP 同向。未列出的类别原样返回（不猜测，保留可观测性）。
+_CATEGORY_ALIASES = {
+    "rev": "reverse",
+    "reversing": "reverse",
+    "reverse-engineering": "reverse",
+    "reverse_engineering": "reverse",
+    "forensics": "misc",
+    "forensic": "misc",
+}
+
+
+def normalize_category(raw: object) -> str:
+    """把外部题源的各种类别拼写归一化到规范集。
+
+    - 去空白 / 转小写；
+    - 命中别名表则映射（rev→reverse、forensics→misc）；
+    - 空值按既有默认回落 misc；
+    - 未知类别原样返回，不静默改写（便于观测新题源）。
+    """
+    cat = str(raw or "").strip().lower()
+    if not cat:
+        return "misc"
+    return _CATEGORY_ALIASES.get(cat, cat)
+
 
 @dataclass
 class Question:
@@ -62,7 +95,7 @@ class Question:
         return cls(
             id=str(data.get("id", "")),
             title=str(data.get("title", "")),
-            category=str(data.get("category", "misc")),
+            category=normalize_category(data.get("category", "misc")),
             description=str(data.get("description", "")),
             flag=data.get("flag"),
             flag_sha256=data.get("flag_sha256"),
