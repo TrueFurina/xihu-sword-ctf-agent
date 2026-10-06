@@ -235,6 +235,7 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "specialcurve": "crypto_complex_mult_group", "高斯整数": "crypto_complex_mult_group",
         "高斯整数群": "crypto_complex_mult_group",
         "morse": "morse_decoder", "摩斯": "morse_decoder",
+        "2^1025": "crypto_cycling",
         "费马": "rsa_fermat_factor", "fermat": "rsa_fermat_factor", "rsa": "rsa_fermat_factor",
         "zip": "zip_chain_decode", "压缩": "zip_chain_decode",
         "base64": "base64_multilayer", "base32": "base64_multilayer",
