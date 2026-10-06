@@ -236,6 +236,13 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "高斯整数群": "crypto_complex_mult_group",
         "morse": "morse_decoder", "摩斯": "morse_decoder",
         "2^1025": "crypto_cycling",
+        # ── 真·L2 纯推理层专属键（2026-10-06 B 接线 · 孤儿求解器回收）──
+        # 键选取纪律：用题面独有短语，禁用泛化词。
+        #   逐位加密 → 全题库仅命中 simplelegendre（0 误伤）；Legendre 符号本身不入题面。
+        #   模逆     → 仅命中 exciting_inverse；禁用「逆元」（全库 9 题，会误伤）。
+        # 键序纪律：必须排在下方裸 "rsa" 之前，否则被 RSA catch-all 抢走（同 specialcurve2 陷阱）。
+        "逐位加密": "crypto_legendre_phi",
+        "模逆": "crypto_modinv_factor",
         "费马": "rsa_fermat_factor", "fermat": "rsa_fermat_factor", "rsa": "rsa_fermat_factor",
         "zip": "zip_chain_decode", "压缩": "zip_chain_decode",
         "base64": "base64_multilayer", "base32": "base64_multilayer",
