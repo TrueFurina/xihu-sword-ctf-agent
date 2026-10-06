@@ -418,7 +418,12 @@ _PROVIDER_MODEL_ALLOWLIST: dict[str, set] = {
     # glm-4.7-flash 为 agentic loop/coding 调优、200K 上下文；探针实测本端点 200 且能吐
     # JSON 动作。登记用途：允许 CTF_AGENT_LIGHT/HEAVY_MODEL 显式覆盖到这两个免费升级档时
     # **不被净化回退**（与 glm-4-flash 同为 $0，不违背"防回退成付费"本意）。
-    "glm": {"glm-4-flash", "glm-4.7", "glm-4.7-flash", "glm-4.5-flash"},
+    # 2026-10-07 补登 glm-4-plus / glm-4-air / glm-4-air-250414：**非推理**档（实测 0.6-1.2s/步，
+    # 无 reasoning_token），用于验证「非推理快模型能否打破 180s 墙钟」。glm-4-plus 为高性能旗舰
+    # （¥5/¥15 每百万）；glm-4-air 系列官方标注"工具调用/代码/智能体能力大大加强"（¥0.5/百万）。
+    # 探针实测三者本端点 200、吐合法 JSON 动作。登记用途同前：防 env 覆盖被静默回退。
+    "glm": {"glm-4-flash", "glm-4.7", "glm-4.7-flash", "glm-4.5-flash",
+            "glm-4-plus", "glm-4-air", "glm-4-air-250414"},
 }
 
 
