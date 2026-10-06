@@ -6,8 +6,9 @@
 本仓63 个 skill（含本轮接线的 11 个实证solver）在真实跑批中**不会被自动调用**。
 
 本测试锁死：
-① 适配层入参契约：路径类/目录类能构造 params，纯数值类与未知 skill 返回 None
-   （fail-closed——不拿猜测参数制造假失败）；
+① 适配层入参契约：路径类/目录类能构造 params；数值类由**确定性提取器**
+   构造（2026-10-07 起，见 tests/test_skill_dispatch_numeric_params.py）；
+   拿不到必需参数时一律返回 None（fail-closed——不拿猜测参数制造假失败）；
 ② 附件解析必须用**精确路径**（全库有 181 道题同名附件冲突，basename 盲找会拿错）；
 ③ flag 抽取：bytes / str / ToolOutput 三种形态都能提取，无则None（不臆造）；
 ④ **端到端**：真实题面 ezRSA（真·L2）→ 路由命中 crypto_hastad_broadcast
@@ -72,17 +73,29 @@ class TestSkillDispatchAdapter(unittest.TestCase):
         self.assertEqual(p["kind"], "dir")
         self.assertTrue(p["dir"])
 
-    def test_numeric_class_and_unknown_return_none(self):
-        """纯数值类与未知 skill 必须返回 None（fail-closed，不猜参数）。"""
+    def test_unknown_skill_and_unresolvable_input_return_none(self):
+        """未知 skill / 拿不到必需参数的场景必须 None（fail-closed，不猜参数）。
+
+        2026-10-07 语义更新：crypto_cycling / crypto_primes_subset /
+        crypto_knapsack_mhk 已由**确定性提取器**（tools/skill_dispatch 的
+        _NUMERIC_EXTRACTORS）接线，不再是"主链无法可靠构造参数"的一类，
+        故移出"永不 can build"的断言。
+        但 fail-closed 语义**没有放宽**：给它们一个不含所需数值的题面时，
+        仍必须返回 None——绝不用默认值/猜测值去喂 solver 制造假失败。
+        （对应的"能提取时真跑出 flag"看 tests/test_skill_dispatch_numeric_params.py）
+        """
         att = os.path.join(_CTF, "data", "questions_real", "_attachments",
                            "crypto", "real_crypto_ezrsa", "output")
         q = _Q([att])
+        self.assertIsNone(self.disp.build_params("no_such_skill", q))
+        self.assertFalse(self.disp.should_auto_call("no_such_skill"),
+                         "未知 skill 不应进入自动调用白名单")
         for name in ("crypto_cycling", "crypto_primes_subset",
-                     "crypto_knapsack_mhk", "no_such_skill"):
-            self.assertIsNone(self.disp.build_params(name, q),
-                              "%s 不应被自动构造参数" % name)
-            self.assertFalse(self.disp.should_auto_call(name),
-                             "%s 不应进入自动调用白名单" % name)
+                     "crypto_knapsack_mhk"):
+            self.assertIsNone(
+                self.disp.build_params(name, q),
+                "%s 在题面不含所需数值参数时必须返回 None（不得拿猜测值 "
+                "去调 solver 制造假失败）" % name)
 
     def test_iter_candidate_params_yields_all_attachments(self):
         """多附件题必须逐个产出候选（实测 ezRSA: task.py 解不出、output 能解出）。"""
@@ -93,6 +106,42 @@ class TestSkillDispatchAdapter(unittest.TestCase):
         self.assertEqual(len(cands), 2, "应产出 2 个候选")
         self.assertTrue(cands[0]["path"].endswith("task.py"))
         self.assertTrue(cands[1]["path"].endswith("output"))
+
+    def test_iter_candidate_params_yields_dir_class(self):
+        """回归护栏（2026-10-07）：目录类必须**在 iter 层面**产出候选。
+
+        背景：一次误编辑把 _DIR_SKILLS 分支整体替换成了 _NUMERIC_SKILLS 分支，
+        导致唯一的 B 类目录 skill crypto_lcg_recover 在主链里走到
+        ``not in _PATH_SKILLS → return``，**永远不被调用**。
+        当时本文件只测了 build_params（仍通过），未覆盖 iter_candidate_params
+        的目录分支，所以 1157 个用例全绿也没拦住——故补此用例。
+        """
+        att = os.path.join(_CTF, "data", "questions_real", "_attachments",
+                           "crypto", "real_crypto_ezrsa", "output")
+        q = _Q([att])
+        cands = list(self.disp.iter_candidate_params("crypto_lcg_recover", q))
+        self.assertEqual(len(cands), 1, "目录类应产出 1 个候选")
+        self.assertEqual(cands[0]["kind"], "dir")
+        self.assertTrue(cands[0]["dir"])
+
+    def test_every_allowlisted_skill_yields_a_candidate(self):
+        """通用护栏：白名单内 skill 在有附件时必须产出候选（含新增的 C 类之外的 Kir）。
+
+        目的：**将来再往 AUTO_CALLABLE 加 skill 时，若它在 iter_candidate_params
+        里没有对应分支（即遗漏接线），本用例会立刻变红**，而不是等到跑批里静默失效。
+        数值类的三个需要各自的专属附件，故此处只对其余项做「有附件即有候选」检查。
+        """
+        att = os.path.join(_CTF, "data", "questions_real", "_attachments",
+                           "crypto", "real_crypto_ezrsa", "output")
+        q = _Q([att])
+        numeric = {"crypto_cycling", "crypto_primes_subset",
+                   "crypto_knapsack_mhk"}  # 各自需要专属数值附件，另有用例覆盖
+        for name in sorted(self.disp.AUTO_CALLABLE - numeric):
+            with self.subTest(skill=name):
+                self.assertTrue(
+                    list(self.disp.iter_candidate_params(name, q)),
+                    "%s 在 AUTO_CALLABLE 内但 iter_candidate_params 无分支 → "
+                    "接线遗漏（跑到 Registry 时会静默不调用）" % name)
 
     def test_iter_candidate_params_empty_for_numeric_class(self):
         q = _Q(["x"])

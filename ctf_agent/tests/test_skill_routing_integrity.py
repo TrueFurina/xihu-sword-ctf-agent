@@ -111,5 +111,13 @@ def test_infer_skill_require_loads_local_skill():
 
     mgr = _Mgr()
     result = infer_skill_require(_Ctx(), {"ability_gap": ["缺少有效攻击路径"]}, mgr)
-    assert result is None
+    # 2026-10-07 语义更新（此处原为 ``assert result is None``，属**锁死旧错误行为**）：
+    # 修复「主链断链」前，infer_skill_require 在命中本地 skill 后仍一律 return None，
+    # 导致 main_agent 永远拿不到"该调哪个 skill"——63 个 skill 从不被调用。
+    # 修复后约定：本地**存在**时必须返回 {"skill_name","keyword"} 供主链 registry.run；
+    # 只有本地**缺失**时才返回 None（见上一个用例，仍被该测试守护）。
+    # 若这里改回 assert None，等于把主链断链缺陷重新制度化。
+    assert result is not None, "本地有 skill 时必须返回 routing 结果，否则主链断链复发"
+    assert result["skill_name"] == "morse_decoder", result
+    assert result["keyword"] == "摩斯", result
     assert "morse_decoder" in mgr.loaded, "本地存在的 skill 应自动加载"
