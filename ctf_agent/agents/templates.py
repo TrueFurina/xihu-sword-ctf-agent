@@ -79,16 +79,6 @@ class TemplateBank:
             "2b. 【确定性 skill 触发】A/B 字符序列→调 morse_ab_decode skill（摩斯解码+UUID定位）；"
             "key:/data: 格式或八进制/多层编码→调 vigenere_decode skill（自动提取+解密）；"
             "JPEG 尾部异常/多文件头→调 jpeg_png_embedded skill（嵌入图片提取）",
-            "2c. 【椭圆曲线/ECDLP/离散对数】若参数含曲线方程(Weierstrass y²=x³+ax+b / Edwards / "
-            "Montgomery)、基点G/阶n/系数(p,a,b)或关键词 ec/elliptic/curve/specialcurve/discrete-log/"
-            "离散对数→ 先判曲线类型再动手，禁止默认当 RSA 处理或一上来手搓大数分解："
-            "① 标准/安全曲线→用 python(sympy/ecdsa/tinyec) 或 sage 算点乘/离散对数；"
-            "② n 极小或素因子平滑→大步小步(BSGS)/Pollard ρ 解 ECDLP；"
-            "③ 奇异(singular)/异常(anomalous,#E=n)/超奇异(supersingular)→对应退化攻击"
-            "(Smart 异常曲线攻击、MOV/FR 把 ECDLP 降到 F_p²/F_p^k 的 DLP)；"
-            "④ weak/special 曲线→查已知攻击(如小嵌入度/可降次)；"
-            "⑤ 若实为 F_p 上离散对数(DLP)→BSGS + Pohlig-Hellman 按 n 的素因子分解；"
-            "以上用 python 脚本实现，先小参数验证算法再上全量",
             "3. 【一键直出·最高优先】直接调用 crypto_auto 工具（参数 attachments 传附件绝对路径列表），"
             "它会自动嗅探 RSA 参数（已知phi/逆元、Hastad 广播 e 爆破、共模、费马、Wiener、small_e）并执行确定性攻击，"
             "同时尝试哈希爆破与多层编码，命中即返回 flag（实测 ExcitingInverse/ezRSA 秒解，无需自己写攻击脚本）；"
