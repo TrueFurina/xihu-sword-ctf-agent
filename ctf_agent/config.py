@@ -413,8 +413,12 @@ def list_dashscope_free_models(kind: str | None = None, chat_only: bool = True) 
 _PROVIDER_MODEL_ALLOWLIST: dict[str, set] = {
     "qwen": set(DASHSCOPE_FREE_MODELS.keys()) | {"qwen3.7-flash", "qwen3.8-max"},
     # glm：登记免费模型 glm-4-flash（2026-10-05 领取 ZHIPU_API_KEY 后接入），
-    # 防 from_env 净化逻辑把 CTF_AGENT_LIGHT/HEAVY_MODEL=glm-4-flash 回退成付费 glm-4.7
-    "glm": {"glm-4-flash", "glm-4.7"},
+    # 防 from_env 净化逻辑把 CTF_AGENT_LIGHT/HEAVY_MODEL=glm-4-flash 回退成付费 glm-4.7。
+    # 2026-10-06 补登 glm-4.7-flash / glm-4.5-flash：Z.ai 官方**永久免费**档（$0/$0），
+    # glm-4.7-flash 为 agentic loop/coding 调优、200K 上下文；探针实测本端点 200 且能吐
+    # JSON 动作。登记用途：允许 CTF_AGENT_LIGHT/HEAVY_MODEL 显式覆盖到这两个免费升级档时
+    # **不被净化回退**（与 glm-4-flash 同为 $0，不违背"防回退成付费"本意）。
+    "glm": {"glm-4-flash", "glm-4.7", "glm-4.7-flash", "glm-4.5-flash"},
 }
 
 
