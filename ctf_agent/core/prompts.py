@@ -246,6 +246,18 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         # lowe（CSAW 2018·e=3 无填充 + Y+N 完全立方）：perfect cube 为题面独有短语，
         # 全题库仅命中本题（零误伤）。禁用「无填充/1536-bit」等泛化表述。
         "perfect cube": "crypto_pkcs1_padding_oracle",
+        # ── 孤儿求解器回收·第四批（2026-10-06，均附 sha256 实证）──
+        # 1black0white（数字矩阵→QR）：题面 "seemingly random numbers ... is a QR code"，
+        #   该短语全题库仅命中本题；**禁用「QR/二维码」泛化键**。
+        "seemingly random numbers": "misc_qr_matrix",
+        # MHK2（Murakami 背包等价密钥恢复）：「Murakami」仅命中本题，语义精确。
+        "murakami": "crypto_knapsack_mhk", "knapsack": "crypto_knapsack_mhk",
+        # least-common-genominator（LCG 参数恢复→RSA 私钥重建）：
+        #   主键必须取 **description 内** 独有短语——infer_skill_require 只匹配 description，
+        #   题名 "Least Common Genominator?" 不参与匹配（实测：只挂题名键路由失败）。
+        #   禁用「LCG」——CSAW m_ster_0f_prn9 也是 LCG 题，会被错带。
+        "dumped the first six": "crypto_lcg_recover",
+        "common genominator": "crypto_lcg_recover",
         "费马": "rsa_fermat_factor", "fermat": "rsa_fermat_factor", "rsa": "rsa_fermat_factor",
         "zip": "zip_chain_decode", "压缩": "zip_chain_decode",
         "base64": "base64_multilayer", "base32": "base64_multilayer",
