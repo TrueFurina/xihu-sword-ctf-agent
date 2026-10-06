@@ -34,9 +34,24 @@ from core.intervention import InterventionCoordinator  # noqa: E402
 _intervention = InterventionCoordinator()
 
 
+def _align_wallclock_to_eval(eval_wallclock, per_q_default, hard_default):
+    """P1 墙钟对齐：评测传入的硬墙钟 < Agent 内部默认墙钟时，把 Agent 内部墙钟收敛到
+    评测墙钟以下（留 30s 余量覆盖单步 LLM 耗时），保证 Agent 优雅自止先于评测层
+    ``asyncio.wait_for(..., timeout=eval_wallclock)`` 取消——否则 Agent 永远等不到自己
+    收尾被外部杀（根因：config 默认 per_question_wallclock=300 > 评测 180，glm 三题
+    即此因：180s 被 cancel，token 恒记 0）。
+    评测墙钟 ≥ Agent 默认时原样保留（不收紧，避免误伤长窗口真跑）。
+    """
+    if not eval_wallclock or eval_wallclock <= 0:
+        return per_q_default, hard_default
+    _cap = max(30.0, float(eval_wallclock) - 30.0)
+    return (min(float(per_q_default), _cap), min(float(hard_default), _cap))
+
+
 def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None,
                  model_override: Optional[str] = None, validate_locally: bool = True,
-                 skip_presolve: bool = False, race_controller=None):
+                 skip_presolve: bool = False, race_controller=None,
+                 wallclock: Optional[float] = None):
     """构建求解器（反馈循环 + 主 Agent + 监督）。
 
     Args:
@@ -85,6 +100,12 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     from verify.flag_checker import FlagChecker
 
     _cfg = AppConfig.from_env()
+
+    # P1 墙钟对齐（2026-10-06）：评测传入墙钟下传 Agent，避免 Agent 内部墙钟(默认 300)
+    # 永远 > 评测墙钟(如 180) 而被外部 asyncio.wait_for 取消、永记 0 token。
+    # 普通题与 HARD 题两条分支都收敛到评测墙钟以下（HARD 默认 480 同样会超 180）。
+    _agent_per_q_wc, _agent_hard_wc = _align_wallclock_to_eval(
+        wallclock, _cfg.per_question_wallclock, _cfg.hard_wallclock)
 
     # 生效配置快照（2026-08-22 锐评第五节整改）：真实 LLM 模式启动即打印
     # provider/端点/模型/key 状态——防 BASE_URL/模型残留打错端点（初赛灾难根因）。
@@ -209,6 +230,8 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
         skill_manager=skill_manager,  # ← /goal 动态 Skill 加载
         provider=provider,   # ← 报告与流量吻合（真实 provider 标签）
         token_usage_fn=_token_usage_fn,  # ← 预算反思 token 口径（2026-10-03）
+        per_question_wallclock=_agent_per_q_wc,  # P1 墙钟对齐：≤ 评测墙钟
+        hard_wallclock=_agent_hard_wc,           # P1 墙钟对齐：HARD 分支同样收敛
     )
     # 正确性判定：未显式传入时，本地题库评测默认与题库 flag 比对（防幻觉 flag 假阳性）；
     # 平台单解模式（validate_locally=False）无本地 ground truth，仅做格式校验

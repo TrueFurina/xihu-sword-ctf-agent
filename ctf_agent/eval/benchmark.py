@@ -406,7 +406,8 @@ def main() -> None:
     if len(providers) == 1:
         # 单 provider：行为与历史版本完全一致（保持可复现基线）。
         _solver = build_solver(use_mock=False, provider=providers[0], validate_locally=True,
-                               skip_presolve=args.presolve_skip)
+                               skip_presolve=args.presolve_skip,
+                               wallclock=args.wallclock)  # P1 墙钟对齐：评测墙钟下传 Agent
 
         async def solver(q, attempt):
             out = await _solver(q, attempt)
@@ -450,7 +451,8 @@ def main() -> None:
         if args.limit and args.limit > 0:
             _questions = _questions[: args.limit]
         _solver = build_solver(use_mock=False, provider=prov, validate_locally=True,
-                               skip_presolve=args.presolve_skip)
+                               skip_presolve=args.presolve_skip,
+                               wallclock=args.wallclock)  # P1 墙钟对齐：评测墙钟下传 Agent
 
         async def solver(q, attempt, _s=_solver):
             return await _s(q, attempt)
