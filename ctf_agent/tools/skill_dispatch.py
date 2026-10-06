@@ -93,8 +93,12 @@ def resolve_attachment_dir(question: Any) -> Optional[str]:
 def build_params(skill_name: str, question: Any) -> Optional[dict]:
     """按 skill 契约构造 params；无法可靠构造时返回 None（不猜参数）。
 
-    A 类：{"path": 首个存在的附件, "text": 文件内容}
-         ——同时给 path 与 text，兼容两种取参风格。
+    A 类：{"path": 单个附件路径, "text": 其内容}——**单个**，不合并。
+         ⚠️ 实测教训（2026-10-06）：不能无脑取「第一个存在的附件」——
+            ezRSA 有两个附件（task.py 加密脚本 + output 数据文件），
+            取第一个喂给 skill 会返回 None（解不出），而 output 才能解出。
+            故本函数只保证「至少有一个可试的路径」，由调用方
+            （skill_dispatch.iter_candidate_params）逐个试探。
     B 类：{"kind": "dir", "dir": 附件所在目录}
     C 类/未知：None（调用方应跳过）
     """
@@ -115,6 +119,41 @@ def build_params(skill_name: str, question: Any) -> Optional[dict]:
             return None
         return {"kind": "dir", "dir": d}
     return None
+
+
+def iter_candidate_params(skill_name: str, question: Any):
+    """产出该 skill 可尝试的 params 序列（按附件顺序，含目录兜底）。
+
+    修「多附件题只试第一个」的缺陷：ezRSA 的 task.py 解不出、output 能解出，
+    故必须逐个附件试探。目录类 skill 只有一个候选。
+    """
+    if skill_name in _DIR_SKILLS:
+        p = build_params(skill_name, question)
+        if p:
+            yield p
+        return
+    if skill_name not in _PATH_SKILLS:
+        return
+    atts = getattr(question, "attachments", None) or []
+    if isinstance(atts, str):
+        atts = [atts]
+    n = 0
+    for a in atts:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        n += 1
+        params = {"path": p}
+        try:
+            with open(p, "r", encoding="utf-8", errors="ignore") as fh:
+                params["text"] = fh.read()
+        except OSError:
+            pass
+        yield params
+    if n == 0:  # 附件路径都不可直接用时，退回首个存在的（可能为相对根差异）
+        p = build_params(skill_name, question)
+        if p:
+            yield p
 
 
 def should_auto_call(skill_name: str) -> bool:

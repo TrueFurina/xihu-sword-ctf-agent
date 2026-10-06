@@ -80,7 +80,11 @@ class TestComplexMultGroupRoute(unittest.TestCase):
 
         mgr = _Mgr()
         result = infer_skill_require(_Ctx(), {"ability_gap": ["缺少有效攻击路径"]}, mgr)
-        self.assertIsNone(result)
+        # 2026-10-06 主链断链修复：infer_skill_require 现**返回** skill_require
+        # （原先一律 return None，把命中的 skill_name 丢弃，导致主链拿不到
+        #  「该调哪个 skill」→63 个 skill 永不被自动调用）。
+        self.assertIsInstance(result, dict, "应返回 skill_require 结构体")
+        self.assertEqual(result.get("skill_name"), "crypto_complex_mult_group")
         self.assertIn(
             "crypto_complex_mult_group", mgr.loaded,
             "specialcurve2 题面必须路由加载 crypto_complex_mult_group（B2 修复核心生效）")

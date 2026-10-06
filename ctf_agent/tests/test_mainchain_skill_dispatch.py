@@ -84,6 +84,21 @@ class TestSkillDispatchAdapter(unittest.TestCase):
             self.assertFalse(self.disp.should_auto_call(name),
                              "%s 不应进入自动调用白名单" % name)
 
+    def test_iter_candidate_params_yields_all_attachments(self):
+        """多附件题必须逐个产出候选（实测 ezRSA: task.py 解不出、output 能解出）。"""
+        atts = ["data/questions_real/_attachments/crypto/real_crypto_ezrsa/task.py",
+                "data/questions_real/_attachments/crypto/real_crypto_ezrsa/output"]
+        q = _Q(atts)
+        cands = list(self.disp.iter_candidate_params("crypto_hastad_broadcast", q))
+        self.assertEqual(len(cands), 2, "应产出 2 个候选")
+        self.assertTrue(cands[0]["path"].endswith("task.py"))
+        self.assertTrue(cands[1]["path"].endswith("output"))
+
+    def test_iter_candidate_params_empty_for_numeric_class(self):
+        q = _Q(["x"])
+        self.assertEqual(
+            list(self.disp.iter_candidate_params("crypto_cycling", q)), [])
+
     def test_missing_attachment_yields_none(self):
         q = _Q(["definitely/not/exists.bin"])
         self.assertIsNone(self.disp.build_params("crypto_hastad_broadcast", q))
@@ -161,6 +176,80 @@ class TestMainChainEndToEnd(unittest.TestCase):
                       "主链应调用 skill_manager.load() 把 skill 装进 registry")
         self.assertIn("self.registry.run(_skill_name", src,
                       "主链应通过 registry.run 调用 skill")
+
+    def test_infer_skill_require_returns_skill_name(self):
+        """回归护栏：infer_skill_require 必须**返回** skill 名（不得再return None）。
+
+        2026-10-06 实测根因：原实现在三条路径上一律 return None，把命中的
+        skill_name 丢弃 → 主链拿不到"该调哪个 skill" → 63 个 skill 永远不会被
+        自动调用（断链）。本用例锁死「返回 skill_require 结构体」。
+        """
+        import os as _os
+        from core.prompts import infer_skill_require
+        from tools.registry import ToolRegistry
+        from tools.skill_manager import SkillManager
+
+        registry = ToolRegistry()
+        sm = SkillManager(skills_dir=_os.path.join(_CTF, "skills"),
+                          registry=registry)
+        sm.discover()
+        name = "crypto_hastad_broadcast"
+        if name not in sm.list_available():
+            self.skipTest("skill 仓库不可用")
+        sm.load(name)
+
+        with open(EZRSA_JSON, encoding="utf-8") as _jf:
+            desc = json.load(_jf)["description"]
+
+        class _Ctx:
+            class question:
+                pass
+
+        _Ctx.question.description = desc
+        _Ctx.question.attachments = []
+        req = infer_skill_require(_Ctx(), {"ability_gap": ["缺少有效攻击路径"]}, sm)
+        self.assertIsInstance(req, dict, "必须返回 dict（skill_require）而非 None")
+        self.assertEqual(req.get("skill_name"), name,
+                         "返回的 skill_require 应含正确 skill_name")
+
+    def test_multi_attachment_real_solve_via_iteration(self):
+        """端到端（多附件）：逐个附件试探必须能跳过 task.py、解出 output。
+
+        这是本轮实测发现的真实缺陷 —— ezRSA 有两个附件，只试第一个会返回 None。
+        """
+        import asyncio
+        import os as _os
+        from tools.registry import ToolRegistry
+        from tools.skill_manager import SkillManager
+        disp = _load(os.path.join(_CTF, "tools", "skill_dispatch.py"),
+                     "skill_dispatch_multi")
+
+        with open(EZRSA_JSON, encoding="utf-8") as _jf:
+            truth = json.load(_jf)["flag_sha256"]
+        base = os.path.join(_CTF, "data", "questions_real", "_attachments",
+                            "crypto", "real_crypto_ezrsa")
+        q = _Q([os.path.join(base, "task.py"), os.path.join(base, "output")])
+
+        registry = ToolRegistry()
+        sm = SkillManager(skills_dir=os.path.join(_CTF, "skills"),
+                          registry=registry)
+        sm.discover()
+        name = "crypto_hastad_broadcast"
+        sm.load(name)
+
+        hit = None
+        tried = []
+        for params in disp.iter_candidate_params(name, q):
+            tried.append(os.path.basename(params["path"]))
+            out = asyncio.run(registry.run(name, params))
+            f = disp.extract_flag(out)
+            if f:
+                hit = f
+                break
+        self.assertEqual(len(tried), 2, "应尝试两个附件（实际 %r）" % tried)
+        self.assertIsNotNone(hit, "逐个附件试探后应解出（task.py 解不出、output 能）")
+        self.assertEqual(hashlib.sha256(hit.encode()).hexdigest(), truth,
+                         "多附件端到端 sha256 应匹配")
 
 
 if __name__ == "__main__":

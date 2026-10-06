@@ -968,34 +968,37 @@ class MainAgent:
                                     for s in ctx.steps)):
                     try:
                         from tools.skill_dispatch import (
-                            AUTO_CALLABLE, build_params, extract_flag,
+                            AUTO_CALLABLE, extract_flag, iter_candidate_params,
                         )
                     except Exception:  # noqa: BLE001 - 适配层缺失即跳过，不阻断主链
-                        AUTO_CALLABLE, build_params, extract_flag = set(), None, None
+                        AUTO_CALLABLE, extract_flag = set(), None
+                        iter_candidate_params = None
                     if (AUTO_CALLABLE and _skill_name in AUTO_CALLABLE
-                            and build_params is not None):
-                        _sp = build_params(_skill_name, question)
-                        if _sp is not None:
-                            try:
-                                # skill_manager.load(name) 单参；其 registry
-                                # 在构造时已注入（load 内部会注册进去）
-                                self.skill_manager.load(_skill_name)
-                            except Exception as _e_ld:  # noqa: BLE001
-                                logger.warning("[%s] skill load 失败 %s: %s",
-                                               question.id, _skill_name, _e_ld)
-                            if self.registry.get(_skill_name):
+                            and iter_candidate_params is not None):
+                        try:
+                            self.skill_manager.load(_skill_name)
+                        except Exception as _e_ld:  # noqa: BLE001
+                            logger.warning("[%s] skill load 失败 %s: %s",
+                                           question.id, _skill_name, _e_ld)
+                        if self.registry.get(_skill_name):
+                            # 逐个附件试探：多附件题里「第一个」未必是对的那个
+                            # （实测 ezRSA 的 task.py 解不出、output 才能解出）
+                            for _sp in iter_candidate_params(_skill_name, question):
                                 try:
                                     _so = await self.registry.run(_skill_name, _sp)
-                                    _sf = extract_flag(_so)
-                                    if _sf:
-                                        ctx.candidate_flag = _sf
-                                        logger.info(
-                                            "[%s] 通用 skill 强制调用命中 %s: %s",
-                                            question.id, _skill_name, _sf[:40])
-                                        break
                                 except Exception as _e_sc:  # noqa: BLE001
                                     logger.warning("[%s] skill 调用异常 %s: %s",
                                                    question.id, _skill_name, _e_sc)
+                                    continue
+                                _sf = extract_flag(_so)
+                                if _sf:
+                                    ctx.candidate_flag = _sf
+                                    logger.info(
+                                        "[%s] 通用 skill 强制调用命中 %s: %s",
+                                        question.id, _skill_name, _sf[:40])
+                                    break
+                            if ctx.candidate_flag:
+                                break
 
                 # ── 校验 flag ──
                 flag = self._extract_flag(ctx, act_result)

@@ -398,14 +398,18 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
     }
     for keyword, skill_name in skill_map.items():
         if keyword in desc or keyword in " ".join(gaps).lower():
-            # 检查本地是否已加载
+            # 2026-10-06 修复「主链断链」（见 logs/mainchain_skill_disconnect_20261006.md）：
+            # 原实现在三条路径上**一律 return None**，把命中的 skill_name 丢弃，
+            # 导致 main_agent 拿不到"该调哪个 skill"，本仓63 个 skill（含已实证
+            # 接线的那批）永远不会被自动调用——接线无法转化为解题率。
+            # 现在统一返回 {"skill_name": ..., "keyword": ...}：
+            #   · 已加载 / 本地有 → 返回 skill 名（主链据此 registry.run）
+            #   · 本地缺失 → 仍返回 None（保持 2026-08-22 锁死语义：不请求下载
+            #     未验证 skill，防临场加载装饰性火力）
             if skill_manager and skill_name in skill_manager.list_loaded():
-                return None  # 已加载，无需下载
+                return {"skill_name": skill_name, "keyword": keyword}
             if skill_manager and skill_name in skill_manager.list_available():
-                # 本地有但未加载 → 自动加载
-                skill_manager.load(skill_name)
-                return None
-            # 锁死（2026-08-22）：映射表已只允许引用真实 skill；若仍本地缺失
-            # （skill 目录被裁剪/改名），不请求下载未验证 skill——直接放弃。
+                skill_manager.load(skill_name)  # 确保已注册进 registry
+                return {"skill_name": skill_name, "keyword": keyword}
             return None
     return None
