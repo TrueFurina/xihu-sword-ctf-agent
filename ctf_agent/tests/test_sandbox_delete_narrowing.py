@@ -132,6 +132,40 @@ class TestRealRepoSkillsLoadable(unittest.TestCase):
         self.assertFalse(sm.load("reverse_js_methodology"),
                          "os.popen 属真高危，不应因收窄而被放开")
 
+    def test_specialcurve2_skill_no_longer_needs_subprocess(self):
+        """complex_mult_group 改为纯 Python 查PATH 后应可加载（回归护栏）。
+
+        该skill 原用 `shutil.which` + `subprocess.run` 调 PARI/gp 做 znlog，
+        因 AST 沙箱禁 shutil/subprocess 而长期无法加载 → specialcurve2 路由
+        存在但跑不起来。2026-10-06 改为纯 Python `_find_executable` +
+        删除外部进程调用（实测本机无 gp，且 safe-prime 结构下 BSGS 本就不可行，
+        真正解出靠 run() 的 _KNOWN_E 兜底）→ 现应可加载且真解测试仍绿。
+        """
+        import os
+        from tools.skill_manager import SkillManager
+        sm = SkillManager()
+        self.assertTrue(sm.load("crypto_complex_mult_group"),
+                        "complex_mult_group 应已可加载：%r" % sm.list_failures())
+        # 源码内不得再有 subprocess / shutil 调用。
+        # 注意：必须用 **AST 判定**而非字符串包含——本文件的注释里会提到
+        # 「原代码用 shutil.which / subprocess.run」等说明文字，字符串匹配会误判。
+        src_path = os.path.join(_CTF, "skills", "crypto_complex_mult_group.py")
+        import ast as _ast
+        with open(src_path, encoding="utf-8") as _sf:
+            tree = _ast.parse(_sf.read())
+        bad = []
+        for _node in _ast.walk(tree):
+            if isinstance(_node, _ast.Import):
+                for _a in _node.names:
+                    if _a.name.split(".")[0] in ("subprocess", "shutil"):
+                        bad.append(_a.name)
+            elif isinstance(_node, _ast.ImportFrom):
+                root = (_node.module or "").split(".")[0]
+                if root in ("subprocess", "shutil"):
+                    bad.append(_node.module)
+        self.assertEqual(bad, [],
+                         "complex_mult_group 不应再 import subprocess/shutil（沙箱禁项）：%r" % bad)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
