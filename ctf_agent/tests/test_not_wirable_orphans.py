@@ -18,12 +18,18 @@ B. 卡在安全沙箱 —— **2026-10-06 已部分收窄**：
    （tempfile.NamedTemporaryFile(delete=False) 产出的路径，或自己写出的
    `x + ".fixed"`），与「删任意用户文件」风险差一个量级 → 属过严误伤。
    现已改为「**仅删除自建临时产物时豁免**」，字面量路径 / 用户传入路径
-   **仍然禁止**（fail-closed）。效果：
-   · 已解锁：reverse_angr_solver / reverse_router / zip_fake_encryption
-   · 仍禁止（真高危，不在收窄范围）：reverse_js_methodology（os.popen）、
-     misc_grid_resample（import subprocess）、jpeg_png_embedded（subprocess/shutil）、
-     crypto_complex_mult_group（subprocess/shutil，用于探测外部工具 gp）
-   收窄后它们**仍不具备接线条件**（题源缺失 / 真高危未解禁），故 NOT_WIRABLE 不变。
+   **仍然禁止**（fail-closed）。后续逐个改写「仅探测外部工具存在性」的调用
+   （os.popen("where node") → 纯 Python 查 PATH），同样零损失解锁。
+   当前效果：
+   · 已解锁：reverse_angr_solver / reverse_router / zip_fake_encryption /
+     reverse_js_methodology（os.popen → _find_node()，纯 Python 等价）
+   · 仍禁止（**真需执行外部二进制**，非探测，删除即损失真实能力）：
+     misc_grid_resample、jpeg_png_embedded（均调tesseract 做 OCR，
+     且实测本机 tesseract **确实存在**：D:/miniconda3_new/Library/bin/tesseract.exe）。
+     另 crypto_complex_mult_group 曾同类问题，已用同样手法（惰性导入 +
+     删除实际调用）解决。
+   收窄后这些 skill **仍不具备接线条件**（题源缺失 / 外部执行待人工裁决），
+   故 NOT_WIRABLE 不变。
 
 本测试的作用：**防止后人随手给这些孤儿加 skill_map 键**，造成
 「看起来接了、实际跑不通/没真解」的假水位。
@@ -49,7 +55,7 @@ NOT_WIRABLE = {
     "zip_fake_encryption": "沙箱阻塞已解除（删除类收窄），但目标题附件 MISS+sha 空",
     "reverse_angr_solver": "沙箱阻塞已解除，但目标题 sha256 为空不可实证",
     "reverse_router": "沙箱阻塞已解除，但候选题 sha256 为空不可实证",
-    "reverse_js_methodology": "AST 沙箱禁 os.popen()（真高危，不在收窄范围）",
+    "reverse_js_methodology": "沙箱阻塞已解除（os.popen 换纯 Python 查 PATH），但候选题 sha256 为空",
     "misc_grid_resample": "AST 沙箱禁 import subprocess（真高危）",
     "jpeg_png_embedded": "AST 沙箱禁 import subprocess/shutil（真高危）",
 }
@@ -98,11 +104,12 @@ class TestNotWirableOrphans(unittest.TestCase):
         from tools.skill_manager import SkillManager
         now_unlocked = [
             "zip_fake_encryption", "reverse_angr_solver", "reverse_router",
+            "reverse_js_methodology",
         ]
         still_locked = [
-            "reverse_js_methodology",  # os.popen
-            "misc_grid_resample",      # import subprocess
-            "jpeg_png_embedded",       # import subprocess / shutil
+            # OCR 类：真需执行外部二进制 tesseract（非探测），且本机确实装了
+            "misc_grid_resample",      # import subprocess（调tesseract）
+            "jpeg_png_embedded",       # import subprocess / shutil（调 tesseract）
         ]
         sm = SkillManager()
         became_loadable = [n for n in now_unlocked if sm.load(n)]

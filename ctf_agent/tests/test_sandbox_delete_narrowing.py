@@ -125,12 +125,43 @@ class TestRealRepoSkillsLoadable(unittest.TestCase):
             self.assertTrue(sm.load(n),
                             "%s 沙箱收窄后应可加载：%r" % (n, sm.list_failures()))
 
-    def test_popen_skill_still_blocked(self):
-        """reverse_js_methodology 含 os.popen（真高危）→ 仍应被拦。"""
+    def test_js_methodology_unblocked_by_pure_python_probe(self):
+        """reverse_js_methodology 的 os.popen 换成纯 Python 查 PATH 后应可加载。
+
+        原代码用 `os.popen("where node")` 探测 node 是否存在，但**并未真正 exec**
+        （返回"node 可用但需人工确认"即止）→ 属纯存在性探测，用纯 Python 遍历
+        PATH 完全等价。2026-10-06 改写后沙箱不应再拦它。
+        """
+        import ast as _ast
+        import os
         from tools.skill_manager import SkillManager
         sm = SkillManager()
-        self.assertFalse(sm.load("reverse_js_methodology"),
-                         "os.popen 属真高危，不应因收窄而被放开")
+        self.assertTrue(sm.load("reverse_js_methodology"),
+                        "js_methodology 改为纯 Python 探测后应可加载：%r"
+                        % sm.list_failures())
+        src = os.path.join(_CTF, "skills", "reverse_js_methodology.py")
+        with open(src, encoding="utf-8") as _sf:
+            tree = _ast.parse(_sf.read())
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.Call) and isinstance(node.func, _ast.Attribute):
+                if node.func.attr in ("popen", "system", "execv", "spawnv"):
+                    self.fail("js_methodology 不应再有 os.%s() 调用" % node.func.attr)
+
+    def test_tesseract_skills_still_blocked(self):
+        """OCR 类 skill 仍应被拦——它们**真需执行外部二进制**，非探测。
+
+        `jpeg_png_embedded` / `misc_grid_resample` 调用 tesseract 做 OCR，
+        与「只探测是否存在」不同，删除即损失真实能力（且实测本机 tesseract
+        **确实存在**：`D:/miniconda3_new/Library/bin/tesseract.exe`）。
+        放开需人工裁决「仓内 skill 是否可执行外部二进制」，不擅自开口子。
+        """
+        from tools.skill_manager import SkillManager
+        sm = SkillManager()
+        still_blocked = [n for n in ("jpeg_png_embedded", "misc_grid_resample")
+                         if sm.load(n)]
+        self.assertEqual(still_blocked, [],
+                         "OCR 类 skill 应仍被拦（真需外部二进制，待人工裁决）：%r"
+                         % still_blocked)
 
     def test_specialcurve2_skill_no_longer_needs_subprocess(self):
         """complex_mult_group 改为纯 Python 查PATH 后应可加载（回归护栏）。
