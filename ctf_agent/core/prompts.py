@@ -239,7 +239,6 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "zip": "zip_chain_decode", "压缩": "zip_chain_decode",
         "base64": "base64_multilayer", "base32": "base64_multilayer",
         "凯撒": "caesar_bruteforce", "caesar": "caesar_bruteforce",
-        "移位": "caesar_bruteforce", "位移": "caesar_bruteforce",
         "md5": "hash_crack", "sha1": "hash_crack", "sha256": "hash_crack",
         "哈希": "hash_crack", "hash": "hash_crack",
         "维吉尼亚": "vigenere_decode", "vigenere": "vigenere_decode",
