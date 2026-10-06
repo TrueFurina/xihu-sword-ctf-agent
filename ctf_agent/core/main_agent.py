@@ -943,6 +943,60 @@ class MainAgent:
                         except Exception as _e_kb:
                             logger.warning("[%s] skill_require 路由异常: %s", question.id, _e_kb)
 
+                # ── 通用 skill 强制调用（2026-10-06 接通主链断链）──
+                # 根因（见 logs/mainchain_skill_disconnect_20261006.md）：
+                #   1) _last_skill_require 只被赋值、**无任何读取点** → 路由结果进死字段；
+                #   2) 主链**从不调用 skill_manager.load()** → skill 永不进 registry；
+                #   3) 唯一真跑 skill 的代码是上面那段**硬编码单点**（只对
+                #      crypto_keyboard_path 生效，且不读 skill_map）。
+                # ⇒ 后果：本仓 63 个 skill（含本轮接线的实证 solver）
+                #        在真实跑批中**不会被自动调用**，接线无法转化为解题率。
+                # 修复：消费 _last_skill_require → load 进 registry → run 一次。
+                # 触发门槛（省 token + 避免误调）：仅当路由命中 skill、该 skill
+                #   尚未被调用过、且入参可可靠构造时才调。
+                # 诚实边界：仅对**路径/目录类** skill 自动调用（tools/skill_dispatch
+                #   的白名单）；纯数值类（cycling/primes/knapsack 等）参数藏在附件
+                #   源码里，主链无法可靠解析 → **不自动调**，不拿猜测参数制造假失败。
+                _skill_hit = self._last_skill_require
+                _skill_name = ""
+                if isinstance(_skill_hit, dict):
+                    _skill_name = str(_skill_hit.get("skill_name") or "")
+                elif _skill_hit is not None:
+                    _skill_name = str(getattr(_skill_hit, "skill_name", "") or "")
+                if (_skill_name and self.registry and self.skill_manager
+                        and not any(getattr(s, "tool_used", "") == _skill_name
+                                    for s in ctx.steps)):
+                    try:
+                        from tools.skill_dispatch import (
+                            AUTO_CALLABLE, build_params, extract_flag,
+                        )
+                    except Exception:  # noqa: BLE001 - 适配层缺失即跳过，不阻断主链
+                        AUTO_CALLABLE, build_params, extract_flag = set(), None, None
+                    if (AUTO_CALLABLE and _skill_name in AUTO_CALLABLE
+                            and build_params is not None):
+                        _sp = build_params(_skill_name, question)
+                        if _sp is not None:
+                            try:
+                                # skill_manager.load(name) 单参；其 registry
+                                # 在构造时已注入（load 内部会注册进去）
+                                self.skill_manager.load(_skill_name)
+                            except Exception as _e_ld:  # noqa: BLE001
+                                logger.warning("[%s] skill load 失败 %s: %s",
+                                               question.id, _skill_name, _e_ld)
+                            if self.registry.get(_skill_name):
+                                try:
+                                    _so = await self.registry.run(_skill_name, _sp)
+                                    _sf = extract_flag(_so)
+                                    if _sf:
+                                        ctx.candidate_flag = _sf
+                                        logger.info(
+                                            "[%s] 通用 skill 强制调用命中 %s: %s",
+                                            question.id, _skill_name, _sf[:40])
+                                        break
+                                except Exception as _e_sc:  # noqa: BLE001
+                                    logger.warning("[%s] skill 调用异常 %s: %s",
+                                                   question.id, _skill_name, _e_sc)
+
                 # ── 校验 flag ──
                 flag = self._extract_flag(ctx, act_result)
                 if flag:

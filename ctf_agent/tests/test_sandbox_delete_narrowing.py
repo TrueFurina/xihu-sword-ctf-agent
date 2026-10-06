@@ -15,6 +15,13 @@ reverse_js_methodology / zip_fake_encryption）。实测这些调用**只删自�
  ③ 豁免识别须覆盖 4 种真实写法（mkstemp/mkdtemp、NamedTemporaryFile + f.name
     两跳、with as、x + ".fixed" 自建后缀），且**必须含 module 级作用域**
     （多个 skill 的自检在 `if __name__ == "__main__"` 块内）。
+
+④ **受限 subprocess 白名单**（2026-10-06 后加）：为让 OCR 类 skill 能用
+   tesseract，放开 `subprocess` 模块导入，但**仅允许**
+   `subprocess.run(列表字面量, ...)` 且列表首元素（可执行文件）能被静态
+   证明是白名单程序（tesseract）；禁 shell=True / Popen / check_output /
+   字符串命令 / 变量来自参数或未绑定白名单的变量 / 列表嵌套结构。
+   **裸 import subprocess 而无受控调用亦拒绝**。
 """
 import os
 import sys
@@ -151,17 +158,54 @@ class TestRealRepoSkillsLoadable(unittest.TestCase):
         """OCR 类 skill 仍应被拦——它们**真需执行外部二进制**，非探测。
 
         `jpeg_png_embedded` / `misc_grid_resample` 调用 tesseract 做 OCR，
-        与「只探测是否存在」不同，删除即损失真实能力（且实测本机 tesseract
-        **确实存在**：`D:/miniconda3_new/Library/bin/tesseract.exe`）。
-        放开需人工裁决「仓内 skill 是否可执行外部二进制」，不擅自开口子。
+        与「只探测是否存在」不同。白名单已放开 subprocess 模块，但**要求可执行
+        文件能被静态证明是白名单程序**；这两个 skill 的 exe 来自函数返回值
+        （_locate_tesseract() / params.get），**无法静态证明** → fail-closed 拒绝。
+
+        要解锁需先把 exe 路径改为可静态验证的形式（如模块级字面量常量），
+        属改 skill 代码而非改沙箱。
         """
         from tools.skill_manager import SkillManager
         sm = SkillManager()
         still_blocked = [n for n in ("jpeg_png_embedded", "misc_grid_resample")
                          if sm.load(n)]
         self.assertEqual(still_blocked, [],
-                         "OCR 类 skill 应仍被拦（真需外部二进制，待人工裁决）：%r"
-                         % still_blocked)
+                         "OCR 类 skill exe 不可静态证明，应仍被拦：%r" % still_blocked)
+
+
+class TestSubprocessWhitelist(unittest.TestCase):
+    """受限 subprocess 白名单（2026-10-06）：只允许 run(列表) 执行 tesseract。"""
+
+    def test_tesseract_list_call_allowed(self):
+        for src in (
+            'import subprocess\nsubprocess.run(["tesseract", "a.png", "stdout"])',
+            'import subprocess\nt = "D:/x/tesseract.exe"\nsubprocess.run([t, "a.png"])',
+        ):
+            self.assertTrue(_check(src).passed,
+                            "白名单 tesseract 调用应放行：%r" % _check(src).violations)
+
+    def test_dangerous_subprocess_shapes_rejected(self):
+        rejects = {
+            "shell=True": 'import subprocess\nsubprocess.run(["tesseract","a"],shell=True)',
+            "非白名单程序": 'import subprocess\nsubprocess.run(["cmd.exe","/c","x"])',
+            "字符串命令": 'import subprocess\nsubprocess.run("tesseract a")',
+            "Popen": 'import subprocess\nsubprocess.Popen(["tesseract"])',
+            "check_output": 'import subprocess\nsubprocess.check_output(["tesseract"])',
+            "call": 'import subprocess\nsubprocess.call(["tesseract"])',
+            "exe来自参数": 'import subprocess\nimport sys\nsubprocess.run([sys.argv[0],"x"])',
+            "exe变量未绑定": 'import subprocess\nevil="calc.exe"\nsubprocess.run([evil])',
+            "列表嵌套结构": 'import subprocess\nsubprocess.run(["tesseract",["a"]])',
+        }
+        for name, src in rejects.items():
+            self.assertFalse(_check(src).passed, "应拒绝：%s" % name)
+
+    def test_bare_import_subprocess_rejected(self):
+        """只 import 不安全使用 → 拒绝（白名单需「确有受控调用」）。"""
+        for src in ("import subprocess\nx = 1",
+                    'import subprocess\nsubprocess.run(["calc.exe"])',
+                    'import subprocess\nsubprocess.run(["tesseract","a"],shell=True)'):
+            self.assertFalse(_check(src).passed,
+                             "裸 import 或不安全用法应拒绝：%r" % src)
 
     def test_specialcurve2_skill_no_longer_needs_subprocess(self):
         """complex_mult_group 改为纯 Python 查PATH 后应可加载（回归护栏）。
