@@ -161,6 +161,8 @@ _WIRED_SKILL_MODULES = {
     "skills.misc_qr_matrix",                # 数字矩阵 → QR 码解码（纯 Python，版本 1-10）
     # 2026-10-07 新增（确定性静态求解）：bzip2/Ascii85 包裹的 SVG path → 栅格化 → OCR
     "skills.svg_path_text",
+    # 2026-10-07 新增（确定性静态求解）：ELF「常量比对」型逆向（xor_const / subst_table / tree_index）
+    "skills.rev_const_compare",
     # 2026-10-04 新增（B1 工具链补齐产物，确定性静态求解）
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
@@ -593,6 +595,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_qr_matrix(question)),
         # 2026-10-07 确定性静态求解：bzip2/Ascii85 包裹的 SVG path → 栅格化 → OCR
         asyncio.ensure_future(_try_svg_path_text(question)),
+        # 2026-10-07 确定性静态求解：ELF「常量比对」型逆向 → 反演输入变换
+        asyncio.ensure_future(_try_rev_const_compare(question)),
         # 2026-10-04 B1 确定性静态求解：子集积 mod q → Coppersmith 平滑因子
         asyncio.ensure_future(_try_crypto_primes(question)),
         asyncio.ensure_future(_try_knapsack_mhk(question)),
@@ -1873,6 +1877,57 @@ async def _try_svg_path_text(question) -> Optional[str]:
         flag = _flag_from_text(decoded)
         if flag and _is_plausible_flag(flag):
             logger.info("[presolve:svg_path_text] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
+    return None
+
+
+async def _try_rev_const_compare(question) -> Optional[str]:
+    """ELF 静态逆向「常量比对」型求解（2026-10-07 新增 · B 类静态求解）。
+
+    对 reverse 类 + ELF 附件，调 skills.rev_const_compare：objdump 反汇编 →
+    提取内嵌常量数组 → 反演输入变换（xor_const / subst_table / tree_index）。
+    命中由题面 flag_sha256（优先）或 flag_pattern 硬门校验，无把握不返回。
+
+    诚实口径：仅覆盖「输入经一次可逆变换后与常量比对」范式（实测 CSAW
+    beleaf / whataxor / tablez 三题逐字命中）；**多数逆向仍需人工/angr**，
+    本路不得外推为「reverse 可解」。实测解出不计入 LLM 自主解题率。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat != "reverse":
+        return None
+    attach = _attachments(question)
+    if not attach:
+        return None
+    try:
+        from skills.rev_const_compare import solve as rev_solve
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.rev_const_compare", exc)
+        return None
+    sha = str(getattr(question, "flag_sha256", "") or "").strip() or None
+    pat = str(getattr(question, "flag_pattern", "") or "").strip() or None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p) or os.path.getsize(p) > 32 * 1024 * 1024:
+            continue
+        try:
+            with open(p, "rb") as fh:
+                if fh.read(4) != b"\x7fELF":
+                    continue  # 廉价预检：非 ELF 不反汇编
+        except OSError:
+            continue
+        try:
+            res = await asyncio.to_thread(rev_solve, p, sha, pat)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:rev_const_compare] %s 异常: %s", p, exc)
+            continue
+        if not res:
+            continue
+        decoded = res.decode("utf-8", "replace").strip()
+        flag = _flag_from_text(decoded) or decoded
+        if flag and _is_plausible_flag(flag):
+            logger.info("[presolve:rev_const_compare] %s 命中 flag=%s",
                         getattr(question, "id", "?"), flag[:60])
             _save_candidates(question, [flag])
             return flag

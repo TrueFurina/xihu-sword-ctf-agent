@@ -1,0 +1,8 @@
+{
+  "name": "rev_const_compare",
+  "purpose": "静态逆向「常量比对」型 flag 求解（确定性，零 LLM）：二进制把输入经一次可逆变换后与内嵌常量数组比对，本 skill 用 objdump 反汇编 + 常量/变换自动提取并反演。已实现三类变换：xor_const（输入整体 XOR 单字节常量后 strcmp，如 whataxor）、subst_table（2 字节/项替换表逐字节映射后 strncmp，如 tablez）、tree_index（常量数组作二叉查找树、函数返回字符下标、再与下标数组比对，如 beleaf）。命中候选由 sha256 / flag_pattern 硬门把关，无把握不返回。",
+  "input_spec": "params = {'path': ELF64 二进制路径, 'sha256': 可选真值(64 hex，优先), 'pattern': 可选 flag 正则}。需系统 objdump（mingw-w64 自带）；无则返回 None。",
+  "output_spec": "还原出的 flag bytes（sha256 逐字匹配 / 命中 pattern / 形态似 flag 才返回）；非「常量比对」范式 / 非 ELF64 / 无 objdump → None。",
+  "categories": ["reverse"],
+  "version": "1.0"
+}
