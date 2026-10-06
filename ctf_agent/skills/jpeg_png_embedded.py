@@ -25,9 +25,30 @@ _TESS_CANDIDATES = [
 ]
 
 
+def _which(name):
+    """在 PATH 中查找可执行文件（纯 Python，替代 shutil.which）。
+
+    2026-10-06：AST 沙箱禁止 import shutil，而本skill 只用到 shutil.which
+    这一处「查可执行文件」功能，用纯 Python 遍历 PATH 等价且无高危。
+    Windows 下需试 .exe/.cmd/.bat 后缀（与 shutil.which 同行为）。
+    """
+    exts = ("", ".exe", ".cmd", ".bat") if os.name == "nt" else ("",)
+    for d in (os.environ.get("PATH") or "").split(os.pathsep):
+        if not d:
+            continue
+        for ext in exts:
+            cand = os.path.join(d, name + ext)
+            try:
+                if os.path.isfile(cand) and os.access(cand, os.X_OK):
+                    return cand
+            except OSError:
+                continue
+    return None
+
+
 def _locate_tesseract():
     """定位 tesseract 可执行文件及其 tessdata 目录。返回 (exe, tessdata_dir) 或 (None, None)。"""
-    exe = shutil.which("tesseract")
+    exe = _which("tesseract")
     if exe:
         exe = os.path.abspath(exe)
     else:

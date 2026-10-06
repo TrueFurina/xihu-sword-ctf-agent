@@ -60,8 +60,10 @@ _SOURCE_CACHE: dict[str, str] = {}
 # ── 安全校验：AST 沙盒 ──────────────────────────────────────────
 
 # 禁止的模块/函数（高危操作）
+# 注：`subprocess` 已移出（2026-10-06 改由 _SUBPROCESS_ALLOWED_EXECUTABLES
+# 白名单 + 调用形态校验管控，见下方说明），其余仍整体禁止。
 _FORBIDDEN_IMPORTS = {
-    "subprocess", "shutil", "ctypes", "multiprocessing",
+    "shutil", "ctypes", "multiprocessing",
     "socket", "http.server", "xmlrpc",
 }
 _FORBIDDEN_CALLS = {
@@ -89,6 +91,23 @@ _FORBIDDEN_CALLS = {
 # 反序列化模块禁止导入（pickle 族；marshal 见上方说明故不在此列）
 _FORBIDDEN_IMPORTS |= {"pickle", "cPickle", "dill"}
 
+# ── 受限 subprocess 白名单（2026-10-06）─────────────────────────
+# 校验 subprocess.run 时需知道"哪些变量被绑定到白名单程序"，暂存当前 AST。
+# （模块级仅在单次 ast_sandbox_check 调用内存活，非跨请求共享状态。）
+_TREE_CTX = {"tree": None}
+# 背景：`subprocess`整体禁止会让 OCR 类 skill（jpeg_png_embedded /
+# misc_grid_resample）永久不可用，而它们调用 **tesseract** 是真实刚需
+# （实测本机 tesseract 存在：D:/miniconda3_new/Library/bin/tesseract.exe）。
+#
+# 折中：**放开 subprocess 这一模块，但只允许执行固定白名单里的二进制**，
+# 且校验调用形态安全：
+#   1. 必须是 subprocess.run(list, ...) —— 列表参数，不走 shell；
+#   2. 列表首元素（可执行文件）basename 必须在 _SUBPROCESS_ALLOWED_EXECUTABLES；
+#   3. **禁止 shell=True**（否则可拼接任意命令）；
+#   4. 其余元素只能是普通字符串/数字（禁止嵌套 list/dict 等复杂注入面）。
+# 这样攻击面被压到「只能调 tesseract，且不能用 shell 拼接」。
+_SUBPROCESS_ALLOWED_EXECUTABLES = {"tesseract", "tesseract.exe"}
+
 # ── 删除类调用的**受限豁免**（2026-10-06 收窄）────────────────────
 # 背景：`os.remove/rmdir/unlink` 原与 `os.system/exec/spawn` 同列禁止，
 # 导致 4 个 skill 永久无法加载（reverse_angr_solver / reverse_router /
@@ -102,6 +121,101 @@ _FORBIDDEN_IMPORTS |= {"pickle", "cPickle", "dill"}
 #   3. 参数是 `<已有字符串>.suffix/.fixed/.tmp` 之类自建后缀拼接 → 豁免。
 # 其余（字面量绝对路径、用户传入路径、库内部文件）**仍然禁止**。
 _SELF_BUILT_SUFFIXES = (".fixed", ".tmp", ".temp", ".bak")
+
+
+def _collect_whitebin_vars(tree):
+    """收集「被显式赋值为白名单程序路径」的变量名。
+
+    覆盖两种真实写法：
+      · `tess = r"D:/.../tesseract.exe"`（字面量赋值）
+      · `exe = "tesseract"`（相对名亦可）
+    仅当赋值的字符串常量 basename 在白名单内才计入——**来源不明的变量不被信任**
+    （fail-closed：若变量来自函数返回值/参数/用户输入，则不予放行）。
+    """
+    out = set()
+    if tree is None:
+        return out
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            val = node.value
+            if isinstance(val, ast.Constant) and isinstance(val.value, str):
+                if os.path.basename(val.value).lower() in _SUBPROCESS_ALLOWED_EXECUTABLES:
+                    for tgt in node.targets:
+                        if isinstance(tgt, ast.Name):
+                            out.add(tgt.id)
+    return out
+
+
+def _subprocess_used_safely(tree) -> bool:
+    """文件内是否**确有**至少一处安全的 subprocess 调用（受限白名单模式）。
+
+    语义：单独 `import subprocess` 而无受控调用 → 可疑 → 拒绝；
+    有 ≥1 处安全调用且**没有**任何不安全调用 → 允许。
+    """
+    found_safe = False
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            continue
+        if not (isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "subprocess"):
+            continue
+        if _check_subprocess_call(node):
+            return False  # 存在不安全调用 → 整体拒绝
+        found_safe = True
+    return found_safe
+
+
+def _check_subprocess_call(call_node: ast.Call) -> list:
+    """校验 subprocess.* 调用的形态是否安全（受限白名单模式）。
+
+    放行条件（全部满足）：
+      1. 必须是 `subprocess.run(...)`（不放开 Popen/call/check_output 等）；
+      2. 第一个位置参数是 **列表字面量**（不走 shell，天然避免命令拼接）；
+      3. 列表首元素（可执行文件）basename 在白名单内（仅 tesseract）；
+      4. 没有 `shell=True`；
+      5. 列表其余元素均为字符串/数字常量（不接受嵌套结构）。
+    其余一律拒绝——fail-closed。
+    """
+    # ① 只允许 subprocess.run
+    fn = call_node.func
+    if not (isinstance(fn, ast.Attribute) and fn.attr == "run"):
+        return ["subprocess 仅允许 run()（白名单模式）"]
+    # ④ 禁止 shell=True
+    for kw in call_node.keywords:
+        if kw.arg == "shell":
+            if isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                return ["subprocess.run 禁止 shell=True（可拼接任意命令）"]
+    # ② 参数必须是列表字面量
+    if not call_node.args or not isinstance(call_node.args[0], ast.List):
+        return ["subprocess.run 第一个参数必须是列表字面量（不使用 shell）"]
+    seq = call_node.args[0].elts
+    if not seq:
+        return ["subprocess.run 列表为空"]
+    # ③ 首元素（可执行文件）须在白名单。
+    # 允许两种形态：字符串常量；或变量名——但该变量必须在**同一文件**里
+    # 被赋为白名单成员的**字符串常量**（如 `tess = r"D:/.../tesseract.exe"`
+    # 或 `_locate_tesseract()` 的返回值场景，见 _collect_whitebin_vars）。
+    head = seq[0]
+    if isinstance(head, ast.Constant) and isinstance(head.value, str):
+        exe_name = os.path.basename(head.value).lower()
+    elif isinstance(head, ast.Name):
+        allowed = _collect_whitebin_vars(_TREE_CTX.get("tree"))
+        if head.id not in allowed:
+            return ["subprocess.run 可执行文件变量 %r 未绑定到白名单程序"
+                    % head.id]
+        return []
+    else:
+        return ["subprocess.run 可执行文件须为字符串常量或已绑定的白名单变量"]
+    if exe_name not in _SUBPROCESS_ALLOWED_EXECUTABLES:
+        return ["禁止执行非白名单程序: %r（仅允许 %s）"
+                % (exe_name, sorted(_SUBPROCESS_ALLOWED_EXECUTABLES))]
+    # ⑤ 其余元素须为字符串/数字常量
+    for el in seq[1:]:
+        if isinstance(el, ast.Constant) and isinstance(
+                el.value, (str, int, float)):
+            continue
+        return ["subprocess.run 列表元素仅允许字符串/数字常量（拒绝嵌套结构）"]
+    return []
 
 
 def _delete_target_is_self_built(argnode: ast.AST,
@@ -222,6 +336,8 @@ def ast_sandbox_check(source: str) -> ASTCheckResult:
         return ASTCheckResult(passed=False, violations=[f"语法错误: {exc}"])
 
     violations = []
+    # 供 subprocess 白名单校验查"哪些变量绑定了白名单程序"
+    _TREE_CTX["tree"] = tree
 
     # fail-closed：先按「作用域」为单位收集各作用域内的 tempfile 变量，
     # 便于判定 os.remove/unlink 的目标是否自建临时产物。
@@ -251,6 +367,13 @@ def ast_sandbox_check(source: str) -> ASTCheckResult:
                 root_module = alias.name.split(".")[0]
                 if root_module in _FORBIDDEN_IMPORTS:
                     violations.append(f"禁止导入: {alias.name}")
+                elif root_module == "subprocess":
+                    # 受限白名单模式：允许 import，但**必须确有受控的调用**。
+                    # 单独 import 却不用（或用法不安全）→ 视为可疑，拒绝。
+                    if not _subprocess_used_safely(tree):
+                        violations.append(
+                            "禁止裸import subprocess（受限白名单仅允许"
+                            " subprocess.run(列表) 执行 tesseract）")
 
         elif isinstance(node, ast.ImportFrom):
             if node.module:
@@ -267,6 +390,11 @@ def ast_sandbox_check(source: str) -> ASTCheckResult:
                 # 检查 os.system / os.popen 等
                 if isinstance(func.value, ast.Name):
                     full_name = f"{func.value.id}.{func.attr}"
+                    # subprocess 受限白名单（2026-10-06）：仅允许 run(列表) 调
+                    # tesseract；Popen/check_output/shell=True/非白名单程序均拒。
+                    if full_name.startswith("subprocess."):
+                        violations.extend(_check_subprocess_call(node))
+                        continue
                     # 删除类调用：仅自建临时产物豁免（2026-10-06 收窄）
                     if full_name in ("os.remove", "os.rmdir", "os.unlink"):
                         if not _delete_allowed(node):
