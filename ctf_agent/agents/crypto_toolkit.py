@@ -627,6 +627,76 @@ if len(_lfsr_masks) >= 2 and len(_lfsr_bits) >= 1024:
     except Exception:
         pass
 
+# ── 2.7) PEM 公钥 + 十进制大整数密文 → 小指数跨模攻击（CSAW 2018 lowe 类）──
+# 布局特征（与题目描述解耦，只看字节结构）：附件含 PEM 公钥（BEGIN PUBLIC KEY）
+#   + 十进制大整数密文 c + 可选等长 base64 密文块。
+#   e 小、明文 m 短 → m^e = c + k*n（k 小）；skills.rsa_fermat_factor 的 small_e
+#   已支持 k 爆破 → 复原 m。若另有 len(m) 等长 base64 块，则 secret = base64 ⊕ m
+#   （lowe：blob(64B) ⊕ K(64B) = flag）。
+# 缺的从来不是攻击能力，而是「PEM→(N,e) 的布局解析」——本段把已存在的能力接上。
+_m_pem = re.search(r"-----BEGIN PUBLIC KEY-----(.*?)-----END PUBLIC KEY-----", text, re.S)
+if _m_pem:
+    import base64 as _b64mod
+
+    def _der_tlv(_buf, _i):
+        _tag = _buf[_i]
+        _i += 1
+        _ln = _buf[_i]
+        _i += 1
+        if _ln & 0x80:
+            _nb = _ln & 0x7f
+            _ln = int.from_bytes(_buf[_i:_i + _nb], "big")
+            _i += _nb
+        return _tag, _buf[_i:_i + _ln], _i + _ln
+
+    _N = 0
+    _E = 0
+    try:
+        _der = _b64mod.b64decode(re.sub(r"\s+", "", _m_pem.group(1)))
+        _, _body, _ = _der_tlv(_der, 0)          # SubjectPublicKeyInfo SEQUENCE
+        _, _, _i1 = _der_tlv(_body, 0)           # AlgorithmIdentifier
+        _, _bitstr, _ = _der_tlv(_body, _i1)     # BIT STRING
+        if _bitstr[:1] == b"\x00":
+            _bitstr = _bitstr[1:]                # 去 unused-bits 填充字节
+        _, _rsa, _ = _der_tlv(_bitstr, 0)        # RSAPublicKey SEQUENCE
+        _, _nber, _i2 = _der_tlv(_rsa, 0)        # INTEGER n
+        _, _eber, _ = _der_tlv(_rsa, _i2)        # INTEGER e
+        _N = int.from_bytes(_nber, "big")
+        _E = int.from_bytes(_eber, "big")
+    except Exception:
+        _N = 0
+        _E = 0
+    # 量级守卫：密文 c 应与 N 同量级（c = m^e mod n ∈ [0,n)）。限制十进制位长与 N
+    # 相差 ≤2 位，既排除无关长数字行，又避免对错误 c 空跑 small_e 的 1e6 次 k 循环。
+    _nlen = len(str(_N)) if _N else 0
+    if _N and 0 < _E <= 100:
+        for _cv in [int(l) for l in _all_lines
+                    if l.isdigit() and len(l) > 30 and abs(len(l) - _nlen) <= 2]:
+            _mv = None
+            try:
+                from skills.rsa_fermat_factor import run as _rsa_run2
+                _mv = _rsa_run2({"n": _N, "e": _E, "c": _cv, "attack": "small_e"})
+            except Exception:
+                _mv = None
+            if not _mv:
+                continue
+            _mb = _mv if isinstance(_mv, bytes) else b""
+            if not _mb:
+                continue
+            show("rsa_small_e_wrap", _mb.decode("utf-8", "ignore"))
+            for _bl in dict.fromkeys(re.findall(r"[A-Za-z0-9+/]{40,}={0,2}", text)):
+                try:
+                    _bd = _b64mod.b64decode(_bl + "=" * (-len(_bl) % 4))
+                except Exception:
+                    continue
+                if len(_bd) != len(_mb):
+                    continue
+                _sv = bytes(_x ^ _y for _x, _y in zip(_bd, _mb))
+                if re.search(rb"(?i)(?:flag|ctf|dasctf)\{", _sv):
+                    print("[rsa_small_e_wrap_xor] %s" % _sv.decode("utf-8", "ignore"))
+                elif _sv.isprintable():
+                    print("[rsa_small_e_wrap_xor_text] %s" % _sv.decode("utf-8", "ignore"))
+
 # ── 3) 纯字母密文（兼容「密文: xxx」前缀行）→ 凯撒 / 维吉尼亚 ──
 cipher_lines = []
 for line in text.splitlines():
