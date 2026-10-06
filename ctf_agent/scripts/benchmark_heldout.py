@@ -429,15 +429,19 @@ def _restore_blackboard(backup: Path | None) -> None:
 def run(cands: list[dict], provider: str, wallclock: float, mock: bool,
         limit: int, concurrency: int, cold_blackboard: bool, e3: bool,
         neutralize_leaks: bool = False) -> int:
+    # 带时间戳的结果子目录：避免覆盖 09-27 的 heldout 证据报告（铁律：确认输出不覆盖证据）
+    ts = time.strftime("%Y%m%d_%H%M%S")
     run_dir = build_run_dir(cands, neutralize_leaks=neutralize_leaks)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     cmd = [
         sys.executable, "-m", "eval.benchmark",
         "--questions-dir", str(run_dir),
-        "--presolve-skip",                      # 强制主 Agent 全链路，禁 presolve 静态直出
+        # 2026-09-29 修正：去掉 --presolve-skip，与 09-27 同口径（presolve 命中 sha256 即验证解出）。
+        # 否则 least-common-genominator 这类「确定性预扫已命中 flag{program}」的题被强制主链路重跑，
+        # LLM 在持久 shell 生成的 command 全报 invalid syntax → 误判失败（首批 5 题实测暴露）。
         "--provider", provider,
         "--wallclock", str(wallclock),
-        "--results-dir", str(OUT_DIR),
+        "--results-dir", str(OUT_DIR / f"G_rerun_{ts}"),
         "--limit", str(limit),
         "--concurrency", str(concurrency),
     ]

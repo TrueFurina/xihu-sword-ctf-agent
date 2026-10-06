@@ -164,3 +164,9 @@ echo "── ⑩ 反注水法令（写死，fail-closed）──"
 # 规则与白名单见仓库根 AGENTS.md；手动全量自检：python scripts/check_structure.py --all
 echo "── ⑪ 目录结构守卫 ──"
 "$PY" scripts/_structure_guard.py
+echo "=== [5/5] 测试文件禁改守卫 ==="
+# 2026-09-26 修正：原为 `python ctf_agent/scripts/test_file_guard.py`，
+# 但本钩子 ROOT 已指向 <repo>/ctf_agent 且 cwd 即 ROOT → 路径被拼成
+# ctf_agent/ctf_agent/scripts/...（文件不存在 → 恒 exit 1 → 拦死所有提交）。
+# 同时裸 `python` 与其余门禁的 "$PY"（.venv）不一致，一并统一为 "$PY"。
+"$PY" scripts/test_file_guard.py --staged || exit 1

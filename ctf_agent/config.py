@@ -412,6 +412,9 @@ def list_dashscope_free_models(kind: str | None = None, chat_only: bool = True) 
 # from_env 的净化逻辑仅在模型不在本白名单时才回退默认——登记在册即视为与端点匹配。
 _PROVIDER_MODEL_ALLOWLIST: dict[str, set] = {
     "qwen": set(DASHSCOPE_FREE_MODELS.keys()) | {"qwen3.7-flash", "qwen3.8-max"},
+    # glm：登记免费模型 glm-4-flash（2026-10-05 领取 ZHIPU_API_KEY 后接入），
+    # 防 from_env 净化逻辑把 CTF_AGENT_LIGHT/HEAVY_MODEL=glm-4-flash 回退成付费 glm-4.7
+    "glm": {"glm-4-flash", "glm-4.7"},
 }
 
 
@@ -435,7 +438,7 @@ def _resolve_provider_defaults(provider: str) -> tuple[str, str, str, str]:
         "qwen": ("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen3.7-flash", "qwen3.8-max", "qwen3.8-max"),
         "baidu": ("https://qianfan.baidubce.com/v2/chat/completions", "ernie-4.5-turbo-32k", "ernie-4.5-turbo-128k", "ernie-4.5-turbo-128k"),
         "mimo": ("https://api.xiaomimimo.com/v1/chat/completions", "mimo-v2.5-pro", "mimo-v2.5-pro", "mimo-v2.5-pro"),
-        "glm": ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4.7", "glm-4.7", "glm-4.7"),
+        "glm": ("https://open.bigmodel.cn/api/paas/v4/chat/completions", "glm-4-flash", "glm-4-flash", "glm-4-flash"),
         "tencent": ("https://api.hunyuan.cloud.tencent.com/v1/chat/completions", "hunyuan-lite", "hunyuan-lite", "hunyuan-lite"),
         "ark": ("https://ark.cn-beijing.volces.com/api/v3/chat/completions", "doubao-seed-2-1-pro-260628", "doubao-seed-2-1-pro-260628", "doubao-seed-2-1-pro-260628"),
         "sensenova": ("https://api.sensenova.cn/compatible-mode/v2/chat/completions", "sensenova-6.8-flash-lite", "sensenova-6.8-flash-lite", "sensenova-6.8-flash-lite"),
