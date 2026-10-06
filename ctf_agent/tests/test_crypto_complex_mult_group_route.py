@@ -46,6 +46,45 @@ class TestComplexMultGroupRoute(unittest.TestCase):
             "椭圆曲线/ECDLP/离散对数方向", TEMPLATES_SRC,
             "仍残留旧的 ECC 方向模板，未彻底清理")
 
+    def test_infer_skill_require_loads_complex_mult_group_for_specialcurve2(self):
+        """B2 路由修复端到端确定性验证（不依赖 LLM）：
+
+        specialcurve2 真实题面（复数乘法群 + 类 RSA）经主链路每题调用的
+        infer_skill_require 必须触发 skill_manager.load('crypto_complex_mult_group')。
+        这正是 A 真跑要验证的路由修复效果——免费模型（glm/kimi）JSON 格式差
+        无法端到端真跑，本测试以确定性方式锁死修复实际生效（绕开模型能力天花板）。
+        """
+        from core.prompts import infer_skill_require
+
+        class _Mgr:
+            def __init__(self):
+                self.loaded = []
+
+            def list_loaded(self):
+                return self.loaded
+
+            def list_available(self):
+                return ["crypto_complex_mult_group", "rsa_fermat_factor"]
+
+            def load(self, name):
+                self.loaded.append(name)
+
+        class _Q:
+            category = "crypto"
+            description = ("在复数乘法群（点加定义 x3=x1*x2-y1*y2, "
+                           "y3=x1*y2+x2*y1）上进行类 RSA 加密")
+            candidate_flag = None
+
+        class _Ctx:
+            question = _Q()
+
+        mgr = _Mgr()
+        result = infer_skill_require(_Ctx(), {"ability_gap": ["缺少有效攻击路径"]}, mgr)
+        self.assertIsNone(result)
+        self.assertIn(
+            "crypto_complex_mult_group", mgr.loaded,
+            "specialcurve2 题面必须路由加载 crypto_complex_mult_group（B2 修复核心生效）")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
