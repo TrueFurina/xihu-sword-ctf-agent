@@ -86,6 +86,28 @@ def _bsgs(base, target, mod, order):
     return None
 
 
+def _find_executable(name: str):
+    """在 PATH 中查找可执行文件（纯 Python 实现，替代 shutil.which）。
+
+    2026-10-06 新增：AST 沙箱禁止 import shutil（高危清单），而本 skill 只需
+    "某程序是否存在"这一只读查询，用纯 Python 遍历 PATH 即可，避免把高危模块
+    带进 skill。找不到返回 None（调用方据此降级）。
+    """
+    import os as _os
+    exts = ("", ".exe", ".bat", ".cmd", ".com") if _os.name == "nt" else ("",)
+    for d in (_os.environ.get("PATH") or "").split(_os.pathsep):
+        if not d:
+            continue
+        for ext in exts:
+            cand = _os.path.join(d, name + ext)
+            try:
+                if _os.path.isfile(cand) and _os.access(cand, _os.X_OK):
+                    return cand
+            except OSError:
+                continue
+    return None
+
+
 def _solve_e_via_pari(n: int, hint: tuple, factors: list):
     """解 e：2^e ≡ norm(HINT) mod n。
 
@@ -97,23 +119,26 @@ def _solve_e_via_pari(n: int, hint: tuple, factors: list):
     2. 否则用 pure-python BSGS 对 ord 求 DLP——仅当 ord 平滑（含大素数因子
        > 2^40 即放弃，避免指数爆炸）。
     3. 否则返回 None + 原因，由 run() 走"已验证 writeup e"fallback（标注数学验证）。
+
+    ⚠️ 2026-10-06 起本 skill **不再调用任何外部二进制**（原代码用
+       `shutil.which` + `subprocess.run` 调 PARI/gp 做 znlog）。
+       原因有二：
+       1) AST 沙箱禁止 import shutil/subprocess —— 仓内 skill 不应具备任意
+          命令执行能力，而 gp 仅是可选加速器；
+       2) **实测本机 PATH 中无 gp**，该加速路径在本环境根本走不通，
+          且对 safe-prime 结构（ord 含 88-bit 大素数）纯 Python BSGS 也不可行
+          ——真正解出本题的是 run() 里的 _KNOWN_E 兜底（对候选 e 做
+          pow 验证后才采用，非盲信）。
+       故：删除 gp 调用，保留 _find_executable() 供将来按需查询工具是否存在
+       （纯 Python 查 PATH，无高危），DLP 直接返回 None 交由 fallback。
     """
-    import shutil
-    import subprocess
     if not hint:
         return None, "缺 HINT，无法构造 norm(HINT)"
     norm_hint = (int(hint[0]) ** 2 + int(hint[1]) ** 2) % n
-    # 路径1: PARI
-    if shutil.which("gp") is not None:
-        try:
-            out = subprocess.run(
-                ["gp", "-q", "-f", "-c", f"znlog({norm_hint}, Mod(2, {n}))"],
-                capture_output=True, text=True, timeout=180)
-            if out.returncode == 0:
-                e = int(str(out.stdout).strip().split("\n")[0])
-                return e, None
-        except Exception:  # noqa: BLE001
-            pass  # 落到 BSGS
+    # 路径1: PARI/gp 加速 —— 已移除外部进程调用（见上方说明），保留存在性查询
+    if _find_executable("gp") is not None:
+        # 装了 gp 但本skill 不再 fork 外部进程；留此分支仅为说明能力边界
+        pass
     # 路径2: BSGS（需 ord 平滑）
     if factors:
         from sympy import factorint
