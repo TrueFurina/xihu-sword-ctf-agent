@@ -272,6 +272,13 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         # （重算 x 与官方 x 不符，已证）；真值需真解，flag_sha256 登记口径为
         # 只对 CTF{...} 部分取摘要。
         "mangled somehow": "crypto_primes_subset",
+        # ── ezRSA（真·L2 · Hastad 广播攻击）专属键（2026-10-06 实测纠错）──
+        # 两个硬点（都由测试逼出来）：
+        # ① 键必须在 **description 内**：原 desc 只写「同一明文 m 用三组不同
+        #    (n,c) 加密」，**不含**「hastad」「广播攻击」二字（那在 title 里，
+        #    而 infer_skill_require 只匹配 description）→ 挂 title 键必然路由失败。
+        # ② 键必须排在下方裸 "rsa" 之前，否则被 RSA catch-all 抢走。
+        "同一明文": "crypto_hastad_broadcast",
         "费马": "rsa_fermat_factor", "fermat": "rsa_fermat_factor", "rsa": "rsa_fermat_factor",
         "zip": "zip_chain_decode", "压缩": "zip_chain_decode",
         "base64": "base64_multilayer", "base32": "base64_multilayer",
@@ -344,7 +351,13 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         # 内部 auto-detect 费马/小指数/Wiener/共模/Hastad/phi已知——文件名"费马"是历史
         # 遗留误导。以下所有 RSA 关键词路由到它，靠内部自动检测兜底，非仅费马分解。
         "小指数": "rsa_fermat_factor", "小e": "rsa_fermat_factor",
-        "广播攻击": "rsa_fermat_factor", "hastad": "rsa_fermat_factor",
+        # 广播攻击/hastad 已前置到裸 "rsa" 之前并改指专用 crypto_hastad_broadcast
+        # （2026-10-06 实测：ezRSA 经本skill 路由会抛
+        #  `pow() 3rd argument cannot be 0`——auto-detect 误落默认费马分支；
+        #   专用 solver 端到端解出且 sha256 逐字匹配）。
+        # 下方这两个键保留为**无害冗余**（供 title 含 hastad 的题面命中）；
+        # 因 desc 匹配优先，前置键会先命中，故不会造成错路由。
+        "广播攻击": "crypto_hastad_broadcast", "hastad": "crypto_hastad_broadcast",
         "crt": "rsa_fermat_factor", "中国剩余": "rsa_fermat_factor",
         "共模": "rsa_fermat_factor", "common modulus": "rsa_fermat_factor",
         "wiener": "rsa_fermat_factor", "连分数": "rsa_fermat_factor",
