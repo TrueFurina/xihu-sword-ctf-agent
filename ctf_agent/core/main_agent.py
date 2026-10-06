@@ -954,9 +954,15 @@ class MainAgent:
                 # 修复：消费 _last_skill_require → load 进 registry → run 一次。
                 # 触发门槛（省 token + 避免误调）：仅当路由命中 skill、该 skill
                 #   尚未被调用过、且入参可可靠构造时才调。
-                # 诚实边界：仅对**路径/目录类** skill 自动调用（tools/skill_dispatch
-                #   的白名单）；纯数值类（cycling/primes/knapsack 等）参数藏在附件
-                #   源码里，主链无法可靠解析 → **不自动调**，不拿猜测参数制造假失败。
+                # 诚实边界：只对**入参可可靠构造**的 skill 自动调用，白名单在
+                #   tools/skill_dispatch.AUTO_CALLABLE（fail-closed，未列入者一律不调）：
+                #   · A 类路径类 / B 类目录类 —— 直接喂附件路径；
+                #   · C 类纯数值类（2026-10-07 扩展：cycling / primes_subset /
+                #     knapsack_mhk）—— 由**确定性提取器**从附件里结构化解析
+                #     （AST / literal_eval / 带门限正则），参数不齐即返回 None。
+                #   仍未覆盖：electric-mayhem-cls（.tgz/.gz 需先解包预处理）、
+                #   pkcs1_padding_oracle（有多阶段人工编排 Semantics）等 ——
+                #   宁可漏调，也不拿猜测参数制造假失败。
                 _skill_hit = self._last_skill_require
                 _skill_name = ""
                 if isinstance(_skill_hit, dict):
