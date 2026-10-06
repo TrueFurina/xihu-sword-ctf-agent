@@ -44,8 +44,9 @@ floating_points  --bzip2-->  Ascii85 文本  --a85decode-->  SVG path 数据
 
 ## 解法（三步，纯 Python + 可选 OCR）
 
-实现落位 `skills/svg_path_text.py`（+ 配套 `.json`），presolve 第 **35 路**接线
-`_try_svg_path_text`（`core/presolve.py`）。
+实现落位 `skills/svg_path_text.py`（+ 配套 `.json`），presolve 并发嗅探组第
+**34 路**接线 `_try_svg_path_text`（`core/presolve.py`；`grep -c
+"asyncio.ensure_future(_try_"` = 34）。
 
 1. **容器解码**（`decode_container`）：`bzip2`（`BZh` magic）→ 文本；若文本已是
    合法 path 直接用，否则要求其为 Ascii85（≥98% 字符落在 `!`..`u`）→ a85decode
@@ -77,9 +78,15 @@ floating_points  --bzip2-->  Ascii85 文本  --a85decode-->  SVG path 数据
   真实题 sha256 锁、presolve 接线与端到端。
 - **变异验证生效**：把 even-odd 异或填充改为并集（`^=`→`|=`）→ 真实题
   sha256 测试与 presolve 端到端**双双转红**，恢复后 19/19 复绿。
-- **回归零红**（presolve+KPI+leak）：`167 passed / 5 skipped`；skill 覆盖度/
-  路由 `22 passed`；presolve+KPI+leak 全量回归 `168 passed / 5 skipped`
-  （含新增 19）。README 中英 skills 计数已按机器真值同步为 **64**（`test_kpi_canonical` 复绿 21/21）。
+- **回归零红**（实测取数，均单跑复现）：门禁⑥快速回归 `152 passed`；
+  presolve+KPI+leak 目标集（`test_presolve_skill_wiring` /
+  `test_presolve_answer_check` / `test_presolve_b1_wiring` /
+  `test_kpi_canonical` / `test_kpi_crossaudit` / `test_leak_provenance` /
+  `test_no_leaked_flag` / `test_scan_kpi_leak_guard` /
+  `test_svg_path_text`）`130 passed / 5 skipped`；skill 覆盖度/路由
+  （`test_skill_coverage` + `test_skill_routing_integrity`）`9 passed`；
+  新增 `test_svg_path_text.py` `19 passed`。README 中英 skills 计数已按机器
+  真值同步为 **64**（`test_kpi_canonical` 复绿 `21 passed`）。
 - **诚实口径**：OCR 非「明文嗅探」；命中仍由下游 `flag_pattern` +
   `_passes_answer_check`（`flag_sha256`）把关，无把握一律不返回，故**不产生
   假阳性**。属 **presolve 命中，不计入 LLM 自主解题率**；「可确定性攻破」仅
