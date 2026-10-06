@@ -293,6 +293,13 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "上传绕过": "web_upload_bypass", "webshell": "web_upload_bypass",
         "布尔盲注": "web_sqli",
         "爆破": "hash_crack", "弱密码": "hash_crack", "字典": "hash_crack", "彩虹表": "hash_crack",
+        # ── 高偶指数 RSA / hint 泄露 p 路由（2026-10-06 B2 纠错：10733 实证）──
+        # 10733 真题：hint=(e*p+e²)^q mod n 可分解 n（crypto_high_exponent.factor_from_hint：
+        # W=e^n mod n → p=gcd(W²-hint,n)，无需先知 q）；题面含 "rot13/编码" 会先命中下面的
+        # base64_multilayer（编码 solver，完全错方向）。本组键必须在 "rot13" 之前，使高偶指数
+        # RSA + 奇数阶子群还原正确路由到 crypto_high_exponent（已实测解出 10733）。
+        "高偶指数": "crypto_high_exponent", "奇数阶子群": "crypto_high_exponent",
+        "hint 泄露 p": "crypto_high_exponent", "hint泄露p": "crypto_high_exponent",
         "rot13": "base64_multilayer", "rot": "base64_multilayer",
         "编码": "base64_multilayer", "解码": "base64_multilayer",
         "多层编码": "base64_multilayer", "url编码": "base64_multilayer",
