@@ -163,6 +163,8 @@ _WIRED_SKILL_MODULES = {
     "skills.svg_path_text",
     # 2026-10-07 新增（确定性静态求解）：ELF「常量比对」型逆向（xor_const / subst_table / tree_index）
     "skills.rev_const_compare",
+    # 2026-10-07 新增（确定性静态求解）：pcap → HTTP 表单 hex 片段 → 拼接还原嵌入文件 → OCR
+    "skills.pcap_http_carve",
     # 2026-10-04 新增（B1 工具链补齐产物，确定性静态求解）
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
@@ -597,6 +599,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_svg_path_text(question)),
         # 2026-10-07 确定性静态求解：ELF「常量比对」型逆向 → 反演输入变换
         asyncio.ensure_future(_try_rev_const_compare(question)),
+        # 2026-10-07 确定性静态求解：pcap → HTTP 表单 hex 片段 → 拼接还原嵌入文件 → OCR
+        asyncio.ensure_future(_try_pcap_http_carve(question)),
         # 2026-10-04 B1 确定性静态求解：子集积 mod q → Coppersmith 平滑因子
         asyncio.ensure_future(_try_crypto_primes(question)),
         asyncio.ensure_future(_try_knapsack_mhk(question)),
@@ -1928,6 +1932,63 @@ async def _try_rev_const_compare(question) -> Optional[str]:
         flag = _flag_from_text(decoded) or decoded
         if flag and _is_plausible_flag(flag):
             logger.info("[presolve:rev_const_compare] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
+    return None
+
+
+async def _try_pcap_http_carve(question) -> Optional[str]:
+    """pcap → HTTP 表单 hex 片段 → 拼接还原嵌入文件 → OCR/搜 flag（2026-10-07 · B 类静态求解）。
+
+    对「抓包里有大量 HTTP 表单、其中额外字段承载某嵌入文件的逐段 hex 片段」的
+    题型做确定性还原：纯 Python 重组 TCP 流（skills.pcap_http_carve）→ 按抓包
+    时间序拼接片段 → 还原文件 → 图片则 OCR 读图。诚实口径：只做字节搬运与读图，
+    不做明文嗅探；命中仍由下游 flag_pattern + 答案校验（题面提供时）把关。
+    实测 NYU CTF Bench 2017q_for_missed_registration（CSAW-Quals 2017）解出
+    FLAG{3Am_LaunDR3Y_FL4G_L34kz!}，与题面 flag_sha256 逐字匹配。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("forensics", "misc"):
+        return None
+    attach = _attachments(question)
+    if not attach:
+        return None
+    try:
+        from skills.pcap_http_carve import run as pcap_run
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.pcap_http_carve", exc)
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p) or os.path.getsize(p) > 64 * 1024 * 1024:
+            continue
+        try:
+            with open(p, "rb") as fh:
+                raw = fh.read(4)
+        except OSError:
+            continue
+        # 廉价预检：只对经典 libpcap 魔数开火（OCR/重组都不便宜）
+        if raw not in (b"\xd4\xc3\xb2\xa1", b"\xa1\xb2\xc3\xd4",
+                       b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d"):
+            continue
+        try:
+            res = await asyncio.to_thread(pcap_run, {"path": p})
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:pcap_http_carve] %s 异常: %s", p, exc)
+            continue
+        if not res:
+            continue
+        decoded = ""
+        for enc in ("utf-8", "latin-1"):
+            try:
+                decoded = res.decode(enc)
+                break
+            except Exception:  # noqa: BLE001
+                continue
+        flag = _flag_from_text(decoded)
+        if flag and _is_plausible_flag(flag):
+            logger.info("[presolve:pcap_http_carve] %s 命中 flag=%s",
                         getattr(question, "id", "?"), flag[:60])
             _save_candidates(question, [flag])
             return flag
