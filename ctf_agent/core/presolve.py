@@ -167,6 +167,8 @@ _WIRED_SKILL_MODULES = {
     "skills.pcap_http_carve",
     # 2026-10-07 新增（确定性静态求解）：bananascript 编码解码 + 滚动异或还原 flag
     "skills.banana_script",
+    # 2026-10-07 新增（确定性静态求解）：二进制 emoji 流（每符号 1 bit，8 符号/字节）
+    "skills.emoji_binary",
     # 2026-10-04 新增（B1 工具链补齐产物，确定性静态求解）
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
@@ -605,6 +607,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_pcap_http_carve(question)),
         # 2026-10-07 确定性静态求解：bananascript 编码解码 + 滚动异或还原 flag
         asyncio.ensure_future(_try_banana_script(question)),
+        # 2026-10-07 确定性静态求解：二进制 emoji 流（每符号 1 bit，8 符号/字节）
+        asyncio.ensure_future(_try_emoji_binary(question)),
         # 2026-10-04 B1 确定性静态求解：子集积 mod q → Coppersmith 平滑因子
         asyncio.ensure_future(_try_crypto_primes(question)),
         asyncio.ensure_future(_try_knapsack_mhk(question)),
@@ -2053,6 +2057,73 @@ async def _try_banana_script(question) -> Optional[str]:
         flag = _flag_from_text(decoded) or decoded
         if flag and _is_plausible_flag(flag):
             logger.info("[presolve:banana_script] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
+    return None
+
+
+# --------------------------------------------------------------------------
+# 2026-10-07 B 类静态解码：二进制 emoji 流（每符号 1 bit，8 符号/字节）
+# --------------------------------------------------------------------------
+
+async def _try_emoji_binary(question) -> Optional[str]:
+    """二进制 emoji 流解码（2026-10-07 · B 类静态求解）。
+
+    对「纯 emoji 文本附件」题型：序列由少量互不相同的 emoji 构成（本题 20 个 =
+    10 组语义对立对），每个 emoji 编码 1 bit、每 8 个拼 1 字节（MSB 在前），整体
+    即一段 ASCII 文本。handler 只对**文本型附件**做廉价预检（无 \\x00、可 utf-8
+    解码、emoji 型 token 数 ≥16 且 %8==0），命中即调 skill 的 DFS 求解。
+    实测 NYU CTF Bench 2023f_for_emoji（CSAW-Finals 2023 forensics/emoji）解出
+    csawctf{emoji_game_on_fleeeeeeeeeek}，与题面 flag_sha256 逐字匹配。
+
+    诚实口径：仅覆盖「每符号 1 bit + MSB 先 8bit/字节 + 纯 ASCII 载荷」子集；
+    Base100 / emoji 替换表 / 零宽字符等其它 emoji 编码不在覆盖内。解出属 presolve
+    静态直出，**不计入 LLM 自主解题率**，也不得外推为「forensics 类可解」。
+    """
+    attach = _attachments(question)
+    if not attach:
+        return None
+    try:
+        from skills.emoji_binary import is_emoji_binary as _is_emoji
+        from skills.emoji_binary import run as emoji_run
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.emoji_binary", exc)
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p) or os.path.getsize(p) > 8 * 1024 * 1024:
+            continue
+        try:
+            with open(p, "rb") as fh:
+                raw = fh.read()
+        except OSError:
+            continue
+        # 廉价预检：文本文件（无 NUL）+ 是「二进制 emoji 流」
+        if b"\x00" in raw[:4096]:
+            continue
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        if not _is_emoji(text):
+            continue
+        exp = getattr(question, "expected_sha256", None)
+        try:
+            res = await asyncio.to_thread(
+                emoji_run, {"raw": text, "expected_sha256": exp})
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:emoji_binary] %s 异常: %s", p, exc)
+            continue
+        if not res:
+            continue
+        try:
+            decoded = res.decode("ascii", "replace").strip()
+        except Exception:  # noqa: BLE001
+            continue
+        flag = _flag_from_text(decoded) or decoded
+        if flag and _is_plausible_flag(flag):
+            logger.info("[presolve:emoji_binary] %s 命中 flag=%s",
                         getattr(question, "id", "?"), flag[:60])
             _save_candidates(question, [flag])
             return flag

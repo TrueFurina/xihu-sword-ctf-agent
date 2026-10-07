@@ -1,0 +1,8 @@
+{
+  "name": "emoji_binary",
+  "purpose": "二进制 emoji 序列解码（CSAW-Finals 2023 forensics「Emoji」型题）。适用题型：给一份纯 emoji 文本（可能附同内容的 strip 图作提示），序列只由少量互不相同的 emoji 构成（本题 20 个 = 10 组语义对立对），每个 emoji 编码 1 bit、每 8 个 emoji 拼 1 字节（MSB 在前），整体即一段 ASCII 文本 → flag。本 skill 不依赖任何硬编码映射表：把「每个不同 emoji → 0/1」当布尔变量，逐字节做可打印 ASCII（0x20–0x7E）剪枝的 DFS，保留能拼出合法 flag 的赋值；多候选时按「前缀全小写 > 正文仅 [a-z0-9_] > 更长」择优；若提供 expected_sha256 则以 sha256 命中为唯一权威。实测 NYU CTF Bench 2023f_for_emoji（CSAW-Finals 2023 forensics/emoji，题面仅一个 🤬）解出 csawctf{emoji_game_on_fleeeeeeeeeek}，sha256=ce5aff49a6411c3ded733575a1f4dc6f419039baf3bd04501beb04b1091cae87，与题面 flag_sha256 逐字吻合，单题 0.4s。",
+  "input_spec": "params = {'path': emoji 文本文件路径 | 'raw': bytes|str, 'expected_sha256': 可选 64hex}。判定门槛：≥16 个 emoji 型 token（首字符码位 ≥U+2000 且非 ASCII 字母数字）、token 数 %8==0、不同符号数 4..24。",
+  "output_spec": "还原出的 flag ASCII bytes；非 emoji 流 / 长度非 8 倍数 / 无合法 flag 候选 / sha256 不符 → None（不谎报）。",
+  "categories": ["forensics", "misc"],
+  "version": "1.0"
+}
