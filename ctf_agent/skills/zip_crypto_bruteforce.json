@@ -1,0 +1,8 @@
+{
+  "name": "zip_crypto_bruteforce",
+  "purpose": "ZipCrypto（传统 zip 加密）密码爆破：流式正确的 12 字节头快筛（候选校验字节必须持续更新 keys，防跳步 bug）+ CRC 精确复核，支持字典与字符集枚举，解出后自动 inflate 落盘并提取 flag{...}。misc zip 真加密题型。注意：deflate 条目无法用已知明文攻击（bkcrack -x 只对 store 条目有效）。",
+  "input_spec": "params = {'zip_path': zip 路径, 'entry': 条目名(可选), 'dict_path': 字典(可选), 'charsets': ['digits','lower',...](可选), 'min_len': 1, 'max_len': 6, 'max_candidates': 50000000}",
+  "output_spec": "{'ok': bool, 'password': str|None, 'entry': str, 'data': 明文落盘路径, 'flag': str|None, 'tried': int}",
+  "categories": ["misc", "zip"],
+  "version": "1.0"
+}

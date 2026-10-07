@@ -280,6 +280,11 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         # ② 键必须排在下方裸 "rsa" 之前，否则被 RSA catch-all 抢走。
         "同一明文": "crypto_hastad_broadcast",
         "费马": "rsa_fermat_factor", "fermat": "rsa_fermat_factor", "rsa": "rsa_fermat_factor",
+        # ── ZipCrypto 真加密爆破（2026-10-08 沉淀，源自 xuanhun_ezip L3 攻防）──
+        # 特异键必须排在下方裸 "zip"/"zip密码" 之前，否则被 catch-all 抢走。
+        "zipcrypto": "zip_crypto_bruteforce",
+        "zip加密": "zip_crypto_bruteforce", "真加密": "zip_crypto_bruteforce",
+        "密码爆破": "zip_crypto_bruteforce", "bruteforce zip": "zip_crypto_bruteforce",
         "zip": "zip_chain_decode", "压缩": "zip_chain_decode",
         "base64": "base64_multilayer", "base32": "base64_multilayer",
         "凯撒": "caesar_bruteforce", "caesar": "caesar_bruteforce",
