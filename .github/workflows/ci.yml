@@ -28,6 +28,16 @@ jobs:
         # tests/test_jpeg_png_ocr.py::test_tesseract_locatable and the vision-fallback
         # path in tests/test_presolve_jpeg_vision.py need the tesseract binary on PATH.
         # ubuntu-latest images do not ship it.
+        #
+        # ⚠️ 这里**刻意不加** continue-on-error：
+        #   test_jpeg_png_ocr.py::test_tesseract_locatable 硬断言 tesseract 必须存在
+        #   （它的 skip 只加在同文件的 test_xuanhun_signin_ocr_flag 上），
+        #   所以「装不上」必须让门禁红。加了 continue-on-error 会掩盖成
+        #   「步骤 success 但二进制缺失」，然后在测试阶段炸出更难定位的失败
+        #   （实测 2026-10-08 CI #152：1 failed，误导性更强）。
+        # timeout-minutes: apt 源故障时（实测 2026-10-08 有 run 挂 50+ 分钟，
+        #   而同一时段相邻 run 2 分钟就跑完）快速失败，而不是无限期占住 required check。
+        timeout-minutes: 5
         run: |
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr
