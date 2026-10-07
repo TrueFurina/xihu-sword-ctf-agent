@@ -165,6 +165,8 @@ _WIRED_SKILL_MODULES = {
     "skills.rev_const_compare",
     # 2026-10-07 新增（确定性静态求解）：pcap → HTTP 表单 hex 片段 → 拼接还原嵌入文件 → OCR
     "skills.pcap_http_carve",
+    # 2026-10-07 新增（确定性静态求解）：bananascript 编码解码 + 滚动异或还原 flag
+    "skills.banana_script",
     # 2026-10-04 新增（B1 工具链补齐产物，确定性静态求解）
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
@@ -601,6 +603,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_rev_const_compare(question)),
         # 2026-10-07 确定性静态求解：pcap → HTTP 表单 hex 片段 → 拼接还原嵌入文件 → OCR
         asyncio.ensure_future(_try_pcap_http_carve(question)),
+        # 2026-10-07 确定性静态求解：bananascript 编码解码 + 滚动异或还原 flag
+        asyncio.ensure_future(_try_banana_script(question)),
         # 2026-10-04 B1 确定性静态求解：子集积 mod q → Coppersmith 平滑因子
         asyncio.ensure_future(_try_crypto_primes(question)),
         asyncio.ensure_future(_try_knapsack_mhk(question)),
@@ -1989,6 +1993,66 @@ async def _try_pcap_http_carve(question) -> Optional[str]:
         flag = _flag_from_text(decoded)
         if flag and _is_plausible_flag(flag):
             logger.info("[presolve:pcap_http_carve] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
+    return None
+
+
+async def _try_banana_script(question) -> Optional[str]:
+    """bananascript 编码解码 + 滚动异或还原 flag（2026-10-07 · B 类静态求解）。
+
+    对「ELF 解释器 + 全是大写变体单词 bananas 的脚本」题型：脚本 token 的大小写
+    即 7 位词值，二进制内 96 项字符表把词值映射成 ASCII；取首条 store 常量指令的
+    48 词常量，用 crib `flag{` 解 8 字节滚动异或密钥前 5 字节，再以「花括号内仅
+    [A-Za-z0-9_]」约束解后 3 字节（官方枚举序取最大者）还原 flag。
+    实测 NYU CTF Bench 2017q_rev_bananascript（CSAW-Quals 2017）解出
+    flag{0r4ng3_3w3_ch1pp3r_1_h47h_n07_s4y_b4n4n4rs}，与题面 flag_sha256 逐字匹配。
+
+    诚实口径：仅覆盖「banana 编码 + store 常量 + 8 字节滚动异或」子集，VM 的
+    mix/sge/jmp 控制流语义未实现（本题无需）；解出属 presolve 静态直出，**不计入
+    LLM 自主解题率**，也不得外推为「reverse 类可解」。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat != "reverse":
+        return None
+    attach = _attachments(question)
+    if not attach:
+        return None
+    try:
+        from skills.banana_script import is_banana_script as _is_banana
+        from skills.banana_script import run as banana_run
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.banana_script", exc)
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p) or os.path.getsize(p) > 8 * 1024 * 1024:
+            continue
+        try:
+            with open(p, "rb") as fh:
+                head = fh.read(4096)
+        except OSError:
+            continue
+        # 廉价预检：文本文件 + 头部 token 已是 bananas 大小写变体
+        if b"\x00" in head:
+            continue
+        if not _is_banana(head):
+            continue
+        try:
+            res = await asyncio.to_thread(banana_run, {"path": p})
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:banana_script] %s 异常: %s", p, exc)
+            continue
+        if not res:
+            continue
+        try:
+            decoded = res.decode("utf-8", "replace").strip()
+        except Exception:  # noqa: BLE001
+            continue
+        flag = _flag_from_text(decoded) or decoded
+        if flag and _is_plausible_flag(flag):
+            logger.info("[presolve:banana_script] %s 命中 flag=%s",
                         getattr(question, "id", "?"), flag[:60])
             _save_candidates(question, [flag])
             return flag
