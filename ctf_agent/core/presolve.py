@@ -169,6 +169,8 @@ _WIRED_SKILL_MODULES = {
     "skills.banana_script",
     # 2026-10-07 新增（确定性静态求解）：二进制 emoji 流（每符号 1 bit，8 符号/字节）
     "skills.emoji_binary",
+    # 2026-10-07 新增（确定性静态求解）：C++ verify 口令校验器 XOR+查表 反推（rox）
+    "skills.rev_xor_verify",
     # 2026-10-04 新增（B1 工具链补齐产物，确定性静态求解）
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
@@ -609,6 +611,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_banana_script(question)),
         # 2026-10-07 确定性静态求解：二进制 emoji 流（每符号 1 bit，8 符号/字节）
         asyncio.ensure_future(_try_emoji_binary(question)),
+        # 2026-10-07 确定性静态求解：C++ verify 口令校验器 XOR+查表 反推（rox）
+        asyncio.ensure_future(_try_rev_xor_verify(question)),
         # 2026-10-04 B1 确定性静态求解：子集积 mod q → Coppersmith 平滑因子
         asyncio.ensure_future(_try_crypto_primes(question)),
         asyncio.ensure_future(_try_knapsack_mhk(question)),
@@ -2124,6 +2128,64 @@ async def _try_emoji_binary(question) -> Optional[str]:
         flag = _flag_from_text(decoded) or decoded
         if flag and _is_plausible_flag(flag):
             logger.info("[presolve:emoji_binary] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
+    return None
+
+
+async def _try_rev_xor_verify(question) -> Optional[str]:
+    """C++ 口令校验器 XOR+查表 反推（2026-10-07 · B 类静态求解）。
+
+    对「带符号的 ELF64 C++ 逆向」题型：`verify(std::string)` 把输入逐字节 XOR 进
+    编译期立即数 key 数组，再用一个 int32 查找表二次混淆，末与 .rodata 常量串比对
+    （不等则打印 `fail_msgs[rand()%6]` 的「sea of flags」诱饵）。handler 只用廉价
+    预检（ELF64 且符号表含 `_Z6verify`），命中即调 skill：纯 Python 解析段表/符号表
+    → 扫描 movb-立即数段自动重建 key → 定位 int32 数据表 → 取 .rodata 常量串 →
+    求长度与逐字节约束交集解出口令。实测 NYU CTF Bench 2023q_rev_rox（CSAW-Quals
+    2023 rev/rox）解出 csawctf{aN0ther_HeRRing_or_iS_tHis_iT}，与题面 flag_sha256
+    逐字匹配。
+
+    诚实口径：仅覆盖「编译期立即数 key + 单个 int32 查表 + 常量串比对」子集；
+    动态解密 key / 多表 / 哈希 / 加壳等更复杂校验器不在覆盖内。解出属 presolve
+    静态直出，**不计入 LLM 自主解题率**，也不得外推为「rev 类可解」。
+    """
+    attach = _attachments(question)
+    if not attach:
+        return None
+    try:
+        from skills.rev_xor_verify import is_rev_xor_verify as _is_rox
+        from skills.rev_xor_verify import run as rox_run
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.rev_xor_verify", exc)
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p) or os.path.getsize(p) > 64 * 1024 * 1024:
+            continue
+        try:
+            with open(p, "rb") as fh:
+                raw = fh.read()
+        except OSError:
+            continue
+        if not _is_rox(raw):
+            continue
+        exp = getattr(question, "expected_sha256", None)
+        try:
+            res = await asyncio.to_thread(
+                rox_run, {"path": p, "expected_sha256": exp})
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:rev_xor_verify] %s 异常: %s", p, exc)
+            continue
+        if not res:
+            continue
+        try:
+            decoded = res.decode("ascii", "replace").strip()
+        except Exception:  # noqa: BLE001
+            continue
+        flag = _flag_from_text(decoded) or decoded
+        if flag and _is_plausible_flag(flag):
+            logger.info("[presolve:rev_xor_verify] %s 命中 flag=%s",
                         getattr(question, "id", "?"), flag[:60])
             _save_candidates(question, [flag])
             return flag

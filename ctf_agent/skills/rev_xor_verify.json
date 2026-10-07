@@ -1,0 +1,8 @@
+{
+  "name": "rev_xor_verify",
+  "purpose": "CSAWA 2023 quals「rox」这类 C++ 口令校验器的确定性反推：verify(std::string) 先把输入逐字节 XOR 进一个编译期立即数 key 数组，再用一个大的 vector<int> 查找表二次混淆，最后与 .rodata 中的常量串比对（不等则打印 fail_msgs[rand()%6] 的『sea of flags』诱饵）。本 skill 不依赖反汇编器/调试器（题面亦提示 don't use any decompilers or debuggers），只用纯 Python：极简解析 ELF64 段表/符号表 → 在 .text 扫描最长一段 movb $imm,disp(%rbp)（C6 45 d8 imm 与 C6 85 d32 imm 两种编码）按 disp 排序自动重建 key → 在静态初始化里扫描 mov $src,%ecx; mov $size,%edx 定位 int32 数据表 → 在 .rodata 取 flag{...} 常量串 → 求长度 len 与逐字节约束交集解出口令。关键洞察：源码里 300× 嵌套循环 vec[j] ^= ((d<<5)&0xFF) ^ (vec[j-5]==0x6e) 因 XOR 计数相消恒为 no-op，可直接跳过，最终只需解 expected[i] = key[i] ^ (in[i] if i<len else 0) ^ data[(in[i%len] + data[(i*10+12)%n]) % n]。实测 NYU CTF Bench 2023q_rev_rox（CSAW-Quals 2023 rev/rox）解出口令 aN0ther_HeRRing_or_iS_tHis_iT，按题面要求包成 csawctf{aN0ther_HeRRing_or_iS_tHis_iT}，sha256=98af532276d02fe4953b5211da114933d7aafc1e8fe00c13488b6207b7162c00，与题面 flag_sha256 逐字吻合。",
+  "input_spec": "params = {'path': ELF64 二进制路径}（可用 {'raw': bytes}；可带 expected_sha256 作为唯一权威判据）。判定门槛：ELF64 且符号表含 _Z6verify（C++ verify(std::string)），且能提取到 ≥8 项的 movb-立即数 key 段与一个 int32 查表。",
+  "output_spec": "解出的 flag bytes（默认包成 csawctf{...}）；给了 expected_sha256 时以 sha256 命中为唯一权威（不命中 → None）。非该题型 / 提取失败 / 解不出口令 → None（不谎报）。",
+  "categories": ["reverse"],
+  "version": "1.0"
+}
