@@ -171,6 +171,8 @@ _WIRED_SKILL_MODULES = {
     "skills.emoji_binary",
     # 2026-10-07 新增（确定性静态求解）：C++ verify 口令校验器 XOR+查表 反推（rox）
     "skills.rev_xor_verify",
+    # 2026-10-07 新增（确定性静态求解）：512B MBR 内 SSE(andps+psadbw) 字节校验链反推
+    "skills.mbr_sse_verify",
     # 2026-10-04 新增（B1 工具链补齐产物，确定性静态求解）
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
@@ -613,6 +615,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_emoji_binary(question)),
         # 2026-10-07 确定性静态求解：C++ verify 口令校验器 XOR+查表 反推（rox）
         asyncio.ensure_future(_try_rev_xor_verify(question)),
+        # 2026-10-07 确定性静态求解：512B MBR 内 SSE(andps+psadbw) 字节校验链反推
+        asyncio.ensure_future(_try_mbr_sse_verify(question)),
         # 2026-10-04 B1 确定性静态求解：子集积 mod q → Coppersmith 平滑因子
         asyncio.ensure_future(_try_crypto_primes(question)),
         asyncio.ensure_future(_try_knapsack_mhk(question)),
@@ -2186,6 +2190,61 @@ async def _try_rev_xor_verify(question) -> Optional[str]:
         flag = _flag_from_text(decoded) or decoded
         if flag and _is_plausible_flag(flag):
             logger.info("[presolve:rev_xor_verify] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
+    return None
+
+
+async def _try_mbr_sse_verify(question) -> Optional[str]:
+    """512B MBR 内 SSE(andps+psadbw) 字节校验链反推（2026-10-07 · B 类静态求解）。
+
+    对「Master Boot Record + SSE 校验」题型：MBR 实模式开启 SSE 后，把输入 20 字节
+    中 body(16B) 载入 xmm0 并 pshufd 置换，再用逐轮移位的 `andps` 掩码 + **链式**
+    `psadbw`（上轮结果作本轮第一操作数）与 8 项 u32 期望表比对。handler 用廉价预检
+    （512B + MBR 引导签名 55 AA + andps/psadbw/pshufd 三件套），命中即调 skill：自动
+    提取初值/期望表/置换立即数 → 拆成两个独立 8 字节子系统用「逐轮递推 + 总和约束」
+    确定性还原 → 完整 psadbw 链仿真复核。实测 NYU CTF Bench 2017q_rev_realism
+    （CSAW-Quals 2017 rev/realism）解出 flag{...}，与题面 flag_sha256 逐字匹配。
+
+    诚实口径：仅覆盖「单表 andps 掩码 + 链式 psadbw + 常量期望表」子集；掩码非
+    「逐轮移位」结构、多表/哈希/加壳的 MBR 不在覆盖内。解出属 presolve 静态直出，
+    **不计入 LLM 自主解题率**，也不得外推为「rev 类可解」。
+    """
+    attach = _attachments(question)
+    if not attach:
+        return None
+    try:
+        from skills.mbr_sse_verify import is_mbr_sse_verify as _is_mbr
+        from skills.mbr_sse_verify import run as mbr_run
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.mbr_sse_verify", exc)
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p) or os.path.getsize(p) > 64 * 1024 * 1024:
+            continue
+        try:
+            with open(p, "rb") as fh:
+                raw = fh.read()
+        except OSError:
+            continue
+        if not _is_mbr(raw):
+            continue
+        try:
+            res = await asyncio.to_thread(mbr_run, {"path": p})
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:mbr_sse_verify] %s 异常: %s", p, exc)
+            continue
+        if not res:
+            continue
+        try:
+            decoded = res.decode("ascii", "replace").strip()
+        except Exception:  # noqa: BLE001
+            continue
+        flag = _flag_from_text(decoded) or decoded
+        if flag and _is_plausible_flag(flag):
+            logger.info("[presolve:mbr_sse_verify] %s 命中 flag=%s",
                         getattr(question, "id", "?"), flag[:60])
             _save_candidates(question, [flag])
             return flag
