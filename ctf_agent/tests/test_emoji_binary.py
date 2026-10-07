@@ -29,10 +29,30 @@ _REAL_PNG = (_POOL_DIR / "_attachments" / "forensics" / "2023f-for-emoji"
 _REAL_QID = "ext_nyu_ctf_bench_2023f_for_emoji"
 _REAL_FLAG = "csawctf{emoji_game_on_fleeeeeeeeeek}"
 _j = _POOL_DIR / "forensics" / f"{_REAL_QID}.json"
-_REAL_SHA = json.loads(_j.read_text(encoding="utf-8"))["flag_sha256"]
 
-_need_real = pytest.mark.skipif(not _REAL_TXT.exists(),
-                                reason=f"真题附件缺失: {_REAL_TXT}")
+
+def _read_real_sha() -> str | None:
+    """读真题 sha256；题面 JSON 缺失时返回 None。
+
+    ⚠️ 这里**不能**在模块级直接 json.loads(_j.read_text())：题面 JSON 属于
+    gitignored 题库，CI 上不存在 ⇒ 导入期抛 FileNotFoundError ⇒ pytest 以
+    **exit 2（收集期错误）** 整体崩掉 —— 把「附件缺失」放大成「全盘失败」，
+    连不依赖真题的合成用例也一起陪葬。真实题断言另有 skipif 兜底。
+    """
+    if not _j.exists():
+        return None
+    try:
+        return json.loads(_j.read_text(encoding="utf-8"))["flag_sha256"]
+    except Exception:          # 坏 JSON / 缺字段
+        return None
+
+
+_REAL_SHA = _read_real_sha()
+
+# 真题「附件 + 题面 JSON」都齐了才算可用（原先只判附件，漏了题面这一半）
+_need_real = pytest.mark.skipif(
+    not _REAL_TXT.exists() or _REAL_SHA is None,
+    reason=f"真题附件/题面缺失: {_REAL_TXT}")
 
 
 # ------------------------------------------------------------------ 合成工具
@@ -72,11 +92,13 @@ def test_is_emoji_token_anchors():
     assert not E._is_emoji_token("1")
 
 
+@_need_real
 def test_real_file_is_emoji_binary():
     assert _REAL_TXT.exists()
     assert E.is_emoji_binary(_REAL_TXT.read_text(encoding="utf-8"))
 
 
+@_need_real
 def test_real_png_is_not_emoji_binary():
     assert E.is_emoji_binary(_REAL_PNG.read_bytes()) is False
 
