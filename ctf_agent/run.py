@@ -75,8 +75,11 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     from eval.corpus import answer_book
 
     # 答案表（**不可套可测性闸门**）：这里要的是「尽可能全的真值」，用于正确性校验。
-    # 旧实现只读 data/questions 单库 → 仅 49 条答案；跨库并集 169 条，且旧有的 49 条
-    # 全部保留（无回归）。扩表的意义：run.py 的 per-question 精确校验只在题于表内时
+    # 旧实现只读 data/questions 单库 → 仅 49 条答案；改为跨库后：明文答案 54 条、
+    # 有真值（含 sha256）210 条，旧有的 49 条全部保留（无回归）。
+    # ⚠️ 早期这里的「169 条」是「flag 字段非空」口径（含大量 sha256 占位串），
+    #    非判题可用答案数，已按 corpus.answer_book 实测重算为 54 / 210。
+    # 扩表的意义：run.py 的 per-question 精确校验只在题于表内时
     # 生效，缺表又缺 flag_sha256 的题仅剩 is_correct 全局跨题集合把关，会放行其它题
     # 的 flag（实测 6 道逃逸题，5 道经此补入）。
     answers, _answers_q_src = answer_book()

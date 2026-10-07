@@ -34,6 +34,28 @@ PROVIDERS = [
     ("ark", "字节豆包", "ARK_API_KEY"),
 ]
 
+def _load_answer_key() -> dict:
+    """赛前检查用的**答案表**（2026-10-08：裁判口径必须与生产一致）。
+
+    旧实现是 `preset_answers(load_questions("data/questions"))` —— 只读单库，
+    实测仅 49 条答案；生产入口 run.py 已改为跨库 `eval.corpus.answer_book()`
+    （去重后：明文答案 54 条、有真值 210 条，旧的 49 条全部保留）。
+
+    两个裁判口径不一致会造成**双向假水位**：
+      - 假阴性：题确实解对了，但真值只写在另一个库的副本上 → 旧表查不到 →
+        is_correct 判 False → preflight 报 ✗「链路坏了」，其实能解；
+      - 假阳性：自己那题没有答案，就只剩 is_correct 的**全局跨题集合**粗筛，
+        提交任意其它题的 flag 也会被判对 → preflight 报 ✓，实际是错的。
+
+    赛前门禁的全部意义是「它说能开赛就真能开赛」，所以这里必须调同一个
+    `answer_book()`：全仓答案只有这一张表，裁判不许分叉。
+    """
+    from eval.corpus import answer_book
+
+    answers, _answers_q = answer_book()
+    return dict(answers)
+
+
 def _has_key(name: str) -> bool:
     try:
         from config import _env_or_registry
@@ -146,17 +168,22 @@ def check_platform() -> None:
 
 def check_regression() -> None:
     print("\n=== 3. 本地 3 题快速回归（主循环/工具/校验）===")
-    from eval.cases import load_questions, preset_answers
+    from eval.cases import load_questions
     from run import build_solver
 
     qs = load_questions("data/questions")
-    answers = preset_answers(qs)
+    # 答案表必须走与生产同一张跨库表（详见 _load_answer_key 文档字符串）。
+    answers = _load_answer_key()
     sel = [q for q in qs if q.id in ("crypto-006", "misc-004", "reverse-001")]
     if not sel:
         print("  [✗] 题库缺失，跳过")
         return
+    # 2026-10-08：provider 不再写死 "baidu"（该源实测长期 403，
+    # 写死会让本项检查恒定误报「链路坏了」），改为与 check_dryrun 同口径 ——
+    # 由 CTF_AGENT_LLM_PROVIDER 指定，未设则走 build_race_solver 竞速。
+    provider = os.getenv("CTF_AGENT_LLM_PROVIDER", "").strip() or None
     solver = build_solver(use_mock=False, is_correct=lambda f: f in answers.values(),
-                          provider="baidu")
+                          provider=provider)
     async def run():
         for q in sel:
             try:
@@ -324,7 +351,7 @@ def check_dryrun() -> None:
     3. 断言：解出 flag 且非空 → PASS；否则 FAIL 阻止开赛
     """
     print("\n=== 6. 全链路 dry-run（拉题→真实解 1 题→断言）===")
-    from eval.cases import load_questions, preset_answers
+    from eval.cases import load_questions
     from run import build_solver
 
     # ① 拉题：平台优先，失败回退本地
@@ -362,7 +389,7 @@ def check_dryrun() -> None:
         return
 
     print(f"  [i] 选定: {source}")
-    answers = preset_answers(load_questions("data/questions"))
+    answers = _load_answer_key()
     provider = os.getenv("CTF_AGENT_LLM_PROVIDER", "").strip() or None
     solver = build_solver(use_mock=False, is_correct=lambda f: f in answers.values(),
                           provider=provider)
