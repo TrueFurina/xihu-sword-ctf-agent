@@ -74,8 +74,15 @@ HELDOUT_EVIDENCE = ROOT / "heldout_evidence"
 _HELDOUT_CLEAN_REPORT = HELDOUT_EVIDENCE / "benchmark_report_clean2_20260922_deepseek.json"
 # 旧 1×/2× 预算对照报告已更名 .SUPERSEDED_contaminated_pool_*（10 题污染池 + bug2 坏验证器），
 # 其「瓶颈是能力不是预算」结论基于坏数据，作废不再引用；clean-2 池太小不做对照。
-_HELDOUT_1X_REPORTS = (HELDOUT_EVIDENCE / "benchmark_report_A_deepseek_1x.json",)
-_HELDOUT_2X_REPORTS = (HELDOUT_EVIDENCE / "benchmark_report_B_deepseek_2x.json",)
+#
+# 🔴 这两个常量**故意留空**，是「作废标记」而不是漏更新：
+#   上一版写成 `(".../benchmark_report_A_deepseek_1x.json",)` 这类**指向不存在文件**的路径，
+#   靠 `_first_existing` 跳过来实现「读不到」。效果对，但表达有歧义——
+#   后来者看到「引用了不存在的文件」很可能顺手「修复」成 .SUPERSEDED_ 真实路径，
+#   反而把已判定污染的报告请回权威口径。留空 + 本注释即消除该歧义，行为与之前完全一致
+#   （`_first_existing(())` → None，与「路径不存在」同结果）。
+_HELDOUT_1X_REPORTS = ()
+_HELDOUT_2X_REPORTS = ()
 # 「最新」报告 = 清洗后干净池实测（clean-2）优先；旧 A/B（10 题污染池 + bug2 坏验证器）
 # 与 clean-3（含源码泄露题 gongye_web2）均已更名 .SUPERSEDED_*，仅留档溯源。
 _HELDOUT_LATEST_REPORTS = (_HELDOUT_CLEAN_REPORT,) + _HELDOUT_2X_REPORTS + _HELDOUT_1X_REPORTS
