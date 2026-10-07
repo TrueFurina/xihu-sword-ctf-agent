@@ -739,7 +739,7 @@ def _xor_bruteforce(_blob):
             if _acc != 0:
                 continue
             _key = [None] * _L
-            for _i in range(5):
+            for _i in range(min(5, _L)):
                 _key[_i] = _blob[_i] ^ b"flag{"[_i]
             for _ in range(_L * 4):
                 _done = True

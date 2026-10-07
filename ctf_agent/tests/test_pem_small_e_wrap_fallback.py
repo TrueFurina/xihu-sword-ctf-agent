@@ -62,7 +62,13 @@ def _make_fixture(secret: bytes):
     assert c == K ** 3 - N, "fixture 前提：K^3 必须恰好跨 1 次模"
     pem = RSA.construct((N, e)).export_key("PEM").decode()
     kb = long_to_bytes(K)
-    blob = bytes(x ^ y for x, y in zip(secret, kb))  # len == len(kb) == 64
+    # 关键：secret 必须严格等于 len(kb) 字节，否则 zip() 会按较短者截断，
+    # 造成 blob 比恢复出的 m 短 1 字节 → 行 692 的 `len(_bd)!=len(_mb)` 守卫
+    # 把唯一候选跳过 → 正例偶发失败。K 在 (0.9·2^512,1.13·2^512) 间浮动，
+    # len(kb) 可能是 64 或 65，故必须按 len(kb) 对齐而非写死 64。
+    secret = secret[:len(kb)].ljust(len(kb), b"_") if len(secret) >= len(kb) \
+        else secret.ljust(len(kb), b"_")
+    blob = bytes(x ^ y for x, y in zip(secret, kb))  # len == len(kb)
     return pem, str(c), base64.b64encode(blob).decode()
 
 
