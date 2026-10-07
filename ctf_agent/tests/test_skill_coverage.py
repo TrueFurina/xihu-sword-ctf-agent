@@ -93,12 +93,6 @@ def test_coverage_gap_is_known_and_documented():
     wired = P.wired_skill_modules()
     gap = sorted(available - wired)
     KNOWN_GAP = {
-        # ── zip 传统加密（2026-10-08 登记）：zip_crypto_bruteforce 已实现且已入
-        #    skill_map（5 个触发词），但 presolve 尚无静态嗅探函数接线它。
-        #    接线需要新增 _try_zip_crypto_bruteforce + 挂进 _tasks 并发列表 +
-        #    补进 _WIRED_SKILL_MODULES，并需真实加密 zip 附件验证爆破参数上限
-        #    （默认 max_candidates=5e7 怕慢）—— 属新增解题能力，待单独做。
-        "skills.zip_crypto_bruteforce",
         # ── fast_solve / decode 已覆盖的编码类 ──
         "skills.base64_multilayer",
         "skills.caesar_bruteforce",
