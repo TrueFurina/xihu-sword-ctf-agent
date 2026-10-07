@@ -22,7 +22,7 @@
 ctf_agent/
 ├── core/          主循环、presolve 静态分析器、监督 Agent、墙钟止损
 ├── agents/        各题型求解器（crypto_toolkit / misc / web / reverse / pwn …）
-├── skills/        66 个确定性解题 skill（run(params) -> dict 接口；机器计数见 `scripts/_kpi_canonical.py`）
+├── skills/        67 个确定性解题 skill（run(params) -> dict 接口；机器计数见 `scripts/_kpi_canonical.py`）
 ├── llm/           LLM 客户端（provider 白名单、fail-closed 熔断）
 ├── ctfplatform/   赛事平台客户端（DASCTF 类）、重试 / fail-open 提交路径
 ├── sandbox/       代码执行沙箱（subprocess 隔离）
@@ -37,12 +37,12 @@ ctf_agent/
 
 ```
 平台轮询 → 分类 → 附件下载 + 靶机探测
-        → 确定性 skill(66) ⇄ LLM 推理(白名单 provider)
+        → 确定性 skill(67) ⇄ LLM 推理(白名单 provider)
         → flag 校验 → 平台提交(fail-closed)
 ```
 
 - **监督架构**：`core/main_agent.py` 按题规划，`core/supervisor_agent.py` 强制步骤预算、工具优先纪律，并区分"请求失败"与"flag 错误"（提交断路器 bug 的事后修复）。
-- **确定性优先**：`skills/` 含 66 个即用 skill（机器计数见 `scripts/_kpi_canonical.py`），`core/presolve.py` 在任何 LLM token 消耗前先跑完它们。
+- **确定性优先**：`skills/` 含 67 个即用 skill（机器计数见 `scripts/_kpi_canonical.py`），`core/presolve.py` 在任何 LLM token 消耗前先跑完它们。
 - **仅白名单 LLM**（赛事规则 §3）；多源回退含 401/402 熔断、按题 token 预算、重型模型升级策略。
 - **作战脚本**：`scripts/_race_start.py --compete` = 首血扫描 → 稳定轮询 → 终报，内置强制 e2e 数据链路预检（fail-closed）。
 

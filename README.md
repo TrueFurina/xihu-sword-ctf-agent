@@ -1,6 +1,6 @@
 # xihu-sword-ctf-agent
 
-> 🔧 **确定性优先的 CTF 智能体框架** — 先用 63 个可复现确定性技能横向爆破常见题型，LLM 仅在静态分析 miss 时才作为最后手段介入，且受白名单 / token 预算 / 墙钟止损三重约束。结果可复现、可调试、且**对自己能做什么诚实**。
+> 🔧 **确定性优先的 CTF 智能体框架** — 先用 67 个可复现确定性技能横向爆破常见题型，LLM 仅在静态分析 miss 时才作为最后手段介入，且受白名单 / token 预算 / 墙钟止损三重约束。结果可复现、可调试、且**对自己能做什么诚实**。
 
 > 🌏 **中文文档 / Chinese documentation**: [README.zh.md](./README.zh.md)
 
@@ -24,7 +24,7 @@ Most "CTF agents" are just an LLM with a shell. This one is the opposite: **dete
 ctf_agent/
 ├── core/          main loop, presolve static analyzer, supervisor agent, wall-clock stop-loss
 ├── agents/        per-category solvers (crypto_toolkit / misc / web / reverse / pwn …)
-├── skills/        66 deterministic skills (run(params) -> dict interface; machine count = `scripts/_kpi_canonical.py`)
+├── skills/        67 deterministic skills (run(params) -> dict interface; machine count = `scripts/_kpi_canonical.py`)
 ├── llm/           LLM client (provider whitelist, fail-closed circuit breaking)
 ├── ctfplatform/   contest-platform client (DASCTF-style), retry / fail-open submit path
 ├── sandbox/       code-execution sandbox (subprocess isolation)
@@ -41,12 +41,12 @@ ctf_agent/
 
 ```
 platform poll → triage/classify → attachment download + target probe
-             → deterministic skills (66) ⇄ LLM reasoning (whitelisted providers)
+             → deterministic skills (67) ⇄ LLM reasoning (whitelisted providers)
              → flag validation → platform submit (fail-closed on request errors)
 ```
 
 - **Supervisor architecture**: `core/main_agent.py` plans per challenge, `core/supervisor_agent.py` enforces step budgets, tool-first discipline, and the request-failure-vs-wrong-flag separation (the post-incident fix for a submit-circuit-breaker bug).
-- **Deterministic-first**: `skills/` holds 66 runnable skills (`scripts/_kpi_canonical.py` machine count). `core/presolve.py` runs them before any LLM token is spent.
+- **Deterministic-first**: `skills/` holds 67 runnable skills (`scripts/_kpi_canonical.py` machine count). `core/presolve.py` runs them before any LLM token is spent.
 - **Whitelisted LLM only** (contest rule §3); multi-source fallback with 401/402 circuit breaking, per-question token budgets, heavy-model upgrade policy.
 - **Race harness**: `scripts/_race_start.py --compete` = first-blood scan → stable polling → final report, with a mandatory e2e data-link preflight (fail-closed).
 
