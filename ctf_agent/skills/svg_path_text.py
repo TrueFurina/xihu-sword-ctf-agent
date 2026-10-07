@@ -372,8 +372,39 @@ def _tessdata_for(bin_path: str) -> Optional[str]:
     return None
 
 
+# OCR 候选评分：良构 flag（仅可打印 ASCII）> 全 ASCII > flag 更长 > 整体更长。
+# 用于多 psm 投票，避免「先试的 psm 恰好含花括号就抢先返回」而选到含非 ASCII
+# 噪声的坏候选（实测 CSAW2017 missed_registration 的 BMP 即 psm7 出 '§' 而 psm6 正确）。
+_OCR_FLAG_RE = re.compile(r"[A-Za-z0-9_]{1,12}\{[!-~]{3,120}\}")
+
+
+def _ocr_candidate_score(text: str) -> Tuple[int, int, int, int]:
+    """给一个 OCR 候选打分，元组越大越好。"""
+    m = _OCR_FLAG_RE.search(text)
+    has_flag = 1 if m else 0
+    ascii_only = 1 if text.isascii() else 0
+    flag_len = len(m.group(0)) if m else 0
+    return (has_flag, ascii_only, flag_len, len(text))
+
+
+def _select_ocr_candidate(outs: Sequence[str]) -> Optional[str]:
+    """从多 psm 候选里择优。返回 None 表示无候选。
+
+    `max` 语义 = 并列时**保留先出现者**（历史实现 psm7 优先，此处保持）。
+    """
+    outs = [o for o in outs if o]
+    if not outs:
+        return None
+    return max(outs, key=_ocr_candidate_score)
+
+
 def ocr_image(img) -> Optional[str]:
-    """对 PIL 灰度图跑 tesseract（单行模式）。无 tesseract → None。"""
+    """对 PIL 灰度图跑 tesseract（psm 7/6 投票择优）。无 tesseract → None。
+
+    历史坑：早期实现「按 psm 顺序、首个含花括号者即返回」——当 psm7 给出含非
+    可打印字符（如 '§'）的伪命中时会抢先返回、丢掉 psm6 的正确结果。现改为
+    收集全部候选后交 `_select_ocr_candidate` 择优。
+    """
     binp = _find_tesseract()
     if not binp:
         return None
@@ -386,17 +417,18 @@ def ocr_image(img) -> Optional[str]:
             td = _tessdata_for(binp)
             if td:
                 env["TESSDATA_PREFIX"] = td
-        best = ""
+        outs: List[str] = []
         for psm in ("7", "6"):
-            r = subprocess.run(
-                [binp, tmp, "stdout", "--psm", psm],
-                capture_output=True, text=True, env=env, timeout=60)
+            try:
+                r = subprocess.run(
+                    [binp, tmp, "stdout", "--psm", psm],
+                    capture_output=True, text=True, env=env, timeout=60)
+            except Exception:  # noqa: BLE001
+                continue
             out = (r.stdout or "").strip()
-            if len(out) > len(best):
-                best = out
-            if "{" in out and "}" in out:
-                return out
-        return best or None
+            if out:
+                outs.append(out)
+        return _select_ocr_candidate(outs)
     except Exception:  # noqa: BLE001
         return None
     finally:
