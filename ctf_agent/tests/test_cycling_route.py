@@ -14,6 +14,7 @@ import os
 import re
 import unittest
 import importlib.util
+import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 PROMPTS_PATH = os.path.join(_HERE, "..", "core", "prompts.py")
@@ -53,6 +54,7 @@ class TestCyclingRoute(unittest.TestCase):
         self.assertIn('"2^1025": "crypto_cycling"', PROMPTS_SRC,
                       "skill_map 缺 Cycling 题专属键 2^1025 -> crypto_cycling")
 
+    @pytest.mark.local
     def test_infer_skill_require_loads_crypto_cycling_for_cycling(self):
         """端到端确定性路由：Cycling 真实题面必须 load crypto_cycling。"""
         from core.prompts import infer_skill_require
@@ -88,6 +90,7 @@ class TestCyclingRoute(unittest.TestCase):
             "crypto_cycling", mgr.loaded,
             "Cycling 题面必须路由加载 crypto_cycling（B 孤儿求解器接线生效）")
 
+    @pytest.mark.local
     def test_crypto_cycling_solves_cycling_real(self):
         """端到端解出 Cycling 真实实例（纯本地数论）：run() 返回非空 flag。"""
         cyc = _load_cycling()

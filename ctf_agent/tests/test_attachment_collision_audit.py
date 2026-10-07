@@ -20,6 +20,7 @@ import json
 import os
 import tempfile
 import unittest
+import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _CTF = os.path.abspath(os.path.join(_HERE, ".."))
@@ -52,6 +53,7 @@ class TestAttachmentCollision(unittest.TestCase):
             self.assertIn("flag.txt", idx)
             self.assertEqual(len(idx["flag.txt"]), 2)
 
+    @pytest.mark.local
     def test_real_repo_reports_collisions(self):
         """真实数据回归：本仓存在大量同名附件冲突（按 basename 解析必错）。"""
         # 用真实数据根跑一次（限定 data 目录以控制耗时）

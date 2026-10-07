@@ -17,6 +17,7 @@ import os
 import subprocess
 import sys
 import unittest
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -119,12 +120,14 @@ class TestBenchmarkCLI(unittest.TestCase):
             encoding="utf-8", errors="replace")
         return proc.stdout + proc.stderr
 
+    @pytest.mark.local
     def test_default_gate_drops_input_less(self):
         """默认必须打印剔除统计（data/questions 里 27 题 input-less）。"""
         out = self._run()
         self.assertIn("剔除", out, "默认模式必须执行口径闸门")
         self.assertIn("有效分母", out)
 
+    @pytest.mark.local
     def test_include_unmeasurable_restores(self):
         out = self._run("--include-unmeasurable")
         self.assertIn("恢复全部", out,

@@ -25,6 +25,7 @@ import json
 import os
 import re
 import unittest
+import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _CTF = os.path.abspath(os.path.join(_HERE, ".."))
@@ -112,6 +113,7 @@ class TestEzRsaRouteFix(unittest.TestCase):
         self.assertIn(DEDICATED, mgr.loaded,
                       "ezRSA 必须路由到 %s（实际 %r）" % (DEDICATED, mgr.loaded))
 
+    @pytest.mark.local
     def test_dedicated_solver_solves_ezrsa(self):
         with open(EZRSA_JSON, encoding="utf-8") as _jf:
             truth = json.load(_jf)["flag_sha256"]

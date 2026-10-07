@@ -24,6 +24,7 @@ import importlib.util
 import json
 import os
 import unittest
+import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _CTF = os.path.abspath(os.path.join(_HERE, ".."))
@@ -80,6 +81,7 @@ class TestFifthBatchRoutes(unittest.TestCase):
             self.assertLess(keys.index(key), rsa_idx,
                             "%s 专属键排在裸 'rsa' 之后 → 被catch-all 抢走" % name)
 
+    @pytest.mark.local
     def test_infer_skill_require_routes_each(self):
         from core.prompts import infer_skill_require
         for name, key, skill, qjson, cat in ROUTES:
@@ -138,6 +140,7 @@ class TestFifthBatchRoutes(unittest.TestCase):
             self.assertFalse(res.get("ok"), "坏输入应 ok=False：%r" % res)
             self.assertIsNone(res.get("flag"))
 
+    @pytest.mark.local
     def test_filterrandom_real_solve(self):
         mod = _load_skill("lfsr_filter_recover")
         res = mod.run({"path": FR_ATT})
@@ -147,6 +150,7 @@ class TestFifthBatchRoutes(unittest.TestCase):
         got = hashlib.sha256(res["flag"].encode("utf-8")).hexdigest()
         self.assertEqual(got, exp, "FilterRandom sha256 不匹配")
 
+    @pytest.mark.local
     def test_electric_mayhem_cls_real_solve(self):
         mod = _load_skill("crypto_electric_mayhem_cls")
         with open(CLS_JSON, encoding="utf-8") as _jf:
@@ -158,6 +162,7 @@ class TestFifthBatchRoutes(unittest.TestCase):
         self.assertEqual(hashlib.sha256(raw).hexdigest(), exp,
                          "Electric Mayhem CLS sha256 不匹配")
 
+    @pytest.mark.local
     def test_pqc_sibling_not_stolen_by_cls_key(self):
         """防错路由：同系列 -pqc（后量子格密码）题面不含本批 CLS 键。"""
         pqc = os.path.join(_CTF, "data", "questions_external", "crypto",

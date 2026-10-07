@@ -113,7 +113,7 @@ def test_gate_is_two_layered_when_leak_set_is_emptied(monkeypatch):
 
 
 # ── 2. 真实题库（缺失则跳过）───────────────────────────────────────────────
-@pytest.mark.skipif(not _have_pool(), reason=_SKIP_POOL)
+@pytest.mark.skipif(not (_have_pool() and _ATT_ANXUN.is_dir()), reason="真实附件缺失（.gitignore 排除）")
 def test_real_att_leak_question_is_excluded():
     q = _load_real("real_crypto_anxun2020_aes")
     scannable, leaked, _ = split_by_leak([q], _classify_provenance)
@@ -138,7 +138,7 @@ def test_real_desc_leak_needs_oracle_pass():
     assert [p for _, p in leaked] == ["desc_leak"]
 
 
-@pytest.mark.skipif(not (_have_pool() and _LEAK_JSON.is_file()), reason="题库或审计证据缺失")
+@pytest.mark.skipif(not (_have_pool() and _ATT_ANXUN.is_dir()), reason="真实附件缺失（.gitignore 排除）")
 def test_guard_blocks_evidence_att_leak_sample():
     """抽样核对：审计判为 att_leak 的题，抽样必须全部被闸门挡住（含裸 token 通道）。"""
     import json

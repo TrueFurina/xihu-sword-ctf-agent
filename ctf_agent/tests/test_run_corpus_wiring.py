@@ -25,6 +25,7 @@ import os
 import subprocess
 import sys
 import unittest
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -140,6 +141,7 @@ class TestNoSingleSourceResidue(unittest.TestCase):
 class TestRunCliCorpusGate(unittest.TestCase):
     """C. run_cli 闸门端到端（subprocess 真跑，防哑开关）。"""
 
+    @pytest.mark.local
     def test_default_skips_unmeasurable(self):
         rc, out = _cli()
         self.assertEqual(rc, 0, out[-500:])
@@ -147,6 +149,7 @@ class TestRunCliCorpusGate(unittest.TestCase):
         self.assertIn("原始 50", out, "须公示原始分母")
         self.assertNotIn("对照模式", out)
 
+    @pytest.mark.local
     def test_env_switch_restores_legacy(self):
         rc, out = _cli({"CTF_AGENT_INCLUDE_UNMEASURABLE": "1"})
         self.assertEqual(rc, 0, out[-500:])

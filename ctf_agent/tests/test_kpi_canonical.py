@@ -10,6 +10,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -251,6 +252,7 @@ def test_readme_count_check_skips_when_corpus_absent():
 
 
 # ── held-out 实测状态：机器派生（禁止手写「已测量 / 未测量」）─────────────────
+@pytest.mark.local
 def test_heldout_status_is_machine_derived():
     """held-out 状态必须机器派生（读 benchmark_report.json），不得手写状态词。
 

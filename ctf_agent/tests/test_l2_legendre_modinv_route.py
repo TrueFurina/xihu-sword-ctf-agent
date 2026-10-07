@@ -23,6 +23,7 @@ import importlib.util
 import json
 import os
 import unittest
+import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _CTF = os.path.abspath(os.path.join(_HERE, ".."))
@@ -100,6 +101,7 @@ class TestL2LegendreModinvRoute(unittest.TestCase):
                 "%s 的专属键 %r 排在裸 'rsa' 之后 → 会被 RSA catch-all 抢走"
                 "（specialcurve2 同款 wrong_direction 陷阱）" % (c["name"], c["key"]))
 
+    @pytest.mark.local
     def test_infer_skill_require_routes_each_l2_to_its_solver(self):
         """端到端确定性路由：真实题面必须 load 对应 solver，且不得 load rsa_fermat_factor。"""
         from core.prompts import infer_skill_require
@@ -140,6 +142,7 @@ class TestL2LegendreModinvRoute(unittest.TestCase):
                 "rsa_fermat_factor", mgr.loaded,
                 "%s 被裸 'rsa' catch-all 抢走 → wrong_direction" % c["name"])
 
+    @pytest.mark.local
     def test_both_l2_solvers_solve_real_instances(self):
         """端到端解出（纯本地数论，无网络/无 LLM）：flag 非空且 sha256 逐字匹配题面。"""
         for c in CASES:

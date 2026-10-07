@@ -22,6 +22,7 @@ import json
 import os
 import sys
 import unittest
+import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _CTF = os.path.abspath(os.path.join(_HERE, ".."))
@@ -55,6 +56,7 @@ class TestSkillDispatchAdapter(unittest.TestCase):
         cls.disp = _load(os.path.join(_CTF, "tools", "skill_dispatch.py"),
                          "skill_dispatch")
 
+    @pytest.mark.local
     def test_path_class_builds_params(self):
         att = os.path.join(_CTF, "data", "questions_real", "_attachments",
                            "crypto", "real_crypto_ezrsa", "output")
@@ -64,6 +66,7 @@ class TestSkillDispatchAdapter(unittest.TestCase):
         self.assertEqual(p["path"], att)
         self.assertIn("text", p, "应同时给 text 兼容两种取参风格")
 
+    @pytest.mark.local
     def test_dir_class_builds_params(self):
         att = os.path.join(_CTF, "data", "questions_real", "_attachments",
                            "crypto", "real_crypto_ezrsa", "output")
@@ -97,6 +100,7 @@ class TestSkillDispatchAdapter(unittest.TestCase):
                 "%s 在题面不含所需数值参数时必须返回 None（不得拿猜测值 "
                 "去调 solver 制造假失败）" % name)
 
+    @pytest.mark.local
     def test_iter_candidate_params_yields_all_attachments(self):
         """多附件题必须逐个产出候选（实测 ezRSA: task.py 解不出、output 能解出）。"""
         atts = ["data/questions_real/_attachments/crypto/real_crypto_ezrsa/task.py",
@@ -107,6 +111,7 @@ class TestSkillDispatchAdapter(unittest.TestCase):
         self.assertTrue(cands[0]["path"].endswith("task.py"))
         self.assertTrue(cands[1]["path"].endswith("output"))
 
+    @pytest.mark.local
     def test_iter_candidate_params_yields_dir_class(self):
         """回归护栏（2026-10-07）：目录类必须**在 iter 层面**产出候选。
 
@@ -124,6 +129,7 @@ class TestSkillDispatchAdapter(unittest.TestCase):
         self.assertEqual(cands[0]["kind"], "dir")
         self.assertTrue(cands[0]["dir"])
 
+    @pytest.mark.local
     def test_every_allowlisted_skill_yields_a_candidate(self):
         """通用护栏：白名单内 skill 在有附件时必须产出候选（含新增的 C 类之外的 Kir）。
 
@@ -166,6 +172,7 @@ class TestSkillDispatchAdapter(unittest.TestCase):
         self.assertIsNone(self.disp.extract_flag("no flag here"))
         self.assertIsNone(self.disp.extract_flag(None))
 
+    @pytest.mark.local
     def test_first_existing_uses_exact_path_not_basename_glob(self):
         """附件解析必须用精确路径（同名附件冲突实测 181 道题）。"""
         att = os.path.join(_CTF, "data", "questions_real", "_attachments",
@@ -177,6 +184,7 @@ class TestSkillDispatchAdapter(unittest.TestCase):
 class TestMainChainEndToEnd(unittest.TestCase):
     """端到端：题面 → 路由 → load 进 registry → run → 命中 flag。"""
 
+    @pytest.mark.local
     def test_skill_really_solves_via_registry(self):
         """本轮 11 题之一（ezRSA，真·L2）真跑 registry 路径并校验 sha256。"""
         from tools.registry import ToolRegistry
@@ -261,6 +269,7 @@ class TestMainChainEndToEnd(unittest.TestCase):
         self.assertEqual(req.get("skill_name"), name,
                          "返回的 skill_require 应含正确 skill_name")
 
+    @pytest.mark.local
     def test_multi_attachment_real_solve_via_iteration(self):
         """端到端（多附件）：逐个附件试探必须能跳过 task.py、解出 output。
 

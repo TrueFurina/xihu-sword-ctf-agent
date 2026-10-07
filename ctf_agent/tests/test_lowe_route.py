@@ -21,6 +21,7 @@ import importlib.util
 import json
 import os
 import unittest
+import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _CTF = os.path.abspath(os.path.join(_HERE, ".."))
@@ -80,6 +81,7 @@ class TestLoweRoute(unittest.TestCase):
         self.assertLess(keys.index(ROUTE_KEY), keys.index("rsa"),
                         "lowe 专属键排在裸 'rsa' 之后 → 会被 catch-all 抢走")
 
+    @pytest.mark.local
     def test_infer_skill_require_routes_lowe(self):
         """端到端确定性路由：lowe 真实题面必须 load crypto_pkcs1_padding_oracle。"""
         from core.prompts import infer_skill_require
@@ -112,6 +114,7 @@ class TestLoweRoute(unittest.TestCase):
         self.assertIn(SKILL_NAME, mgr.loaded,
                       "lowe 题面必须路由加载 %s（实际 %r）" % (SKILL_NAME, mgr.loaded))
 
+    @pytest.mark.local
     def test_lowe_real_instance_solved_with_sha_match(self):
         """端到端解出 lowe 真实实例：e=3 无填充 → Y+N 完全立方 → C XOR K_low64。"""
         import gmpy2

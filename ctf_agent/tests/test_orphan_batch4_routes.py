@@ -26,6 +26,7 @@ import json
 import os
 import re
 import unittest
+import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _CTF = os.path.abspath(os.path.join(_HERE, ".."))
@@ -106,6 +107,7 @@ class TestFourthBatchRoutes(unittest.TestCase):
             self.assertLess(keys.index(key), rsa_idx,
                             "%s 专属键排在裸 'rsa' 之后 → 会被 catch-all 抢走" % name)
 
+    @pytest.mark.local
     def test_infer_skill_require_routes_each(self):
         """端到端确定性路由：三题真实题面必须 load 对应 solver。"""
         from core.prompts import infer_skill_require
@@ -147,6 +149,7 @@ class TestFourthBatchRoutes(unittest.TestCase):
             self.assertTrue(sm.load(skill),
                             "%s 无法被 SkillManager 加载：%r" % (name, sm.list_failures()))
 
+    @pytest.mark.local
     def test_1black0white_real_solve(self):
         mod = _load_skill("misc_qr_matrix")
         out = mod.run({"path": os.path.join(QR_DIR, "qr_code.txt")})
@@ -156,6 +159,7 @@ class TestFourthBatchRoutes(unittest.TestCase):
         self.assertEqual(_sha(out.decode("utf-8", "replace")), exp,
                          "1black0white sha256 不匹配")
 
+    @pytest.mark.local
     def test_mhk2_real_solve(self):
         mod = _load_skill("crypto_knapsack_mhk")
         with open(os.path.join(MHK_DIR, "output.txt"), encoding="utf-8") as _of:
@@ -168,6 +172,7 @@ class TestFourthBatchRoutes(unittest.TestCase):
             exp = json.load(_jf)["flag_sha256"]
         self.assertEqual(_sha(res["plaintext"]), exp, "MHK2 sha256 不匹配")
 
+    @pytest.mark.local
     def test_lcd_real_solve(self):
         mod = _load_skill("crypto_lcg_recover")
         res = mod.run({"kind": "dir", "dir": LCD_DIR})
@@ -176,6 +181,7 @@ class TestFourthBatchRoutes(unittest.TestCase):
             exp = json.load(_jf)["flag_sha256"]
         self.assertEqual(_sha(res["flag"]), exp, "LCD sha256 不匹配")
 
+    @pytest.mark.local
     def test_primes_real_solve_sha_match(self):
         """primes（GCTF 2023 素数背包）实证解出，sha256 逐字匹配题面真值。
 

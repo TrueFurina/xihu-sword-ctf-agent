@@ -16,6 +16,7 @@ import re
 import unittest
 import hashlib
 import importlib.util
+import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 PROMPTS_PATH = os.path.join(_HERE, "..", "core", "prompts.py")
@@ -104,6 +105,7 @@ class Test10733HighExponentRoute(unittest.TestCase):
             "base64_multilayer", mgr.loaded,
             "10733 题面不得误路由到 base64_multilayer（编码 solver 完全错方向）")
 
+    @pytest.mark.local
     def test_crypto_high_exponent_solves_10733_real(self):
         """端到端解出 10733 真实实例（纯本地数学，无网络）：run() 成功且 ROT13 编码态
         经 rot13 归一后命中题面真值 sha256（真题坑点）。"""

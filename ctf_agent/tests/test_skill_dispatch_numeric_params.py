@@ -25,6 +25,7 @@ import hashlib
 import os
 import sys
 import unittest
+import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _CTF = os.path.abspath(os.path.join(_HERE, ".."))
@@ -126,6 +127,7 @@ class TestNumericParamExtraction(unittest.TestCase):
         cls.AUTO_CALLABLE = AUTO_CALLABLE
         cls.should_auto_call = staticmethod(should_auto_call)
 
+    @pytest.mark.local
     def test_cycling_extracts_n_ct_e(self):
         q = _load_question("ext_gctf2022_cycling")
         p = self.EXT("crypto_cycling", q)
@@ -136,6 +138,7 @@ class TestNumericParamExtraction(unittest.TestCase):
         # 完整性：真实值是 1024-bit 十六进制，长度应远超样例短值（12 hex）
         self.assertGreater(len(p["n"]) - 2, 200)
 
+    @pytest.mark.local
     def test_primes_extracts_q_x_n(self):
         q = _load_question("ext_gctf2023_primes")
         p = self.EXT("crypto_primes_subset", q)
@@ -148,6 +151,7 @@ class TestNumericParamExtraction(unittest.TestCase):
         self.assertEqual(p["n"] % 7, 0)
         self.assertGreaterEqual(p["n"], 131)
 
+    @pytest.mark.local
     def test_mhk2_extracts_pk_and_ct(self):
         q = _load_question("ext_gctf2023_mhk2")
         p = self.EXT("crypto_knapsack_mhk", q)
@@ -172,6 +176,7 @@ class TestNumericParamExtraction(unittest.TestCase):
             self.assertIsNone(self.EXT(name, _Q()),
                               "%s 拿不到参数时必须 None" % name)
 
+    @pytest.mark.local
     def test_packed_data_not_auto_called(self):
         """electric-mayhem 的 .tgz/.gz 需先解包预处理 → 不在自动调用范围。"""
         q = _load_question("ext_gctf2022_electric-mayhem-cls")
@@ -220,12 +225,14 @@ class TestNumericEndToEnd(unittest.TestCase):
                              "%s 解出的 flag 与题库真值不符: %r" % (qid, flag))
         return flag
 
+    @pytest.mark.local
     def test_cycling_solves_and_matches_truth(self):
         flag = self._solve_and_check("ext_gctf2022_cycling", "crypto_cycling")
         # 尾缀杂质回归：解出的 flag 必须干净（贪婪版本会变成 ...Great}'}）
         self.assertTrue(flag.endswith("}"), flag)
         self.assertNotIn("'", flag, "flag 不应含引号杂质: %r" % flag)
 
+    @pytest.mark.local
     def test_primes_solves_and_matches_truth(self):
         """实测 ~12s（Coppersmith + flint LLL），够快，进常规回归。
 
