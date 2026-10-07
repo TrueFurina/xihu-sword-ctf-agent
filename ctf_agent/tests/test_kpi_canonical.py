@@ -252,25 +252,48 @@ def test_readme_count_check_skips_when_corpus_absent():
 
 
 # ── held-out 实测状态：机器派生（禁止手写「已测量 / 未测量」）─────────────────
-@pytest.mark.local
-def test_heldout_status_is_machine_derived():
-    """held-out 状态必须机器派生（读 benchmark_report.json），不得手写状态词。
+def test_heldout_status_internally_consistent():
+    """held-out 报告的**内部一致性**——不依赖题池，故 CI 必须能验。
 
     背景：README 曾手写「0/10 未测量」而实测早已完成——**手写状态词本身就是漂移**。
+    本条守「报告自身不许自相矛盾」：状态确为已测量、池数非 0、解出数不超过池内题数、
+    分渠道之和不超过总解出数、token 消耗非 0。
+
+    为什么能留在 CI：全部只读**仓内归档**报告 `ctf_agent/heldout_evidence/`
+    （已入库，48 份），不需要任何 gitignored 题池。
     """
     st = heldout_status()
     assert st.get("measured") is True, \
-        "held-out 报告缺失——应能读 ctf_agent/heldout_evidence/ 或 data/results 下的 benchmark_report.json"
-    assert st["pool_total"] > 0 and st["pool_total"] == count_heldout_candidates(), \
-        (f"报告池数 {st['pool_total']} ≠ select_candidates 能力分母 "
-         f"{count_heldout_candidates()}（同一池出现两套数字）")
+        "held-out 报告缺失——应能读 ctf_agent/heldout_evidence/ 下的 benchmark_report.json"
+    assert st["pool_total"] > 0, "报告池数为 0（疑读到空/残缺报告）"
     assert st["solved_total"] <= st["pool_total"], "解出数大于池内题数（计数通道错乱）"
     assert st["solved_by_presolve"] + st["solved_by_llm"] <= st["solved_total"], \
         "分渠道解出数之和大于总解出数（by_solved_by 口径错乱）"
     assert st["tokens_global_total"] > 0, "token 消耗为 0（疑读到空/残缺报告）"
-    print(f"✓ test_heldout_status_is_machine_derived (pool={st['pool_total']} "
+    print(f"✓ test_heldout_status_internally_consistent (pool={st['pool_total']} "
           f"solved={st['solved_total']} presolve={st['solved_by_presolve']} "
           f"llm={st['solved_by_llm']})")
+
+
+@pytest.mark.local
+def test_heldout_pool_matches_machine_denominator():
+    """报告池数必须 == 机器真值算出的能力分母（KPI 防漂移的最后一道闸）。
+
+    ⚠️ 必须保持 local，且**不要因为「它让 CI 红」而进一步豁免/删除**：
+    分母 = `scripts.benchmark_heldout.select_candidates()` 的扫描结果，依赖**完整题池**
+    （data/questions_external、questions_ext 等），而这些目录被 .gitignore 排除。
+    ⇒ CI 上分母必然偏离真值（实测：CI 环境算出 3、空环境算出 0、真值 2），
+    在 CI 上断言必然失败。这是**环境性不可验证**，不是缺陷。
+
+    拆分说明（2026-10-07）：此前本条与 4 条内部一致性断言被捆在一起、整条标 local，
+    导致内部一致性这 4 条也一并脱管。现已拆开：能验的留 CI（见上条），
+    只有真正依赖题池的「与分母对齐」留在本地。
+    """
+    st = heldout_status()
+    assert st["pool_total"] == count_heldout_candidates(), \
+        (f"报告池数 {st['pool_total']} ≠ select_candidates 能力分母 "
+         f"{count_heldout_candidates()}（同一池出现两套数字）")
+    print(f"✓ test_heldout_pool_matches_machine_denominator (pool={st['pool_total']})")
 
 
 def test_summarize_benchmark_report_follows_input():
