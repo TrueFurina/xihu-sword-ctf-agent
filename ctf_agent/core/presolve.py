@@ -1999,7 +1999,15 @@ async def _try_svg_path_text(question) -> Optional[str]:
             except Exception:  # noqa: BLE001
                 continue
         try:
-            res = await asyncio.to_thread(svg_run, {"raw": raw})
+            res = await asyncio.wait_for(
+                asyncio.to_thread(svg_run, {"raw": raw}),
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            # ⚠️ asyncio.to_thread 不可取消：本超时只让调用方不再等待，
+            #    底层线程仍跑到自然结束（根治需迁 ProcessPoolExecutor）。
+            logger.info("[presolve:svg_path_text] %s 超时 60s，跳过", p)
+            continue
         except Exception as exc:  # noqa: BLE001
             logger.debug("[presolve:svg_path_text] %s 异常: %s", p, exc)
             continue
@@ -2107,7 +2115,15 @@ async def _try_pcap_http_carve(question) -> Optional[str]:
                        b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d"):
             continue
         try:
-            res = await asyncio.to_thread(pcap_run, {"path": p})
+            res = await asyncio.wait_for(
+                asyncio.to_thread(pcap_run, {"path": p}),
+                timeout=120,
+            )
+        except asyncio.TimeoutError:
+            # ⚠️ asyncio.to_thread 不可取消：本超时只让调用方不再等待，
+            #    底层线程仍跑到自然结束（根治需迁 ProcessPoolExecutor）。
+            logger.info("[presolve:pcap_http_carve] %s 超时 120s，跳过", p)
+            continue
         except Exception as exc:  # noqa: BLE001
             logger.debug("[presolve:pcap_http_carve] %s 异常: %s", p, exc)
             continue
@@ -2170,7 +2186,15 @@ async def _try_banana_script(question) -> Optional[str]:
         if not _is_banana(head):
             continue
         try:
-            res = await asyncio.to_thread(banana_run, {"path": p})
+            res = await asyncio.wait_for(
+                asyncio.to_thread(banana_run, {"path": p}),
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            # ⚠️ asyncio.to_thread 不可取消：本超时只让调用方不再等待，
+            #    底层线程仍跑到自然结束（根治需迁 ProcessPoolExecutor）。
+            logger.info("[presolve:banana_script] %s 超时 60s，跳过", p)
+            continue
         except Exception as exc:  # noqa: BLE001
             logger.debug("[presolve:banana_script] %s 异常: %s", p, exc)
             continue
@@ -2350,7 +2374,15 @@ async def _try_mbr_sse_verify(question) -> Optional[str]:
         if not _is_mbr(raw):
             continue
         try:
-            res = await asyncio.to_thread(mbr_run, {"path": p})
+            res = await asyncio.wait_for(
+                asyncio.to_thread(mbr_run, {"path": p}),
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            # ⚠️ asyncio.to_thread 不可取消：本超时只让调用方不再等待，
+            #    底层线程仍跑到自然结束（根治需迁 ProcessPoolExecutor）。
+            logger.info("[presolve:mbr_sse_verify] %s 超时 60s，跳过", p)
+            continue
         except Exception as exc:  # noqa: BLE001
             logger.debug("[presolve:mbr_sse_verify] %s 异常: %s", p, exc)
             continue
