@@ -548,13 +548,16 @@ def main() -> int:
     #
     # 关于 provider 存活性：这里**刻意不内置任何「死源清单」**。provider 可用性会随
     # 余额/欠费/平台策略变化，手写的黑白名单必然漂移成新的假水位（本项目已为此
-    # 栽过数次）。正确做法是让窥探由机器当场完成：`scripts/_preflight_env.py`。
+    # 栽过数次）。正确做法是让窥探由机器当场完成：`scripts/_preflight_env.py --probe-llm`。
+    # （2026-10-08 补：此前只写 `python scripts/_preflight_env.py`，但该脚本原本
+    #  ①②③④ 四项**没有一项探测 provider**，光跑它并不能回答「这个源能不能用」；
+    #  第 ⑤ 项 LLM 可达性补齐后，需显式 `--probe-llm` 才会真发一次最小请求。）
     if not args.mock:
         scope = "全部 %d 题" % len(cands) if args.limit == 0 else "前 %d 题" % args.limit
         print(f"[heldout] ⚠️ 即将真跑 {scope}，provider={args.provider}，"
               f"请先估 token 与金额并确认已获授权（小额分批：建议先 --limit 5）。")
         print("[heldout]   provider 存活性会漂移，勿依赖记忆中的黑白名单；"
-              "实探命令：python scripts/_preflight_env.py")
+              "实探命令：python scripts/_preflight_env.py --probe-llm")
     return run(cands, args.provider, args.wallclock, args.mock,
                args.limit, args.concurrency, args.cold_blackboard, args.e3,
                neutralize_leaks=args.include_neutralized)

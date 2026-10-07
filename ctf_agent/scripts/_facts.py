@@ -52,21 +52,40 @@ def _git_head() -> str:
 # 聚合 provider 有效值 / HEAD / 工作树 / 租约全景 / 机器校验结果，全部实时采集。
 
 
-def _effective_provider() -> str:
-    """实际生效的 LLM provider：环境变量优先，否则 config.py 默认（baidu 千帆）。"""
-    env = os.environ.get("CTF_AGENT_LLM_PROVIDER", "").strip()
-    if env:
-        return f"env={env}"
+def _config_default_provider() -> str:
+    """config.py 里写明的数据类默认值（如 `llm_provider: str = "baidu"`）。
+
+    注意这里是**读取配置默认值**，不代表该 provider 当前可用（余额/欠费/平台策略
+    随时变化）；可用性必须另行实探，不得凭本函数的返回值声称「可用/存活/主源」。
+    """
     try:
         with open(os.path.join(ROOT, "config.py"), encoding="utf-8", errors="ignore") as f:
             for line in f:
                 # 匹配 `llm_provider: str = "baidu"`（类型注解）或 `llm_provider = "baidu"`
                 m = re.match(r'\s*llm_provider\s*[:=][^"]*"([^"]+)"', line)
                 if m:
-                    return f"config默认={m.group(1)}"
+                    return m.group(1)
     except OSError:
         pass
-    return "unknown"
+    return ""
+
+
+def effective_provider_value() -> str:
+    """当前实际生效的 provider **裸值**（env 优先，否则 config.py 默认值）。
+
+    对外暴露此函数是为了避免下游各自再写一遍解析、形成第二个漂移源
+    （2026-10-08：`scripts/_preflight_env.py` 的 LLM 可达性检查复用此处）。
+    """
+    return os.environ.get("CTF_AGENT_LLM_PROVIDER", "").strip() or _config_default_provider()
+
+
+def _effective_provider() -> str:
+    """实际生效的 LLM provider：环境变量优先，否则 config.py 默认值。"""
+    env = os.environ.get("CTF_AGENT_LLM_PROVIDER", "").strip()
+    if env:
+        return f"env={env}"
+    cfg = _config_default_provider()
+    return f"config默认={cfg}" if cfg else "unknown"
 
 
 def _git_worktree_summary() -> str:
