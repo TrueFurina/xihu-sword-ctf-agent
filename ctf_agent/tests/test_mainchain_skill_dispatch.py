@@ -16,11 +16,13 @@
    sha256 与题面逐字匹配 —— 即「接线真的能兑现为解题能力」；
 ⑤ 白名单外的 skill 不被自动调用。
 """
+import contextlib
 import hashlib
 import importlib.util
 import json
 import os
 import sys
+import tempfile
 import unittest
 import pytest
 
@@ -50,31 +52,54 @@ class _Q:
         self.id = qid
 
 
+@contextlib.contextmanager
+def _tmp_atts(*names):
+    """在临时目录里造出给定文件名的附件（**内容无关**），退出即清理。
+
+    为什么不用 data/questions_real/_attachments 下的真实附件：
+      那批附件被 .gitignore 排除（体积/合规），CI 上根本不存在 ⇒ 任何依赖它的
+      用例必然失败 ⇒ 只能被标 ``@pytest.mark.local`` ⇒ **护栏随之在 CI 上脱管**。
+      而本文件这些用例验的是「**接线 / 取参路径**」，与附件内容无关，只要
+      「路径存在、能打开」即可。故用合成附件，让它们重回 CI 门禁。
+
+    ⚠️ 反面教训：护栏被脱管比护栏失败更危险——2026-10-06 有 6 个 skill
+    在 AUTO_CALLABLE 内却缺 iter_candidate_params 分支（Registry 静默不调用），
+    正是靠本文件这条通用护栏抓出来的；一旦标 local，同类问题会再次静默。
+    """
+    with tempfile.TemporaryDirectory() as d:
+        paths = []
+        for n in names:
+            p = os.path.join(d, n)
+            sub = os.path.dirname(p)
+            if sub:
+                os.makedirs(sub, exist_ok=True)
+            with open(p, "w", encoding="utf-8") as fh:
+                fh.write("synthetic attachment for wiring test\n")
+            paths.append(p)
+        yield paths
+
+
 class TestSkillDispatchAdapter(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.disp = _load(os.path.join(_CTF, "tools", "skill_dispatch.py"),
                          "skill_dispatch")
 
-    @pytest.mark.local
     def test_path_class_builds_params(self):
-        att = os.path.join(_CTF, "data", "questions_real", "_attachments",
-                           "crypto", "real_crypto_ezrsa", "output")
-        q = _Q([att])
-        p = self.disp.build_params("crypto_hastad_broadcast", q)
-        self.assertIsNotNone(p, "路径类 skill 应能构造 params")
-        self.assertEqual(p["path"], att)
-        self.assertIn("text", p, "应同时给 text 兼容两种取参风格")
+        with _tmp_atts("output") as paths:
+            q = _Q(list(paths))
+            p = self.disp.build_params("crypto_hastad_broadcast", q)
+            self.assertIsNotNone(p, "路径类 skill 应能构造 params")
+            self.assertEqual(p["path"], paths[0])
+            self.assertIn("text", p, "应同时给 text 兼容两种取参风格")
 
-    @pytest.mark.local
     def test_dir_class_builds_params(self):
-        att = os.path.join(_CTF, "data", "questions_real", "_attachments",
-                           "crypto", "real_crypto_ezrsa", "output")
-        q = _Q([att])
-        p = self.disp.build_params("crypto_lcg_recover", q)
-        self.assertIsNotNone(p)
-        self.assertEqual(p["kind"], "dir")
-        self.assertTrue(p["dir"])
+        with _tmp_atts("output") as paths:
+            q = _Q(list(paths))
+            p = self.disp.build_params("crypto_lcg_recover", q)
+            self.assertIsNotNone(p)
+            self.assertEqual(p["kind"], "dir")
+            self.assertTrue(p["dir"])
 
     def test_unknown_skill_and_unresolvable_input_return_none(self):
         """未知 skill / 拿不到必需参数的场景必须 None（fail-closed，不猜参数）。
@@ -100,18 +125,15 @@ class TestSkillDispatchAdapter(unittest.TestCase):
                 "%s 在题面不含所需数值参数时必须返回 None（不得拿猜测值 "
                 "去调 solver 制造假失败）" % name)
 
-    @pytest.mark.local
     def test_iter_candidate_params_yields_all_attachments(self):
         """多附件题必须逐个产出候选（实测 ezRSA: task.py 解不出、output 能解出）。"""
-        atts = ["data/questions_real/_attachments/crypto/real_crypto_ezrsa/task.py",
-                "data/questions_real/_attachments/crypto/real_crypto_ezrsa/output"]
-        q = _Q(atts)
-        cands = list(self.disp.iter_candidate_params("crypto_hastad_broadcast", q))
-        self.assertEqual(len(cands), 2, "应产出 2 个候选")
-        self.assertTrue(cands[0]["path"].endswith("task.py"))
-        self.assertTrue(cands[1]["path"].endswith("output"))
+        with _tmp_atts("task.py", "output") as (t, o):
+            q = _Q([t, o])
+            cands = list(self.disp.iter_candidate_params("crypto_hastad_broadcast", q))
+            self.assertEqual(len(cands), 2, "应产出 2 个候选")
+            self.assertTrue(cands[0]["path"].endswith("task.py"))
+            self.assertTrue(cands[1]["path"].endswith("output"))
 
-    @pytest.mark.local
     def test_iter_candidate_params_yields_dir_class(self):
         """回归护栏（2026-10-07）：目录类必须**在 iter 层面**产出候选。
 
@@ -121,33 +143,33 @@ class TestSkillDispatchAdapter(unittest.TestCase):
         当时本文件只测了 build_params（仍通过），未覆盖 iter_candidate_params
         的目录分支，所以 1157 个用例全绿也没拦住——故补此用例。
         """
-        att = os.path.join(_CTF, "data", "questions_real", "_attachments",
-                           "crypto", "real_crypto_ezrsa", "output")
-        q = _Q([att])
-        cands = list(self.disp.iter_candidate_params("crypto_lcg_recover", q))
-        self.assertEqual(len(cands), 1, "目录类应产出 1 个候选")
-        self.assertEqual(cands[0]["kind"], "dir")
-        self.assertTrue(cands[0]["dir"])
+        with _tmp_atts("output") as paths:
+            q = _Q(list(paths))
+            cands = list(self.disp.iter_candidate_params("crypto_lcg_recover", q))
+            self.assertEqual(len(cands), 1, "目录类应产出 1 个候选")
+            self.assertEqual(cands[0]["kind"], "dir")
+            self.assertTrue(cands[0]["dir"])
 
-    @pytest.mark.local
     def test_every_allowlisted_skill_yields_a_candidate(self):
         """通用护栏：白名单内 skill 在有附件时必须产出候选（含新增的 C 类之外的 Kir）。
 
         目的：**将来再往 AUTO_CALLABLE 加 skill 时，若它在 iter_candidate_params
         里没有对应分支（即遗漏接线），本用例会立刻变红**，而不是等到跑批里静默失效。
         数值类的三个需要各自的专属附件，故此处只对其余项做「有附件即有候选」检查。
+
+        ⚠️ 本用例**必须留在 CI 门禁内**（勿标 local）：它验的是接线，与附件内容无关，
+        用 `_tmp_atts` 合成附件即可跑。历史上正是靠它抓出 6 个静默失效的 skill。
         """
-        att = os.path.join(_CTF, "data", "questions_real", "_attachments",
-                           "crypto", "real_crypto_ezrsa", "output")
-        q = _Q([att])
-        numeric = {"crypto_cycling", "crypto_primes_subset",
-                   "crypto_knapsack_mhk"}  # 各自需要专属数值附件，另有用例覆盖
-        for name in sorted(self.disp.AUTO_CALLABLE - numeric):
-            with self.subTest(skill=name):
-                self.assertTrue(
-                    list(self.disp.iter_candidate_params(name, q)),
-                    "%s 在 AUTO_CALLABLE 内但 iter_candidate_params 无分支 → "
-                    "接线遗漏（跑到 Registry 时会静默不调用）" % name)
+        with _tmp_atts("output") as paths:
+            q = _Q(list(paths))
+            numeric = {"crypto_cycling", "crypto_primes_subset",
+                       "crypto_knapsack_mhk"}  # 各自需要专属数值附件，另有用例覆盖
+            for name in sorted(self.disp.AUTO_CALLABLE - numeric):
+                with self.subTest(skill=name):
+                    self.assertTrue(
+                        list(self.disp.iter_candidate_params(name, q)),
+                        "%s 在 AUTO_CALLABLE 内但 iter_candidate_params 无分支 → "
+                        "接线遗漏（跑到 Registry 时会静默不调用）" % name)
 
     def test_iter_candidate_params_empty_for_numeric_class(self):
         q = _Q(["x"])
@@ -172,13 +194,11 @@ class TestSkillDispatchAdapter(unittest.TestCase):
         self.assertIsNone(self.disp.extract_flag("no flag here"))
         self.assertIsNone(self.disp.extract_flag(None))
 
-    @pytest.mark.local
     def test_first_existing_uses_exact_path_not_basename_glob(self):
         """附件解析必须用精确路径（同名附件冲突实测 181 道题）。"""
-        att = os.path.join(_CTF, "data", "questions_real", "_attachments",
-                           "crypto", "real_crypto_ezrsa", "output")
-        q = _Q(["definitely/not/exists.bin", att])
-        self.assertEqual(self.disp.resolve_first_existing(q), att)
+        with _tmp_atts("output") as paths:
+            q = _Q(["definitely/not/exists.bin"] + list(paths))
+            self.assertEqual(self.disp.resolve_first_existing(q), paths[0])
 
 
 class TestMainChainEndToEnd(unittest.TestCase):
