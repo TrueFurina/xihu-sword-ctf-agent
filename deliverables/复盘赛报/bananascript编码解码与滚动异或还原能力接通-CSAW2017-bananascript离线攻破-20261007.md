@@ -1,7 +1,9 @@
 # bananascript 编码解码 + 8 字节滚动异或「还原 flag」能力接通 —— CSAW-Quals 2017 rev `bananascript` 离线攻破
 
-> 提交：`3a4b01c`（实现）+ `c644ac3`（测试）→ 本文（文档）
+> 提交：`feat(skills): bananascript 编码解码 + 8 字节滚动异或还原 flag`（实现）
+> ＋ `test(skills): banana_script VM 行为 + 变异`（测试）→ 本文（文档）
 > 日期：2026-10-07 ｜ 成本：**¥0**（纯离线确定性求解，不触平台闸口）
+> ⚠️ 状态行不钉死 commit 哈希——多会话下 rebase/重放会使其失效（2026-10-07 教训）。
 
 ## 结论先行
 
