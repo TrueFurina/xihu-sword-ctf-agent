@@ -479,11 +479,17 @@ def run(cands: list[dict], provider: str, wallclock: float, mock: bool,
     return rc
 
 
-def main() -> int:
+def build_arg_parser() -> "argparse.ArgumentParser":
+    """构造 CLI 解析器（独立成函数：默认值可被测套件直接验证，不必触发选题/跑批）。"""
     ap = argparse.ArgumentParser(description="Held-out 未见题自主解题基准")
     ap.add_argument("--select", action="store_true", help="仅选题并写 manifest")
     ap.add_argument("--run", action="store_true", help="在候选池上跑自主链路")
-    ap.add_argument("--provider", default="baidu")
+    ap.add_argument("--provider", default=os.getenv("CTF_AGENT_LLM_PROVIDER", "").strip() or None,
+                    help="真实模式 LLM provider（如 glm / ark / xfyun）。"
+                         "默认取环境变量 CTF_AGENT_LLM_PROVIDER；"
+                         "2026-10-08 起**不再写死 'baidu'**——千帆已长期 403 不可用，"
+                         "沿用旧默认会让 --run 变成「死 provider 跑全池」的静默烧钱路径。"
+                         "真跑（非 mock）必须显式指定，否则拒绝启动（fail-closed）。")
     ap.add_argument("--wallclock", type=float, default=300.0)
     ap.add_argument("--mock", action="store_true", help="冒烟用 mock（无 API）")
     ap.add_argument("--limit", type=int, default=0, help="只跑前 N 题（0=全部）")
@@ -501,7 +507,22 @@ def main() -> int:
     ap.add_argument("--external-dir", default=str(QUESTIONS_EXTERNAL),
                     help=f"外部 CTF 平台题源目录（默认 {QUESTIONS_EXTERNAL}；"
                          "存在则并入候选池，复用全部既有排除链，零新诚实逻辑）")
-    args = ap.parse_args()
+    return ap
+
+
+def main() -> int:
+    args = build_arg_parser().parse_args()
+
+    # fail-closed 守卫（2026-10-08，P0-4 收口）：真实跑批**必须显式指定 provider**。
+    # 旧实现写死 default="baidu"，而千帆已长期 403 不可用 → 按默认 `--run` 会变成
+    # 「死 provider 跑全池」：既拿不到任何有效结果，又可能先空耗一轮完整预算。
+    # 这里在**选题之前**就拒绝，避免产生无意义的 manifest 与耗时。
+    if args.run and not args.mock and not args.provider:
+        print("[heldout] ✗ 拒绝启动：未指定 provider（且环境变量 CTF_AGENT_LLM_PROVIDER 为空）。")
+        print("[heldout]   真跑必须显式给一个**当前存活**的 provider（如 glm / ark / xfyun）；")
+        print("[heldout]   只选题用 --select，冒烟用 --mock（后者无需 provider）。")
+        print("[heldout]   背景：写死的默认 'baidu' 已长期 403，属已知失效源。")
+        return 2
 
     external_dir = Path(args.external_dir) if args.external_dir else None
     cands, all_recs = select_candidates(require_sha256=args.require_sha256,
@@ -522,6 +543,18 @@ def main() -> int:
     if not args.run:
         # 默认：选完即止（不自动真跑，避免无凭证时空耗）
         return 0
+    # 成本可见性（2026-10-08）：--limit 默认 0 = 全池。真跑前强制把规模与 provider 打出来，
+    # 配合项目铁律「先估 token 与金额并获授权，再分批跑」——不静默吞掉预算。
+    #
+    # 关于 provider 存活性：这里**刻意不内置任何「死源清单」**。provider 可用性会随
+    # 余额/欠费/平台策略变化，手写的黑白名单必然漂移成新的假水位（本项目已为此
+    # 栽过数次）。正确做法是让窥探由机器当场完成：`scripts/_preflight_env.py`。
+    if not args.mock:
+        scope = "全部 %d 题" % len(cands) if args.limit == 0 else "前 %d 题" % args.limit
+        print(f"[heldout] ⚠️ 即将真跑 {scope}，provider={args.provider}，"
+              f"请先估 token 与金额并确认已获授权（小额分批：建议先 --limit 5）。")
+        print("[heldout]   provider 存活性会漂移，勿依赖记忆中的黑白名单；"
+              "实探命令：python scripts/_preflight_env.py")
     return run(cands, args.provider, args.wallclock, args.mock,
                args.limit, args.concurrency, args.cold_blackboard, args.e3,
                neutralize_leaks=args.include_neutralized)
