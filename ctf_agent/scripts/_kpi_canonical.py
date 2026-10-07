@@ -13,14 +13,19 @@
 ------------
   - offline_verified：来自 scripts/_merge_gate.count_offline_verified()
     （严格真题 + 确定性复现 verifier，绝对计数，非率）
-  - real_corpus：data/questions_real/**/*.json 递归计数（92 题真题全集）
+  - real_corpus：data/questions_real/**/*.json 递归计数（真题全集分母）。
+    ⚠️ 数值**屡次漂移**（2026-10-03 补齐 10733 后 92→93），故本文件任何位置
+    （含注释）**不得手写该数字**，一律取 canonical_kpi()["real_corpus"]。
   - heldout_candidates：由 scripts/benchmark_heldout.select_candidates() 在
     real_corpus 中剔除「已训练/泄露/自产/无 sha256」后的 unseen 非平凡题池
     —— 这才是「LLM 真·自主推理」的唯一合法分母
 
 口径铁律（输出即声明，引用者照搬）
 ------------------------------
-  1. 14 是**绝对计数**，不是率；凡说「能力 X%」必须显式声明分母是 92 还是 heldout 子集。
+  1. offline_verified 是**绝对计数**，不是率；凡说「能力 X%」必须显式声明分母是
+     real_corpus（真题全集，机器计数）还是 heldout_candidates（unseen 子集）——
+     ⚠️ 两处数字均不得手写，一律从 canonical_kpi() 取（历史教训：注释里写 92，
+     机器早已 93，真值源自己对外输出过时分母）。
   2. 15 题子集 / 86.7% 口径已作废（早期 presolve 静态分析子集，不具竞技代表性）。
   3. goal_log.jsonl 是独立实验日志（解出数恒 0），与 KPI 非同源，**不构成产品能力率**。
 
@@ -318,7 +323,7 @@ def canonical_kpi() -> dict:
     return {
         "as_of": __import__("time").strftime("%Y-%m-%dT%H:%M:%SZ", __import__("time").gmtime()),
         "offline_verified": ov,                 # 绝对计数（KPI 真值上限）
-        "real_corpus": corpus,                 # 真题全集分母（=92）
+        "real_corpus": corpus,                 # 真题全集分母（机器计数，勿手写具体值）
         "heldout_candidates": heldout,         # unseen 非平凡题池（自主推理分母）【能力分母】
         "heldout_runnable_pool": runnable,     # 可选跑池（含外部采源）【非能力分母，禁混用】
         "skills": skills,                      # 确定性 skill 数（skills/*.py 顶层 run 入口）
@@ -364,7 +369,13 @@ def render_md(k: dict) -> str:
         L.append(
             f"- **held-out 实测（{hs['report']}）**：池内 {hs['solved_total']}/{hs['pool_total']}"
             f"（确定性 presolve {hs['solved_by_presolve']}，非 LLM）/ "
-            f"LLM 自主推理 {hs['solved_by_llm']}/{hs['pool_total']}；"
+            # 2026-10-08 修复：此摘要行原为裸的「LLM 自主推理 1/2」，作废说明只写在下方
+            # 长段落里 → 只读摘要（或复制这一行）的人拿到的正是 2026-10-01 已被两次独立实测
+            # 推翻的数字。「历史报告的记载」必须与「当前可验证值」在同一行里区分开，
+            # 否则陈述离开关联上下文就自动变成虚假声明。
+            f"报告记为 LLM 自主推理 {hs['solved_by_llm']}/{hs['pool_total']}"
+            f"（⚠️ 已作废：该笔归属经复核实为 presolve，当前可验证的 LLM 自主解出数 = 0，"
+            f"依据见下方口径铁律）；"
             f"tokens={hs['tokens_global_total']}，budget_exceeded={hs['budget_exceeded']}"
         )
         if abl.get("available"):
@@ -378,7 +389,13 @@ def render_md(k: dict) -> str:
         L.append("- held-out 状态：**未实测**（本机与仓内均无 benchmark_report.json）")
     L += [
         "",
-        "> 口径铁律：14 是绝对计数不是率；凡说「能力 X%」必须显式声明分母是 92 还是 heldout 子集。",
+        # 2026-10-08 修复：此处曾硬编码「分母是 92」，而机器计数早已是 93
+        # （10733 补齐后 real_corpus 92→93）→ **唯一真值源自己输出过时分母**，
+        # 下游照搬这份「引用者必须遵守」的口径铁律时会连错数字一起继承。
+        # 根治法不是把 92 改成 93，而是从此处的 f-string 注入机器值，
+        # 让注释只能说「见 real_corpus」，不再有机会誊抄。
+        f"> 口径铁律：{k['offline_verified']} 是绝对计数不是率；凡说「能力 X%」"
+        f"必须显式声明分母是 {k['real_corpus']}（= real_corpus 机器计数）还是 heldout 子集。",
         "> 15 题子集 / 86.7% 口径已作废。goal_log.jsonl 解出数恒 0，与 KPI 非同源，不构成产品能力率。",
         "",
         f"> {k['statement']}",
@@ -435,7 +452,7 @@ def check_readme_counts(readme_root: "Path | None" = None, truth: "dict | None" 
         # 宁漏勿误：真值 <= 0 视为「该语料/目录在本环境不可得」（如 sparse/LFS clone
         # 或 .gitignore 误配），而非「期望值为 0」——此时跳过，绝不误报 RED。
         # （data/questions_real/ 由 .gitignore 的 `!data/questions_real/**` 反忽略，
-        #  正常 clone 应得 92；skills/ 为跟踪目录。取 0 只可能是环境异常。）
+        #  正常 clone 应得非 0 的真题计数；skills/ 为跟踪目录。取 0 只可能是环境异常。）
         if truth.get(key, 0) <= 0:
             sys.stderr.write(
                 f"[kpi_canonical] 跳过「{label}」校验：机器真值 {key}="
