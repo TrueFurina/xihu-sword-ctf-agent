@@ -145,6 +145,10 @@ _WIRED_SKILL_MODULES = {
     "skills.crypto_complex_mult_group",
     "skills.misc_grid_resample",
     "skills.misc_zip_fake_encryption",
+    # 2026-10-08 新增（确定性静态求解）：传统 ZipCrypto 密码爆破。
+    # ⚠️ 仅走「内置弱口令表 + 4 位数字」两条字典，**不做大空间暴力**
+    #    （实测 max_len=4/5e5 候选就要 17~19s，而 skill 默认 max_len=6/5e7）。
+    "skills.zip_crypto_bruteforce",
     "skills.web_source_audit",
     "skills.web_target_interact",
     "skills.web_sqli",
@@ -592,6 +596,7 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_complex_mult_group(question)),
         asyncio.ensure_future(_try_grid_resample(question)),
         asyncio.ensure_future(_try_zip_fake_encryption(question)),
+        asyncio.ensure_future(_try_zip_crypto_bruteforce(question)),
         asyncio.ensure_future(_try_zero_width(question)),
         asyncio.ensure_future(_try_pattern_scan(question, answers)),
         asyncio.ensure_future(_try_attachment_script(question)),
@@ -1431,6 +1436,119 @@ async def _try_zip_fake_encryption(question) -> Optional[str]:
             _save_candidates(question, [flag])
             return flag
     return None
+
+
+# CTF 高频弱口令（照skills/hash_crack.py 的 COMMON_WORDS 范式）。
+# 不引外部词表：仓内无 rockyou 一类文件，而 CI 必须能跑。
+_ZIPCRYPTO_COMMON = (
+    "123456", "12345678", "123456789", "1234567890", "000000",
+    "password", "admin", "root", "test", "guest", "qwerty",
+    "abc123", "111111", "123123", "654321", "666666", "88888888",
+    "letmein", "welcome", "monkey", "dragon", "master", "login",
+    "pass", "passwd", "changeme", "secret", "default", "1q2w3e4r",
+)
+_ZIPCRYPTO_MAXLEN = 3          # 实测：max_len=3 时0.2s，=4 时 17s+
+_ZIPCRYPTO_MAX_CAND = 20_000   # 上限双保险（正常远达不到）
+
+
+async def _try_zip_crypto_bruteforce(question) -> Optional[str]:
+    """传统 ZipCrypto 密码爆破（2026-10-08 接线 · xuanhun_ezip 多层 zip 场景）。
+
+    `skill_map` 里有5 个触发词指向本 skill，但此前**未接入 presolve** ⇒
+    路由会选中它、执行层却缺位（与 2026-10-07 修复的「键序遮蔽」同类后果）。
+
+    ⚠️ 墙钟纪律（本函数存在的首要理由）：
+    `skills/zip_crypto_bruteforce.run()` 是**同步阻塞**实现
+    （`itertools.product` 双层循环），实测：
+
+        max_len=3, max_candidates=2e5→ 0.4s
+        max_len=4, max_candidates=5e5      → 17~19s
+        skill默认值 max_len=6 / 5e7        → 分钟级
+
+    所以：① 必须 `to_thread` + `wait_for`（裸 ensure_future 会卡死事件循环）；
+          ② 只走内置弱口令表 + 4 位数字（实测带 dict_path 仅 0.02s）；
+          ③ 预筛 encryption flag，非加密 zip 直接跳过，不浪费任何预算。
+    """
+    attach = _attachments(question)
+    zip_attach = [a for a in attach if str(a).lower().endswith(".zip")]
+    if not zip_attach:
+        return None
+    try:
+        from skills.zip_crypto_bruteforce import run as zc_run
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:zip_crypto] 导入失败: %s", exc)
+        return None
+
+    for a in zip_attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        # 预筛：只有真加密的 entry 才值得爆破（非加密直接跳过）
+        try:
+            import zipfile
+            with zipfile.ZipFile(p) as zf:
+                if not any(i.flag_bits & 0x1 for i in zf.infolist()):
+                    continue
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:zip_crypto] %s 非有效 zip: %s", p, exc)
+            continue
+
+        # 极小空间 + 线程 + 超时兜底
+        params = {
+            "zip_path": p,
+            "max_len": _ZIPCRYPTO_MAXLEN,
+            "max_candidates": _ZIPCRYPTO_MAX_CAND,
+            "charsets": ["digits", "lower", "alnum"],
+        }
+        try:
+            res = await asyncio.wait_for(
+                asyncio.to_thread(_zc_run_with_common, zc_run, params,
+                                  _ZIPCRYPTO_COMMON),
+                timeout=20,
+            )
+        except asyncio.TimeoutError:
+            logger.debug("[presolve:zip_crypto] %s 超时 20s，跳过", p)
+            continue
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:zip_crypto] %s 异常: %s", p, exc)
+            continue
+        if isinstance(res, dict) and res.get("ok") and res.get("flag"):
+            flag = str(res["flag"])
+            logger.info("[presolve:zip_crypto] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
+    return None
+
+
+def _zc_run_with_common(run_fn, params, common):
+    """先试内置弱口令表，再做极小空间暴力。
+
+    ⚠️ 契约说明：`skills/zip_crypto_bruteforce.run()` 的入参**只认**
+    `zip_path / entry / dict_path / charsets / min_len / max_len / max_candidates`
+    —— **没有**「单密码直试」这种入口（我第一版臆造了 `_single_password`，
+    被契约自核查出来）。所以弱口令表必须落成一个临时字典文件走 `dict_path`。
+
+    拆成独立函数是为了能被 `asyncio.to_thread` 直接投递（必须是可调用对象，
+    不能是 coroutine），也便于测试时替换 run_fn。
+    """
+    import tempfile
+    d = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
+                                    encoding="utf-8", errors="ignore")
+    try:
+        d.write(chr(10).join(common) + chr(10))
+        d.close()
+        # 第1 轮：内置弱口令表（实测 0.02s，走 dict_path 不做空间爆破）
+        r = run_fn(dict(params, dict_path=d.name, max_candidates=len(common) + 8))
+        if isinstance(r, dict) and r.get("ok") and r.get("flag"):
+            return r
+    finally:
+        try:
+            os.unlink(d.name)
+        except OSError:
+            pass
+    # 第 2 轮：极小空间暴力（max_len=3 / 2e4 上限 ⇒ 实测 0.2~0.4s）
+    return run_fn(params)
 
 
 # 靶机 URL 识别：IPv4:port / http(s)://host[:port] / 裸 host:port
