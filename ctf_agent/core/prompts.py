@@ -279,12 +279,17 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         #    而 infer_skill_require 只匹配 description）→ 挂 title 键必然路由失败。
         # ② 键必须排在下方裸 "rsa" 之前，否则被 RSA catch-all 抢走。
         "同一明文": "crypto_hastad_broadcast",
+        "rsa脚本": "task_analyzer",
+        "rsa加密脚本": "task_analyzer",
         "费马": "rsa_fermat_factor", "fermat": "rsa_fermat_factor", "rsa": "rsa_fermat_factor",
         # ── ZipCrypto 真加密爆破（2026-10-08 沉淀，源自 xuanhun_ezip L3 攻防）──
         # 特异键必须排在下方裸 "zip"/"zip密码" 之前，否则被 catch-all 抢走。
         "zipcrypto": "zip_crypto_bruteforce",
         "zip加密": "zip_crypto_bruteforce", "真加密": "zip_crypto_bruteforce",
         "密码爆破": "zip_crypto_bruteforce", "bruteforce zip": "zip_crypto_bruteforce",
+        "zip_filename": "zip_filename_chain_decode",
+        "zip密码": "zip_filename_chain_decode",
+        "压缩包损坏": "zip_filename_chain_decode",
         "zip": "zip_chain_decode", "压缩": "zip_chain_decode",
         "base64": "base64_multilayer", "base32": "base64_multilayer",
         "凯撒": "caesar_bruteforce", "caesar": "caesar_bruteforce",
@@ -300,6 +305,9 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "uaf": "pwn_exploit_flow", "堆溢出": "pwn_exploit_flow",
         "seccomp": "pwn_sandbox_escape", "沙盒": "pwn_sandbox_escape",
         "格攻击": "crypto_lattice_attack", "lll": "crypto_lattice_attack",
+        "流量包": "misc_bigfile_traffic",
+        "大流量": "misc_bigfile_traffic",
+        "pcapng": "misc_bigfile_traffic",
         "流量": "misc_traffic_analysis", "pcap": "misc_traffic_analysis",
         "混淆": "reverse_obfuscation", "ollvm": "reverse_obfuscation",
         "审计": "web_source_audit", "源码": "web_source_audit",
@@ -313,7 +321,6 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "ssti": "ssti_detect", "模板注入": "ssti_detect",
         "sqli": "web_sqli", "sql注入": "web_sqli",
         "ssrf": "web_ssrf", "内网探测": "web_ssrf",
-        "zip_filename": "zip_filename_chain_decode",
         "n接近": "rsa_fermat_factor", "p和q接近": "rsa_fermat_factor", "大素数差小": "rsa_fermat_factor",
         "磁盘": "misc_disk_forensics", "raid": "misc_disk_forensics",
         "分区": "misc_disk_forensics", "img镜像": "misc_disk_forensics",
@@ -329,7 +336,7 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "堆利用": "pwn_tcache_safelinking", "glibc2.31": "pwn_tcache_safelinking",
         "JWT": "web_jwt_prototype", "token伪造": "web_jwt_prototype",
         "原型链": "web_jwt_prototype", "__proto__": "web_jwt_prototype",
-        "伪加密": "zip_filename_chain_decode", "zip密码": "zip_filename_chain_decode",
+        "伪加密": "zip_filename_chain_decode",
         "明文攻击": "crypto_coppersmith", "小根方程": "crypto_coppersmith",
         "部分密钥": "crypto_coppersmith",
         "返回导向": "pwn_ret2dlresolve", "无libc利用": "pwn_ret2dlresolve",
@@ -376,7 +383,6 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "usb键盘": "misc_traffic_analysis",
         "反编译": "pyc_decompile",
         "js合并": "web_jwt_prototype",
-        "压缩包损坏": "zip_filename_chain_decode",
         "维吉尼亚密码": "vigenere_decode",
         # ── 键盘/坐标类映射（2026-09-01 补：dnui_keyboard 等"键盘坐标→字母"题型，
         #    skills/crypto_keyboard_path.py 已实证可对真实附件解出 flag，但原映射表缺此项
@@ -396,10 +402,9 @@ def infer_skill_require(ctx, reflection: dict, skill_manager=None) -> Optional[d
         "改进填充": "crypto_pkcs1_improved",
         # misc_bigfile_traffic：16MB+ pcapng / 超大 zip 直读（避免超时）
         "大文件": "misc_bigfile_traffic", "超大": "misc_bigfile_traffic",
-        "pcapng": "misc_bigfile_traffic", "流量包": "misc_bigfile_traffic",
-        "大流量": "misc_bigfile_traffic", "mmap扫描": "misc_bigfile_traffic",
+        "mmap扫描": "misc_bigfile_traffic",
         # task_analyzer：task.py RSA 算法识别+路由（元分析 skill，crypto 附 .py 脚本时）
-        "task.py": "task_analyzer", "rsa脚本": "task_analyzer", "rsa加密脚本": "task_analyzer",
+        "task.py": "task_analyzer",
     }
     for keyword, skill_name in skill_map.items():
         if keyword in desc or keyword in " ".join(gaps).lower():
