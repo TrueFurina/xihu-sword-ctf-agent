@@ -332,8 +332,14 @@ def test_mutation_corrupt_mask_table_returns_none():
     assert M.solve(bytes(data)) is None
 
 
+@_need_real
 def test_mutation_break_detector_too_loose(monkeypatch):
-    """放宽探测器（任意 512B 都算）→ 全池出现假阳性。"""
+    """放宽探测器（任意 512B 都算）→ 全池出现假阳性。
+
+    ⚠️ 需要真实附件：它遍历 _POOL_DIR/_attachments 找 512B 的文件，而该目录被
+    .gitignore 排除 ⇒ CI 上不存在 ⇒ hits 恒为 0，`assert hits == 1` 必红。
+    本文件其余依赖真题的用例都已挂 @_need_real，本条此前漏挂。
+    """
     hits = 0
     for p in (_POOL_DIR / "_attachments").rglob("*"):
         if p.is_file() and p.stat().st_size == 512:

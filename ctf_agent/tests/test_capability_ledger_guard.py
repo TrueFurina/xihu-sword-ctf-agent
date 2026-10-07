@@ -98,6 +98,35 @@ def _corpus_index():
     return {getattr(e.question, "id", ""): e for e in load_corpus()}
 
 
+def _corpus_unavailable() -> str | None:
+    """台账所需题目是否齐备；缺失时返回可读原因，齐备时返回 None。
+
+    判定条件刻意是「台账 8 条是否都能在语料里找到」，而不是「语料是否为空」：
+    `data/questions_real` 是入库的，所以 CI 上 `load_corpus()` 返回非空 ——
+    以「空/加载失败」为条件永远不会触发 skip（第一版就是这么错的，CI 上照样 6 条全红）。
+    真正缺的是 `ext_*` 那 5 条（`data/questions_external`、`questions_ext` 被 .gitignore 排除）。
+
+    用 `unittest.skipIf` 而非 `@pytest.mark.local`：local 是 *deselected*
+    （连收集都不收集），会让这些用例从门禁视野里消失；skipIf 是 *skipped*，
+    `pytest -rs` 可审计。本文件是「真实解题数」这条核心指标的直接守卫，
+    必须留在 CI 的视野里 —— 本地题库齐备时 8 条照跑，能力退化仍会被抓住。
+    """
+    try:
+        idx = _corpus_index()
+    except Exception as exc:
+        return "语料加载失败: %s" % exc
+    missing = [qid for qid, _skill, _slow in LEDGER if qid not in idx]
+    if missing:
+        return ("语料缺少台账题目 %d/%d 个（CI 上 data/questions_external、"
+                "questions_ext 被 .gitignore 排除），例：%s"
+                % (len(missing), len(LEDGER), missing[:3]))
+    return None
+
+
+_CORPUS_UNAVAILABLE = _corpus_unavailable()
+
+
+@unittest.skipIf(_CORPUS_UNAVAILABLE is not None, _CORPUS_UNAVAILABLE or "")
 class _LedgerSolveTest(unittest.TestCase):
     """台账每题：走主链同款路径真解 + sha256 逐字匹配。"""
 

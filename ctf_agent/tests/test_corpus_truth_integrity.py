@@ -114,6 +114,15 @@ class TestJudgeVisibility(unittest.TestCase):
         cls.questions = [e.question for e in entries]
         cls.kept, cls.dropped, cls.raw_n = apply_corpus_gate(cls.questions)
         _answers, cls.answers_q = answer_book()
+        # 本类的价值全在「有题真的通过了闸门」这个前提上。
+        # CI 上 data/questions_external / questions_ext 等被 .gitignore 排除，
+        # 仅剩的题又被闸门剔光 ⇒ kept 为空，此时
+        #   test_every_admitted_question_is_visible_to_judge 会「0 题不可见」**假绿**，
+        # 所以整类跳过，而不是只跳过 test_gate_admits_questions 那一条。
+        if not cls.kept:
+            raise unittest.SkipTest(
+                "闸门放行集为空（raw_n=%d）—— CI 上题库仅剩 questions_real 且未被放行；"
+                "此时『0 题不可见』属假绿，整类跳过" % cls.raw_n)
 
     def test_gate_admits_questions(self):
         """防护：语料为空时下面的「0 不可见」会假绿，必须先验放行集非空。"""
@@ -142,6 +151,15 @@ class TestTruthConsistency(unittest.TestCase):
             except Exception:  # noqa: BLE001 - 单库不可读由 corpus 层负责
                 cls.by_root[root] = []
         cls.indexed = index_truths(cls.by_root)
+        # 本类验的是「跨库真值冲突」，前提是至少 2 个可读数据源。
+        # CI 上 data/questions_external / questions_ext 被 .gitignore 排除 ⇒ 只剩 1 个
+        # ⇒ find_conflicts 必然返回 {}，两条「无冲突」断言会**假绿**。
+        # 故整类跳过（而不是只跳过 test_default_roots_not_empty）。
+        loaded = sum(1 for qs in cls.by_root.values() if qs)
+        if loaded < 2:
+            raise unittest.SkipTest(
+                "实际可读的数据集不足 2 个（%d）—— 跨库冲突检测前提不成立"
+                "（CI 上 data/questions_external 等被 .gitignore 排除），整类跳过" % loaded)
 
     def _collect(self, want_plain):
         return find_conflicts(self.indexed, want_plain)
