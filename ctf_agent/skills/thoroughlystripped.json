@@ -1,0 +1,9 @@
+{
+  "name": "thoroughlystripped",
+  "purpose": "CSAW-Finals 2017「thoroughlyStripped」forensics 题确定性静态求解：从被剥离全部 null 字节的 ELF64（4367B，0 个 0x00）中，通过字节级解析 main→wrapper→leaf 两级结构（e8 rel32 直接调用 + rank pairing），恢复被打印字符拼成的 flag，并以题面 sha256 闭环校验",
+  "input_spec": "params = {'path': <thoroughlyStripped ELF 二进制路径>}",
+  "output_spec": "run → {'ok': True, 'flag': 'flag{...}', 'sha256': '<hex>', 'verified': bool}",
+  "categories": ["forensics", "reverse", "elf", "null-stripped", "static-recovery"],
+  "version": "1.0",
+  "honesty": "确定性静态求解（presolve 路线），非 LLM 自主推理；与题面 flag_sha256 逐字匹配"
+}

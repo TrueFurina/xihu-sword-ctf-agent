@@ -200,6 +200,7 @@ _WIRED_SKILL_MODULES = {
     "skills.crypto_cycling",                 # RSA cycling attack（2^1025-2 因子分解）
     "skills.crypto_electric_mayhem_cls",    # AES-128 CPA 侧信道（模拟功耗轨迹，离线可解）
     "skills.crypto_lcg_recover",             # LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
+    "skills.thoroughlystripped",             # null 剥离 ELF 字节级恢复（CSAW-Finals 2017）
 }
 
 
@@ -655,6 +656,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_ecxor(question)),
         # 2026-10-07 B 类静态解码：RSA-IBE 串谋攻击（同 N 双私钥 + AES-GCM 密文）
         asyncio.ensure_future(_try_rsa_ibe_collusion(question)),
+        # 2026-10-08 确定性静态求解：null 剥离 ELF 字节级恢复（CSAW-Finals 2017 thoroughlyStripped）
+        asyncio.ensure_future(_try_thoroughlystripped(question)),
     ]
     try:
         for _fut in asyncio.as_completed(_tasks):
@@ -3657,3 +3660,45 @@ async def _try_rsa_ibe_collusion(question) -> Optional[str]:
     logger.info("[presolve:rsa_ibe_collusion] %s 命中 flag=%s", qid, chosen[:60])
     _save_candidates(question, [chosen])
     return chosen
+
+
+async def _try_thoroughlystripped(question) -> Optional[str]:
+    """null 字节剥离 ELF 的确定性字节级恢复（2026-10-08 · forensics 静态求解）。
+
+    CSAW-Finals 2017 thoroughlyStripped：附件是被剥离全部 null 字节的 ELF64（4367B，
+    0 个 0x00）。代码指令流未破坏，故可纯字节解析 main→wrapper→leaf 两级结构恢复 flag。
+    仅对**含 ELF 魔数**的附件触发，避免对非 ELF 题空转；命中由 skill 内部 sha256 闭环校验。
+
+    诚实口径：属 presolve 确定性静态求解（非 LLM 自主推理），与题面 flag_sha256 逐字匹配。
+    """
+    attach = _attachments(question)
+    if not attach:
+        return None
+    try:
+        from skills.thoroughlystripped import run as ts_run
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:thoroughlystripped] 导入失败: %s", exc)
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            with open(p, "rb") as fh:
+                head = fh.read(4)
+        except OSError:
+            continue
+        if head != b"\x7fELF":
+            continue
+        try:
+            r = ts_run({"path": p})
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:thoroughlystripped] %s 异常: %s", p, exc)
+            continue
+        if isinstance(r, dict) and r.get("ok") and r.get("flag"):
+            flag = str(r["flag"])
+            logger.info("[presolve:thoroughlystripped] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
+    return None
