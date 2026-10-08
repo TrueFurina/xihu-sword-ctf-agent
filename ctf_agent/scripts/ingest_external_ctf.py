@@ -9,7 +9,7 @@
 是廉价拿到「有官方 flag 可校验 + 类别多样」题源的唯一渠道。本脚本把外部
 题源灌入本地题库，使其能被 `benchmark_heldout.py` 的既有排除链统一筛选。
 
-三条诚实红线（与 held-out 口径一致，违反即拒绝入库）
+四条诚实红线（与 held-out 口径一致，违反即拒绝入库）
 ---------------------------------------------------
 1. ground-truth 只存 `flag_sha256`，明文 flag 永不落盘。
    若 staging 给了明文 `flag`，本脚本现场算 sha256 后**丢弃明文**再写文件。
@@ -18,6 +18,12 @@
    若 staging 显式 `source_reconstructed_from_writeup=true` 则拒收（交给既有排除链）。
 3. attachments 不得含明文 flag。整链 `_has_plaintext_flag_in_source()` 会在
    `benchmark_heldout.py` 选题时确定性拦截；本脚本做 best-effort 预检告警。
+4. 真值不得是「占位词自证」形态（2026-10-08 新增，09-29「9/17」污染的根因入口）。
+   明文 flag 括号内容 ≥4 字符且逐字出现在本题 description 中 → 判占位嫌疑拒收
+   （presolve 的 desc 抽词会从描述 reproduces 同一个词 → 明文分支自证假命中）。
+   确需入库用 `--allow-suspect-truth` 显式放行（降级为 stderr 告警）。
+   另：`flag` 与 `flag_sha256` 同时给出时必须一致（红线④b）；
+   `flag{}` 空内容拒收（红线④a）。
 
 用法
 ----
@@ -59,8 +65,20 @@ def sha256_hex(s: str) -> str:
     return hashlib.sha256(s.strip().encode("utf-8")).hexdigest()
 
 
-def validate(q: dict) -> list[str]:
-    """返回错误列表；空列表表示可入库。同时就地补全 flag_sha256 / provenance。"""
+def _flag_inner(s: str) -> str | None:
+    """取第一个 flag 形态串括号内内容；无匹配返回 None，`flag{}` 返回空串。"""
+    m = _FLAG_RE.search(s)
+    if not m:
+        return None
+    mm = re.match(r"^[^{]*\{(.*)\}$", m.group(0), re.S)
+    return mm.group(1) if mm else None
+
+
+def validate(q: dict, allow_suspect_truth: bool = False) -> list[str]:
+    """返回错误列表；空列表表示可入库。同时就地补全 flag_sha256 / provenance。
+
+    红线④（真值可信性，2026-10-08 新增）默认 fail-closed：
+    allow_suspect_truth=True 时占位嫌疑降级为 stderr 告警（仍写 sha256）。"""
     errs: list[str] = []
     # 红线①块会 pop 掉明文 flag，故此处**先捕获**明文原值，供红线③精确判据使用
     real_flag_plain = q.get("flag")
@@ -85,17 +103,37 @@ def validate(q: dict) -> list[str]:
     if q.get("source_reconstructed_from_writeup"):
         errs.append(f"{qid}: source_reconstructed_from_writeup=true refused (红线②)")
 
-    # 红线①：ground-truth 只存 sha256
+    # 红线①：ground-truth 只存 sha256；红线④：真值可信性
     fs = q.get("flag_sha256")
     plain = q.get("flag")
     if fs:
         if not _SHA256_RE.match(str(fs)):
             errs.append(f"{qid}: flag_sha256 not 64-hex")
+        if plain:
+            # 红线④b：双字段同给必须一致（静默不一致 = 判分真值漂移）
+            if sha256_hex(str(plain)) != str(fs).lower():
+                errs.append(f"{qid}: flag 与 flag_sha256 不一致（红线④b）")
     elif plain:
         # 红线①：现场算哈希后丢弃明文，明文永不落盘
         if _FLAG_RE.search(str(plain)):
-            q["flag_sha256"] = sha256_hex(str(plain))
-            q.pop("flag", None)
+            inner = _flag_inner(str(plain))
+            if inner == "":
+                errs.append(f"{qid}: flag 括号内容为空（红线④a）")
+            # 红线④c：占位词自证——desc 抽词会从描述 reproduces 同词 → 假命中
+            # （09-29「9/17」污染根因：7 道占位词真值由此入库）
+            suspect = bool(inner) and len(inner) >= 4 and inner.lower() in str(
+                q.get("description") or "").lower()
+            if suspect:
+                msg = (f"{qid}: flag 括号内容 {inner!r} 逐字出现在本题 description"
+                       f"（红线④c 占位嫌疑）")
+                if allow_suspect_truth:
+                    print(f"[ingest][warn] {msg}（--allow-suspect-truth 放行）",
+                          file=sys.stderr)
+                else:
+                    errs.append(msg)
+            if not suspect or allow_suspect_truth:
+                q["flag_sha256"] = sha256_hex(str(plain))
+                q.pop("flag", None)
         else:
             errs.append(f"{qid}: flag not a flag-format string and no flag_sha256")
     else:
@@ -132,8 +170,9 @@ def validate(q: dict) -> list[str]:
     return errs
 
 
-def ingest_one(q: dict, out_dir: Path, dry_run: bool) -> tuple[bool, str]:
-    errs = validate(q)
+def ingest_one(q: dict, out_dir: Path, dry_run: bool,
+               allow_suspect_truth: bool = False) -> tuple[bool, str]:
+    errs = validate(q, allow_suspect_truth=allow_suspect_truth)
     if errs:
         return False, "; ".join(errs)
     cat = (q.get("category") or "").lower()
@@ -188,6 +227,9 @@ def main() -> int:
     ap.add_argument("--external-dir", default=str(EXTERNAL_DIR),
                     help=f"输出目录（默认 {EXTERNAL_DIR}）")
     ap.add_argument("--dry-run", action="store_true", help="只校验不写盘")
+    ap.add_argument("--allow-suspect-truth", action="store_true",
+                    help="红线④c 占位嫌疑降级为告警（默认 fail-closed 拒收；"
+                         "确需入库真实短词 flag 时显式放行并人工复核）")
     args = ap.parse_args()
 
     if args.emit_example:
@@ -216,7 +258,8 @@ def main() -> int:
             print(f"[ingest] 跳过非对象条目: {q!r}")
             fail += 1
             continue
-        good, msg = ingest_one(q, out_dir, args.dry_run)
+        good, msg = ingest_one(q, out_dir, args.dry_run,
+                               allow_suspect_truth=args.allow_suspect_truth)
         if good:
             ok += 1
             print(f"[ingest] OK  {msg}")
