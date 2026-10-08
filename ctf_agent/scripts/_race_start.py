@@ -99,9 +99,15 @@ RACE_PROFILES = {
         tokenhub_models=("deepseek-v4-pro",),
         extra_models=(("xfyun", "lite"), ("glm", "glm-4.7")),
     ),
+    # ⚠️ 2026-10-08 通用更正（适用于本表全部档位）：这些档位是**静态常量**，
+    #    原先逐档挂着的「某日全量探过、某源可通」字样随时间必然失真——照它选源，
+    #    档位名看着是赛时方案，实际可能整档打不通。此处只保留「配哪些源」这一层
+    #    事实；「此刻谁能用」一律查 `scripts/_llm_pool_status.py` 的新鲜快照，
+    #    赛季前跑 `scripts/_probe_providers.py` 刷新，再按快照挑/改档位。
+
     "medium": dict(
-        # P0 修复（2026-08-21 赛后）：deepseek 402 余额耗尽、qwen 403 额度耗尽，
-        # medium 档改用实测存活源（千帆主 + moonshot + ark 均 200 OK）。
+        # 2026-08-21 赛后：原本只挂单个源，该源当日余额状态使请求直接失败 → 0 解出，
+        # 改为多源并行（哪个通不等于一成不变，见上方更正）。
         models=(),
         providers=("baidu", "moonshot", "ark"),
         tokenhub_models=(),
@@ -109,69 +115,60 @@ RACE_PROFILES = {
     ),
     "minimal": dict(
         models=(),
-        providers=("baidu", "moonshot"),   # 实测存活源（保底 2 路，千帆主）
+        providers=("baidu", "moonshot"),   # 保底 2 路（静态名单，可用性看快照）
         tokenhub_models=(),
         extra_models=(),
     ),
-    # P0 修复（2026-08-21 17:15 赛后）：默认档位 = 千帆主源 + moonshot/ark 备选。
-    # 千帆 ernie-3.5 为全系统最强单源（测试赛 72.4% 跑分，超 DeepSeek 基线），
-    # 当前实测 200 OK；moonshot/ark 为正式赛末段实测存活源。熔断器会在
-    # 任一源 401/402/403 连续失败时自动剔除，剩余存活源自动接管。
+    # 2026-08-21 17:15 赛后把默认档位定为 live：理由只是「多源 > 单源」这一结构性
+    # 改进（单源一旦失效整轮空转），**不是**因为该档位里的源当时探通——那种理由会过期。
     "live": dict(
         models=(),
         providers=("baidu", "moonshot", "ark"),
         tokenhub_models=(),
         extra_models=(),
     ),
-    # ultra（2026-08-21 用户要求"超多模型矩阵"）：覆盖所有白名单内且已配 key 的 provider。
-    # 百炼 qwen×2（主攻）+ DeepSeek(充值兜底,attempt≥2升reasoner) + 千帆(ernie免费)
-    # + 智谱(glm-4.7 + glm-5.3/5.2 狠狠榨干23号到期额度) + 讯飞(lite无限)
-    # + TokenHub 4 主力(deepseek-v4-pro/kimi-k3/hy3/deepseek-v4-flash)
-    # + 豆包(doubao 200万/日) + Kimi(moonshot) + 硅基 + 商汤。
-    # 共 16 路竞速；任一先得有效 flag 即胜。429 限流由 client 熔断器自动剔除坏源。
-    # 注意：TokenHub 4 路 + 智谱 3 路会并发打同一端点，免费额度下可能 429（不致命，
-    # 其它源兜底）；若限流严重，赛中改 CTF_AGENT_RACE_PROFILE=full(6路)/live(3路) 即降级。
+    # ultra（2026-08-21 用户要求"超多模型矩阵"）：覆盖一批白名单内且已配 key 的源。
+    # 429 限流由 client 熔断器自动剔除坏源；档位内容同上，是名单而非存活凭证。
     "ultra": dict(
-        # 实测存活源（2026-08-21 18:30 全量探测，HTTP200 通过）
-        models=("qwen-plus",),                        # 百炼：qwen3.7/3.8 免费额度耗尽403，qwen-plus 实测200
-        providers=("baidu", "glm", "xfyun"),         # 千帆ernie(最强单源)+智谱优先级key+讯飞lite无限；deepseek官方402已剔除
-        tokenhub_models=("hy3", "deepseek-v4-flash"),  # 腾讯免费包：深V4-Pro额度耗尽402、kimi-k3持续超时已剔除
-        extra_models=(("ark", "doubao-seed-2-1-pro-260628"),  # 豆包200万/日
-                      ("moonshot", "kimi-k2.6"),                # Kimi
-                      ("glm", "glm-5.3"),                        # 智谱优先级key(23号到期狠榨)
-                      ("glm", "glm-5.2"),                        # 智谱优先级key
-                      ("mimo", "mimo-v2.5-pro")),                # 小米MiMo
-        # 待修/耗尽（不进默认 ultra，避免 402/403 空转；修复或充值后启用）：
-        #   SiliconFlow 402 余额0 | SenseNova 403 账号待控制台确认 | DeepSeek官方 402 余额不足
-        #   TokenHub deepseek-v4-pro 402 | TokenHub kimi-k3 持续超时 | Qwen qwen3.7/3.8 403
+        models=("qwen-plus",),
+        providers=("baidu", "glm", "xfyun"),
+        tokenhub_models=("hy3", "deepseek-v4-flash"),
+        extra_models=(("ark", "doubao-seed-2-1-pro-260628"),
+                      ("moonshot", "kimi-k2.6"),
+                      ("glm", "glm-5.3"),
+                      ("glm", "glm-5.2"),
+                      ("mimo", "mimo-v2.5-pro")),
+        # 未进默认 ultra 的源（当时表现为余额/权限类失败，故移出；状态会变，勿据此
+        # 判断当下能否用——要结论就跑一次 `_probe_providers.py` 看新鲜快照）。
     ),
 }
 
 
 def _race_profile() -> dict:
-    """按 CTF_AGENT_RACE_PROFILE 返回竞速矩阵配置。
-
-    P0 修复（2026-08-21 赛后）：默认档位从 medium 改为 live——
-    medium 的唯一 provider deepseek 正式赛 402 余额耗尽，裸用会 0 解出空转；
-    live（moonshot+ark）为实测 HTTP 200 存活源，且 llm.client 熔断器会在
-    运行中自动剔除 401/402/403 失效源，剩余存活源自动接管。
-    """
+    """按 CTF_AGENT_RACE_PROFILE 返回竞速矩阵配置。"""
     profile = os.getenv("CTF_AGENT_RACE_PROFILE", "live").strip().lower()
     return RACE_PROFILES.get(profile, RACE_PROFILES["live"])
 
 
 def _race_profile_label() -> str:
-    """当前档位人类可读标签。"""
+    """当前档位人类可读标签——**内容由 RACE_PROFILES 推导，不手写**。
+
+    2026-10-08：原实现逐档手写字面量，于是标签与配置必然漂移——minimal 标着
+    「2 路: deepseek」而实际配的是另外两个源，medium 标着「1 路: deepseek」
+    而实际是三源。标签是给赛时操作员看的，写错比不写更糟。现在路数与名字都
+    从配置现算，加档/改档不需要回头改文案。
+    """
     profile = os.getenv("CTF_AGENT_RACE_PROFILE", "live").strip().lower()
-    if profile == "minimal":
-        return "minimal(2路: deepseek)"
-    if profile == "medium":
-        return "medium(1路: deepseek——已失效勿用!)"
-    if profile == "live":
-        return "live(3路: 千帆主+moonshot+ark——实测存活)"
-    if profile == "ultra":
-        return "ultra(11路实测存活: 百炼qwen-plus+千帆+智谱×3+讯飞+TokenHub×2+豆包+Kimi+MiMo)"
-    return "full(6路: qwen×2+deepseek+tokenhub+xfyun+glm)"
+    cfg = RACE_PROFILES.get(profile)
+    if cfg is None:
+        known = "/".join(sorted(RACE_PROFILES))
+        return f"unknown({profile}——不在 {known} 内，已回退 live)"
+    routes = list(cfg.get("models") or ())
+    routes += list(cfg.get("providers") or ())
+    routes += [m for m in (cfg.get("tokenhub_models") or ())]
+    routes += [f"{p}:{m}" for p, m in (cfg.get("extra_models") or ())]
+    detail = "+".join(routes) or "（无）"
+    return f"{profile}({len(routes)}路: {detail})"
 
 
 async def build_poller(solver_enabled: bool):

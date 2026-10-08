@@ -84,12 +84,19 @@ def check_bigfile(path: str = "") -> bool:
 
 
 def check_config() -> bool:
-    """④ 配置确认——网关/重型/白名单。"""
+    """④ 配置确认——网关/重型/白名单。
+
+    2026-10-08：原实现还要求 `heavy == "deepseek-reasoner"`。那一行把某场比赛的
+    具体选型钉进了通用门禁，而该源后来因余额状态变化再也发不通——照它判定，等于
+    逼人配上一个当下打不通的模型才算「可开赛」。门禁只该验**结构性**要求：网关配了、
+    重型模型非空、比赛模式开了强制白名单。「配的这个源此刻通不通」是第 ⑤ 项的事。
+    """
     gw = os.getenv("CTF_AGENT_LLM_BASE_URL", "")
     heavy = os.getenv("CTF_AGENT_HEAVY_MODEL", "")
     enf = os.getenv("CTF_AGENT_ENFORCE_WHITELIST", "")
-    ok = bool(gw) and "llm-gateway" in gw and heavy == "deepseek-reasoner" and enf == "1"
-    print(f"④ 配置: {'✅' if ok else '❌'} 网关={'有' if gw else '无'} 重型={heavy} ENFORCE={enf}")
+    ok = bool(gw) and "llm-gateway" in gw and bool(heavy.strip()) and enf == "1"
+    print(f"④ 配置: {'✅' if ok else '❌'} 网关={'有' if gw else '无'} "
+          f"重型={'已配' if heavy.strip() else '未配'} ENFORCE={enf}")
     return ok
 
 

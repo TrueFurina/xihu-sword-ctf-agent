@@ -715,10 +715,16 @@ def _resolve_settings(model: Optional[str], provider: Optional[str] = None) -> d
     """
     config = AppConfig.from_env()
 
-    # 逃生开关（2026-08-22 锐评第五节整改）：CTF_AGENT_ESCAPE_PROVIDER=<白名单provider>
+    # 逃生开关（2026-08-22 锐评第五节整改）：CTF_AGENT_ESCAPE_PROVIDER=<provider>
     # 强制切换——解决「fail-closed 拦截所有调用 + 无降级可用档」的致命设计：
-    # 赛中任一环境变量误设导致当前 provider 全瘫时，只需设逃生变量即可一键切到
-    # 已知可用白名单 provider（baidu/tokenhub/mimo…），不必重启排查残留。
+    # 赛中任一环境变量误设导致当前 provider 全瘫时，只需设逃生变量即可一键切源，
+    # 不必重启排查残留。
+    # ⚠️ 2026-10-08：原注释曾把三个具体点名源写成「随时可顶上的白名单对象」——写的
+    #    人当时确实探过，但源的状态随余额/欠费/平台策略漂移；隔一阵照注释逃生，结果
+    #    可能是逃到一个同样打不通的源（逃生开关只在赛中最紧张时才动，误导代价最高）。
+    #    成员资格看 OFFICIAL_WHITELIST_PROVIDERS（那是资格，不是存活结论）；
+    #    「此刻谁能用」只查 `scripts/_llm_pool_status.py` 的新鲜探测快照，查不到就
+    #    多试几个，别信任何注释里的名单。
     # 触发条件：显式 provider 形参传入（竞速多 solver 各传各的）时不劫持；
     #           否则只要设了逃生变量就强制切换（用户显式意图最高优先）。
     _escape_provider = os.getenv("CTF_AGENT_ESCAPE_PROVIDER", "").strip().lower()

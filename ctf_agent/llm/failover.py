@@ -23,7 +23,9 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # 默认兜底顺序（仅在未显式设 CTF_AGENT_FAILOVER_ORDER 时采用）。
-# 按「免费/低成本优先 + 实测存活」排序；具体可用性取决于本机各源 key 配置。
+# 2026-10-08：排序口径原写有「依当日探测排先后」，但该顺序是**静态常量**，而源的实际
+# 状态随余额/欠费/平台策略漂移——注释里那半句话隔几周必然失真。此处只声明「成本位次」
+# 这一层意图；谁真的能通，看 `scripts/_llm_pool_status.py` 的新鲜快照。
 DEFAULT_FAILOVER_ORDER = ["qwen", "tokenhub", "mimo", "deepseek", "baidu"]
 
 

@@ -108,21 +108,24 @@ class AppConfig:
 
     # ── LLM 基础 ──────────────────────────────────────────
     use_real_llm: bool = False       # CTF_AGENT_USE_REAL_LLM=1 启用真实 API
-    # P1-9 修复（2026-08-21 赛后）：单一事实源——默认 provider 统一为 baidu 千帆。
+    # P1-9 修复（2026-08-21 赛后）：单一事实源——默认 provider 统一为一处。
     # 此前三处漂移：dataclass 默认 "deepseek" / from_env 默认 "baidu" /
     # _resolve_provider_defaults 兜底 "deepseek-v4-flash"，注释还互相矛盾。
-    # 千帆 ernie-4.5-turbo 三个免费模型（2026-08-28 充值后用户指定唯一使用）：
-    # ernie-4.5-turbo-32k / 128k / vl。deepseek 402 余额、qwen 额度问题为历史，已不相关。
-    # 显式 provider（竞速池）
-    # 不受影响；仅影响无显式 provider 的单源模式。
-    llm_provider: str = "baidu"      # 默认千帆 baidu（白名单内，实测存活主源）
+    # ⚠️ 2026-10-08：本处原先还挂了一句「白名单成员 + 当日探测可接受」式的可用性
+    #    承诺（写的时候当天确实验过），随后该端点转 403，注释就成了假话——同一故障
+    #    在本仓第四次复发。**静态默认值不携带可用性承诺**：谁能用，只有
+    #    `scripts/_llm_pool_status.py` 读到的新鲜探测快照能回答（缺失/过期＝未知＝
+    #    不可用，fail-closed）。开赛先用 `_probe_providers.py` 落快照、
+    #    再用 `_preflight_env.py --probe-llm` 验主链。
+    # 显式 provider（竞速池）不受影响；仅影响无显式 provider 的单源模式。
+    llm_provider: str = "baidu"      # 静态默认（白名单成员）；可用性须现场探测才成立
     llm_base_url: str = ""           # 留空则按 provider 默认
     llm_api_key: str = ""            # 兜底 Key（一般用环境变量）
     llm_timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
 
     # ── 分级降级调度（v2.0 核心）──────────────────────────
-    # 2026-08-28：baidu 千帆充值后免费档仅 3 个 ernie-4.5-turbo 模型（用户指定唯一使用）：
-    # ernie-4.5-turbo-32k（轻量快速）/ ernie-4.5-turbo-128k（大上下文强推理）/ ernie-4.5-turbo-vl（视觉）。
+    # 2026-08-28：默认走 3 档 ernie-4.5-turbo（32k 轻 / 128k 中重 / vl 视觉）。
+    # ⚠️ 账号侧的额度状态会漂移，**不可凭本注释判断能否发通**——见 `_llm_pool_status`。
     light_model: str = "ernie-4.5-turbo-32k"   # attempt 0：轻量快速推理
     mid_model: str = "ernie-4.5-turbo-128k"    # 中型：pwn/reverse 起步 + attempt 1（大上下文）
     heavy_model: str = "ernie-4.5-turbo-128k"  # attempt 2-3：重型强推理（免费档仅 128k 最强）
@@ -165,9 +168,11 @@ class AppConfig:
     @classmethod
     def from_env(cls) -> "AppConfig":
         """从环境变量构建配置（未设置则用默认值）。"""
-        # P0 修复（2026-08-21 17:22 赛后）：默认 provider 从 deepseek 改为 baidu 千帆。
-        # deepseek 正式赛 402 余额耗尽——默认打它会单源空转 0 解出。
-        # 千帆 ernie-3.5 为全系统最强单源（测试赛 72.4% 跑分）+ 当前实测 200 OK。
+        # P0 修复（2026-08-21 17:22 赛后）：默认 provider 从 deepseek 改为白名单内另一源。
+        # 当时动机：该默认源余额状态已使直连失败，默认打它会单源空转 0 解出。
+        # ⚠️ **这次换默认依据的是当时那次探测，不代表今天仍然成立**——默认值是静态的，
+        #    可用性是漂移的。换源请用 `_probe_providers.py` 的快照挑，赛前用
+        #    `_preflight_env.py --probe-llm` 对当前生效 provider 真发一发。
         # 显式 provider（竞速池）不受此影响；仅影响无显式 provider 的单源模式。
         provider = os.getenv("CTF_AGENT_LLM_PROVIDER", "").strip().lower() or "baidu"
         base_url, light_model, mid_model_def, heavy_model_def = _resolve_provider_defaults(provider)
@@ -436,11 +441,15 @@ def _resolve_provider_defaults(provider: str) -> tuple[str, str, str, str]:
     main_agent 在 attempt>=2 升级重型会把 ernie 模型打到 dashscope → 404 model_not_found，
     随后判定"重型升级连续失败"直接放弃止损——crypto/reverse 等需深推理的题永远 0 解出
     （8/31 dryrun crypto+reverse 0/2 真因：heavy 打到错误端点）。现 mid/heavy 随 provider 走，
-    保证重型升级端点-模型匹配。各 provider 默认模型源自参赛手册白名单 + 实测可用：
-    - baidu：用户 8-28 充值后指定唯一使用的 3 个 ernie-4.5-turbo（32k 轻 / 128k 中重）。
+    保证重型升级端点-模型匹配。各 provider 默认模型取自参赛手册白名单：
+    - baidu：3 个 ernie-4.5-turbo（32k 轻 / 128k 中重）。
     - qwen：qwen3.7-flash(轻) / qwen3.8-max(中重，dashscope 真实存在，非 kimi-k3)。
     - deepseek：deepseek-chat(轻) / deepseek-reasoner(R1 深推理，重型)。
     - tokenhub：hy3(轻) / deepseek-v4-pro(重型，TokenHub 免费深推理)。
+
+    ⚠️ 2026-10-08：本表只解决「哪个模型名配哪个端点」，**不声明任何源当前可用**
+    （原文此处写有「+ 当日探测可接受」，随余额漂移后失效）。可用性一律查
+    `scripts/_llm_pool_status.py` 的新鲜快照。
     """
     mapping = {
         "deepseek": ("https://api.deepseek.com/chat/completions", "deepseek-chat", "deepseek-chat", "deepseek-reasoner"),
