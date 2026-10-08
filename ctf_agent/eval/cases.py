@@ -136,14 +136,15 @@ class Question:
 
         2026-10-08 修复：原实现把「走哪条分支」gate 在 `flag_is_placeholder`
         （要求 `flag` 字段**本身**是 sha256 串），于是第三种合法形态
-        「`flag=None` + 只有 `flag_sha256`」（外部题常见，全库实测 79 题）落进明文分支、
-        与 `None` 比对 → **恒 False**：正确答案被自己的验证器判 hallucination
-        （`run.py:387` 生产判分正走此路径）。改为直接取 `expected_sha256`
-        （其优先级「flag_sha256 字段 > flag 占位」已由本类定义），三种形态全覆盖：
-        flag 明文（无 sha256）/ flag=sha256 占位 / flag=None+flag_sha256。
-        实测形态分布：`(None,set)=79 / (sha256,set)=124 / (plain,none)=57 /
-        (None,none)=1 / (plain,set)=0` —— `(plain,set)=0` 保证本次改动对未来题库
-        无行为变更。"""
+        「`flag=None` + 只有 `flag_sha256`」（外部题全部如此，全库去重实测 40 题）
+        落进明文分支、与 `None` 比对 → **恒 False**：正确答案被自己的验证器判
+        hallucination（`run.py:387` 生产判分正走此路径）。改为直接取
+        `expected_sha256`（其优先级「flag_sha256 字段 > flag 占位」已由本类定义），
+        三种形态全覆盖：flag 明文（无 sha256）/ flag=sha256 占位 / flag=None+flag_sha256。
+        形态分布（去重源库）：`(None,set)=40（全在 questions_external）/ (sha256,set)=122 /
+        (plain,none)=57 / (None,none)=1 / (plain,set)=0` —— `(plain,set)=0` 保证本次改动
+        对未来题库无行为变更。（⚠️ 初稿曾记「79 题」：那把派生副本 heldout_run 与源库
+        重复计入，去重后 40。）"""
         if not candidate:
             return False
         exp = self.expected_sha256
