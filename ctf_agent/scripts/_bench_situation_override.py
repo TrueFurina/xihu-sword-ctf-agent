@@ -75,13 +75,22 @@ def _build_agent(llm_call_budget: int = 10):
     agent = MainAgent(llm_client=None, llm_call_budget=llm_call_budget)
     agent.max_retries = 4  # _max_steps = min(4*3, budget) = min(12,10) = 10
 
-    # 顶部 presolve 是确定性入口，用 async mock 跳过（避免真实文件分析副作用）
+    # 顶部 presolve 是确定性入口，用 async mock 跳过（避免真实文件分析副作用）。
+    # 2026-10-08 锐评修复：mock 必须可还原——此前裸赋值永久替换
+    # core.presolve.presolve，测试模块跑完后全进程的 presolve 都是假的，
+    # 导致 test_svg_path_text 端到端在全量套件下必红（单独跑却绿）。
+    # 现返回 restore 回调，由 run_scenario 在 finally 中还原。
     import core.presolve as _cp
+
+    _orig_presolve = _cp.presolve
 
     async def _fake_presolve(*a, **k):
         return None
 
     _cp.presolve = _fake_presolve
+
+    def _restore_presolve():
+        _cp.presolve = _orig_presolve
 
     state = {
         "supervisor_calls": 0,
@@ -147,14 +156,18 @@ def _build_agent(llm_call_budget: int = 10):
     agent._supervise = _fake_supervise
     agent._log_situation = _fake_log_situation
     agent._situation_override_triggered = _override_tagged
-    return agent, state
+    return agent, state, _restore_presolve
 
 
 async def run_scenario(override_on: bool, llm_call_budget: int = 10) -> dict:
     """跑一个场景，返回可比较的指标字典。"""
     os.environ["CTF_AGENT_SITUATION_OVERRIDE"] = "1" if override_on else "0"
-    agent, state = _build_agent(llm_call_budget)
-    result = await agent.solve(_BenchQuestion())
+    agent, state, _restore_presolve = _build_agent(llm_call_budget)
+    try:
+        result = await agent.solve(_BenchQuestion())
+    finally:
+        # 还原全局 presolve，防止 mock 泄漏到同进程的后续测试/调用方
+        _restore_presolve()
     return {
         "override_on": override_on,
         "solved": result.get("flag") is not None,
