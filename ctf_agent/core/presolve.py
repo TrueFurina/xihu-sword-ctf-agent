@@ -1477,12 +1477,23 @@ _ZIPCRYPTO_COMMON = (
 #     max_len=5, cap=20_000     -> 0.27s  ok=False   ← 候选不够，仍失败
 #     max_len=5, cap=2_000_000  -> 1.05s  ok=True  pwd=66688
 #
-# 实测速率（真ZipCrypto 包，密码**不在空间内**⇒ 走满全空间）：
-#     max_len=4, cap=20_000    -> 0.28s
-#     max_len=4, cap=2_000_000 -> 27.95s   ⇒ 约 71,500 候选/秒
+# ⚠️ 速率数字在 2026-10-09 **重新实测并订正**（旧值 71,500 候选/秒偏高）：
+# 真 ZipCrypto 包、密码**不在空间内**（走满全空间）时的端到端速率：
+#
+#     改造前（逐个流式筛选）    : 25,000 候选/秒   ⇒ 2e6 候选要 80s（>60s 墙钟，必被杀）
+#     改造后（numpy 批量筛选）  : store 条目 43,242/s（2e6 → 46.25s）
+#                                deflate 条目 353,344/s（2e6 → 5.66s）
+#
+# 两档差 8 倍，原因是**命中复核**而不是筛选：头校验只有 1 个校验字节 ⇒
+# 误报率 1/256 ⇒ 每 256 个候选付一次 `_try_password`（实测 3.0 ms/次，
+# zipfile 解密器是纯 Python 逐字节）⇒ store 条目（要完整解密 body）最贵。
+# 详见 skills/zip_crypto_bruteforce.py 顶部说明。
 _ZIPCRYPTO_MAXLEN = 6       # 6 位：cap 已先于它耗尽，实际由 cap 决定
-_ZIPCRYPTO_MAX_CAND = 2_000_000   # ≈28s 满空间；实测 5 位数字 1.05s命中
-# 墙钟预算按上面速率反推：2e6 候选 ≈ 28s ⇒ 60s 留足spawn 与 IO 余量。
+_ZIPCRYPTO_MAX_CAND = 2_000_000   # 最坏 46s（store）；5 位数字 0.30s 命中
+# 墙钟预算按**改造后最坏档**反推：2e6 候选 store 条目 46.25s ⇒ 60s 留 ~13s 余量。
+# ⚠️ 注意这个余量是**随附件大小浮动**的：store 条目 body 越大，复核越贵
+# （3ms 是按 fixture 的 3.5KB 测的）⇒ 真实大附件仍可能触到墙钟，
+# 届时会真终止并放弃该题（有保护，不是挂死）。根治需优化复核（见 skill 文件 NOTE）。
 # ⚠️ 放宽必须配合 `run_skill_isolated`（墙钟到点**真终止**）。
 # 留在 `to_thread` 时 28s 的活会**占住 worker 直到自然结束**，
 # 多题连续触发即耗尽线程池 ⇒ 全链路变慢（见 core/skill_pool.py 根因说明）。
@@ -1496,22 +1507,22 @@ async def _try_zip_crypto_bruteforce(question) -> Optional[str]:
     路由会选中它、执行层却缺位（与 2026-10-07 修复的「键序遮蔽」同类后果）。
 
     ⚠️ 墙钟纪律（本函数存在的首要理由）：
-    `skills/zip_crypto_bruteforce.run()` 是**同步阻塞**实现
-    （`itertools.product` 双层循环）。2026-10-08 重新实测（真ZipCrypto 包，
-    密码**刻意不在搜索空间内** ⇒ 走满全空间，这是最坏情况）：
+    `skills/zip_crypto_bruteforce.run()` 是**同步阻塞**实现。
+    2026-10-09 重新实测（真ZipCrypto 包，密码**刻意不在空间内** ⇒ 走满全空间）：
 
-        max_len=3, max_candidates=20_000     -> 0.27s
-        max_len=4, max_candidates=20_000     -> 0.28s
-        max_len=4, max_candidates=2_000_000  -> 27.95s   ⇒ 约 71,500 候选/秒
+        cap=2_000_000，store 条目（复核最贵）  -> 46.25s  ⇒ 43,242 候选/秒
+        cap=2_000_000，deflate 条目            ->  5.66s  ⇒ 353,344 候选/秒
+        （改造前同一档实测 25,000 候选/秒 ⇒ 2e6 要 80s，**必然撞墙钟**）
 
-    ⚠️ **修正旧注释的错误数字**：先前写「max_len=4 / cap=5e5 → 17~19s」，
-    实测同样是 4 位但 cap=2e6 才是 27.95s ⇒ **耗时几乎只由 cap 决定**，
-    与 max_len 关系不大（旧数据把两者混在一起了）。
-    这正是「数字必须自己实测、不能沿用」的又一处实例。
+    ⚠️ **两次修正旧注释的错误数字**：
+    ① 先前写「4 位 / cap=5e5 → 17~19s」，实测 4 位但 cap=2e6 才 27.95s
+       ⇒ 耗时几乎只由 cap 决定（旧数据把两者混了）；
+    ② 那个 71,500 候选/秒同样偏高，本机实测改造前只有 **25,000**。
+    这正是「数字必须自己实测、不能沿用」的又一处实例（已第三次）。
 
     三条纪律：
         ① 必须 `run_skill_isolated`（隔离子进程，墙钟到点**真终止**）。
-           不能用 `to_thread` —— 线程不可取消，28s 的活会占住 worker
+           不能用 `to_thread` —— 线程不可取消，几十秒的活会占住 worker
            到自然结束，多题连续触发即耗尽线程池 ⇒ 全链路变慢。
         ② 先走内置弱口令表（实测 0.02s，命中 `password` 一类），
            再做空间爆破；两者分工不是二选一。
@@ -1588,10 +1599,10 @@ def _zc_run_with_common(params: dict, common: tuple):
     所以形如 `core.presolve._zc_run_with_common` 的**模块级函数**是唯一可行形态，
     skill 的 import 必须挪进函数体内部。
 
-    实测（本机，真ZipCrypto fixture）：
+    实测（本机，真ZipCrypto fixture，2026-10-09 向量化改造后）：
       弱口令命中 `password` 之类→ 0.02s；
-      空间爆破 5 位数字 66688 → 1.05s（cap=2e6）；
-      满空间走满 cap=2e6 → 27.95s。
+      空间爆破 5 位数字 66688 → 0.30s（cap=2e6，改造前 1.05s）；
+      满空间走满 cap=2e6 → store 条目 46.25s / deflate 条目 5.66s。
     """
     import tempfile
 
