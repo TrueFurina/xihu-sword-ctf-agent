@@ -28,7 +28,7 @@
 | 未推送提交归属 | 🟢 | **2026-10-03 逐条核验：22 个提交全部属他人/多会话；已按授权推送**（qr-solver `75b7fa4`、leak-baretoken `420f5ed`、kpi-crossaudit `1cfbc90`/`75bd9be`、gu-envelope `a1407a7`、本会话 `6790751`/`7859665`/`5c70e76`/`66995a6`/`11e3d05` 等）；用户 2026-10-03 明确授权「最后再推」→ **已推送**（远端 = 本地，见第五节） |
 | 三池假命中治理 | 🟢 **2026-10-03 已修** | presolve **B 组假命中 11→1**（internal92 6→0 / nyu34 3→0 / cybench13 2→1），**A 组真命中不变**（74/2/2）；残留 1 条＝cybench `data_siege`（pcap 内含貌似合法诱饵 flag，无真值不可辨）。证据 `heldout_evidence/presolve_audit_*_v3_20261003.json` |
 | 10733 语料缺口 | 🟢 **2026-10-03 已补齐** | 归档恢复 `race_details/10733.json` + 原始 URL 下载附件 `task.py`（本地 gitignored）+ 新建 `data/questions_real/crypto/10733.json`（id=10733）；`_kpi_leak_crossaudit` 的 `missing_corpus` **1→0**；`real_corpus` **92→93**（`11e3d05`） |
-| 工作树 | 🟢 **2026-10-08 接管后清零** | 接管时 6 改 2 增（provider 存活单源改造流）已提交 3 笔：`e498be8`/`9458606`/`fc4d866`；现无未提交变更。**`git add -An` = 5**（均为未跟踪的 held-out 证据/报价单残留，见下方备注，未入库）。cybench 6847 文件仍由 `.gitignore` 排除 |
+| 工作树 | 🟢 **2026-10-08 接管后完全清零** | 本次会话共 5 笔提交（`e498be8`/`9458606`/`fc4d866`/`991d4fa`/`0d5ad75`）；**`git status` 干净、`git add -An` = 0**。cybench 6847 文件仍由 `.gitignore` 排除 |
 | KPI 真值源 | 🟢 **2026-10-08 已收口** | `ad61c8b`（10-01 首修：读 09-29 证据 + 更正说明）→ **10-08 复查发现两处残留**：①摘要行裸引「LLM 自主推理 1/2」无同行作废标记 ②口径铁律硬编码「分母是 92」（机器值 93）。已补修 `099011b` + 护栏 `0dc1bcc` |
 | 门禁脚本 | 🟢 **已修** | `test_file_guard.py` 已于提交 `834bffd` 入库（`git ls-files` 可查） |
 | 跑批默认值 | 🟢 **已修**（2026-10-08） | `eval/benchmark.py` 默认改 `deepseek`（`d51fdae`）；`benchmark_heldout.py` 真跑无 provider **fail-closed 拒绝**（`c37efe1`/`d94bca3`）。另落地「provider 存活单一真值源」（`e498be8`/`9458606`）：可用性一律查 `logs/llm_probe` 新鲜快照，禁手写 |
@@ -315,7 +315,7 @@
 
 1. ✅ **口径终值** — 已按「标注作废」执行（提交 `ad61c8b`）：真值源输出改为带更正说明，中英 README 顶置更正声明，原文按项目规矩逐字保留为历史记录。
 2. ✅ **跑批授权** — 已执行：NYU 分层 5 题，实耗 **161,604 token（≈¥0.6–1.3）**，结果 **0/5**（详见第二章之二）。
-3. 🟡 **竞赛遗留是否进一步归档** — 已用 gitignore 做非破坏性收口（提交 `596b056`，`git add -An` **6854→5**；余 5 项＝held-out 证据 3 + 报价单 1 + progress.jsonl，均为未跟踪残留，见下方新备注）。是否再把 4 份已跟踪文档迁走仍可由你决定：注意 `M2_E3对照` 是 E3 定调的引用源，有持续价值，**须先迁到中性目录再归档其余**，不可随目录整体掩埋。
+3. ✅ **竞赛遗留归档** — gitignore 非破坏性收口（提交 `596b056`）+ 未跟踪残留归档入库（提交 `0d5ad75`）：`git add -An` **6854→0**，工作树完全干净。是否再把 4 份已跟踪文档迁走仍可由你决定：注意 `M2_E3对照` 是 E3 定调的引用源，有持续价值，**须先迁到中性目录再归档其余**，不可随目录整体掩埋。
 4. ✅ **未推送提交** — 用户 2026-10-03 明确授权「最后再推」（豁免 10-01「不推送」）：本地领先远端 **22** 个提交（本会话占 5 个），逐条核验全部属他人/多会话；推送前发现远端另 3 个文档提交（分叉）→ **合并** `ad8a17c` 后经 **SSH** fast-forward 推送（**无 `--force`**），`ls-remote` 复核远端 = `ad8a17c`。
 5. 🟡 **是否继续扩样**：下一批再来 5 题（约 ¥1），每批单独授权；扩到 17–20 才算有统计意义，且须用独立字段、不得与分母 2 混算。
 
@@ -330,7 +330,7 @@
 - ❌ `git push --force`
 - ❌ **`git add -A` / `git add .`**（会误加未跟踪残留；一律 `git add <具体路径>`）
 - ❌ 代他人提交 / 推送（原 3 处他人改动 `git_hooks/pre-commit`/`benchmark_heldout.py`/`test_kpi_canonical.py` 已由各自会话提交；2026-10-08 接管时工作树无他人未提交改动）
-- ⚠️ **5 项未跟踪残留未入库**（`heldout_evidence/benchmark_report_glm4flash_nyu5_20261005.json`、`runA_e3off_ext5_20260927_1328/`、`runB_e3off_real2_20260927_1330/`、`plans/付费强模型跑批报价单-20261006.md`）：2026-10-08 接管时判定——`runB` 报告含**已被 10-01 复跑证伪**的归因（`main_agent_llm solved real_crypto_dnui_keyboard`，实为 presolve）→ 入库须先按目录约定打 `.SUPERSEDED` 标记 + 补 PROVENANCE 条目，故留待用户裁定，**未擅自提交**
+- ✅ **残留已归档入库**（提交 `0d5ad75`）：5 项未跟踪残留按 heldout_evidence 目录约定入库——`benchmark_report_glm4flash_nyu5_20261005.json`、`runA_e3off_ext5_20260927_1328/`、`runB_e3off_real2_20260927_1330/`、`plans/付费强模型跑批报价单-20261006.md`；其中 `runB` 报告含**已被 10-01 复跑证伪**的归因（`main_agent_llm solved real_crypto_dnui_keyboard`，实为 presolve）→ 已打 `.SUPERSEDED_llm_attribution_refuted_20261008` 标记 + `PROVENANCE.md` 明令下游不得据此宣称 LLM 自主。`.log` 因 `.gitignore` 排除
 - ❌ 删除 `2027-prep` 或其它磁盘文件
 - ❌ 未估 token×金额报授权就跑批；未补 fail-closed 默认值就付费试跑
 
