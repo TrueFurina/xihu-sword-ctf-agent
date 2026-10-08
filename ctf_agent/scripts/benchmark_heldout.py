@@ -510,6 +510,42 @@ def build_arg_parser() -> "argparse.ArgumentParser":
     return ap
 
 
+def should_refuse(args) -> str | None:
+    """真跑启动前的 fail-closed 判定——返回拒绝原因码，None = 放行。
+
+    🔴 为什么要抽成生产侧纯函数（2026-10-08 二次收口）
+    ─────────────────────────────────────────────
+    这条判定原先只以**内联 if** 出现在 `main()` 里，于是护栏测套不得不在自己文件里
+    「独立重述」同一判定式。那份副本与生产漂移时**不会有任何用例变红**——已实测：
+    把生产的 `not args.mock` 摘掉（把 `--run --mock` 冒烟也拦了，一个非常符合本仓
+    「再紧一档」习惯的改动），`tests/test_heldout_provider_failclosed.py` 仍 7 passed。
+    这是 project memory ㉚ 的同型缺陷：测试用例验证的是自己那份实现副本，不是被测入口。
+    抽成函数后，护栏直接调 `should_refuse`，生产与测试再无第二份判定式。
+    """
+    if getattr(args, "run", False) and not getattr(args, "mock", False) \
+            and not getattr(args, "provider", None):
+        return "no-provider"
+    return None
+
+
+_REFUSAL_TEXT = {
+    "no-provider": (
+        "[heldout] ✗ 拒绝启动：未指定 provider（且环境变量 CTF_AGENT_LLM_PROVIDER 为空）。",
+        "[heldout]   真跑必须显式给一个**当前存活**的 provider（如 glm / ark / xfyun）；",
+        "[heldout]   只选题用 --select，冒烟用 --mock（后者无需 provider）。",
+        "[heldout]   背景：写死的默认 'baidu' 已长期 403，属已知失效源。",
+    ),
+}
+
+
+def refusal_text(reason: str) -> list:
+    """拒绝原因码 → 操作员提示行（未知原因码也必须有话可说，不得静默通过）。"""
+    lines = _REFUSAL_TEXT.get(reason)
+    if lines is None:  # fail-closed：认不出的原因码按最坏情况处理——提示去查守卫，而非放行
+        return [f"[heldout] ✗ 拒绝启动：未知拒绝原因码 {reason!r}——拒绝放行，请检查守卫实现。"]
+    return list(lines)
+
+
 def main() -> int:
     args = build_arg_parser().parse_args()
 
@@ -517,11 +553,11 @@ def main() -> int:
     # 旧实现写死 default="baidu"，而千帆已长期 403 不可用 → 按默认 `--run` 会变成
     # 「死 provider 跑全池」：既拿不到任何有效结果，又可能先空耗一轮完整预算。
     # 这里在**选题之前**就拒绝，避免产生无意义的 manifest 与耗时。
-    if args.run and not args.mock and not args.provider:
-        print("[heldout] ✗ 拒绝启动：未指定 provider（且环境变量 CTF_AGENT_LLM_PROVIDER 为空）。")
-        print("[heldout]   真跑必须显式给一个**当前存活**的 provider（如 glm / ark / xfyun）；")
-        print("[heldout]   只选题用 --select，冒烟用 --mock（后者无需 provider）。")
-        print("[heldout]   背景：写死的默认 'baidu' 已长期 403，属已知失效源。")
+    # 判定走 `should_refuse()` 而非内联 if：内联会让护栏只能抄一份副本去读（见其 docstring）。
+    refusal = should_refuse(args)
+    if refusal:
+        for line in refusal_text(refusal):
+            print(line)
         return 2
 
     external_dir = Path(args.external_dir) if args.external_dir else None
