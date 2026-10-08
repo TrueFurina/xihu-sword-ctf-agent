@@ -21,7 +21,18 @@ PR #22 把 9 个**长** task 迁到了可终止的隔离执行（core/skill_pool
 | `_recover_primes_n` | 0.11s | 默认 `max_bytes=200` | 见下|
 
 ⇒ 最坏 0.66s，而迁移一次的 spawn 开销就是 **~0.22s**。
-**迁移它们是纯亏**（付 spawn 换0.4s 的保险），除非耗时真的不可控。
+**迁移它们是纯亏**（付spawn 换0.4s 的保险），除非耗时真的不可控。
+
+> ⚠️ **2026-10-08 更新**：`zip_crypto_bruteforce` 原在本表（当时实测
+> 「最坏 0.44s」⇒ 不迁）**已迁出**。重新实测发现旧参数有**真实盲区**：
+> `max_candidates=20_000` 是全局累计 ⇒ alnum 只能走 2 位
+> ⇒ 3 位以上混合密码完全没覆盖；仓库自带 fixture 的 5 位密码 66688
+> 在旧参数下**解不出**。放宽到 `2_000_000` 后满空间实测 **27.95s**
+> ⇒ 必须换成可终止的隔离执行。
+>
+> **判断标准从来不是「迁移 / 不迁移」，而是「耗时是否可控」**：
+> 毫秒级 ⇒ 留 `to_thread`（省 spawn）；秒级以上 ⇒ 必须可终止。
+> 见 `test_zip_crypto_budget_calibration.py` 的实测与变异验证。
 
 `_recover_primes_n` 的重点
 ---------------------------
@@ -142,10 +153,33 @@ def test_short_tasks_not_migrated_to_spawn():
             f"当前 to_thread 被调者：{sorted(callees)}")
 
 
-def test_zip_crypto_bruteforce_stays_in_thread():
-    """zip_crypto_bruteforce 最坏 0.44s，刻意不迁（PR #19 已实测该数字）。"""
-    assert "_zc_run_with_common" in _to_thread_callees(), (
-        "zip_crypto_bruteforce 应仍在 to_thread（最坏 0.44s，迁移不划算）")
+def test_zip_crypto_bruteforce_now_uses_isolation():
+    """zip_crypto_bruteforce **已迁到隔离执行**（2026-10-08，因预算放宽）。
+
+    ⚠️ 本用例在 PR #23 时是反过来的（断言它「留在 to_thread」，
+    依据是当时实测「最坏 0.44s，迁移只白付 spawn」）。
+    2026-10-08 实测发现旧参数有**真实盲区**：
+      - `max_candidates=20_000` 是全局累计 ⇒ alnum 只能走 2 位
+        ⇒ 3 位以上混合密码完全没覆盖；
+      - 仓库自带 fixture（密码 66688 = 5 位）在旧参数下**解不出**。
+
+    放宽到`max_candidates=2_000_000` 后，满空间实测 **27.95s**
+    ⇒ 此时留在 `to_thread` 就是**制造卡死源**：线程跑到自然结束并占住
+    worker，多题连续触发即耗尽线程池 ⇒ 全链路变慢
+    （与 PR #22 根治的正是这个问题，不该在放宽时重新引入）。
+
+    所以判断标准从来不是「迁移 / 不迁移」，而是「**耗时是否可控**」：
+    毫秒级 ⇒ 留to_thread（省spawn）；秒级以上 ⇒ 必须可终止。
+    详见 `test_zip_crypto_budget_calibration.py` 的实测与变异验证。
+    """
+    src = _src()
+    assert '"core.presolve", "_zc_run_with_common"' in src, (
+        "zip_crypto 应通过 run_skill_isolated 执行（预算已放宽到 ~28s，"
+        "留在 to_thread 会让线程占住 worker 到自然结束）")
+    # 且不得同时出现在 to_thread 列表里
+    assert "_zc_run_with_common" not in _to_thread_callees(), (
+        "_zc_run_with_common 又回到 to_thread 了——28s 预算下不可取消的线程"
+        "会占住 worker 并发传导为全链路变慢")
 
 
 # --------------------------------------------------------------------------

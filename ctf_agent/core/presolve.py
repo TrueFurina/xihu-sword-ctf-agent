@@ -1464,8 +1464,29 @@ _ZIPCRYPTO_COMMON = (
     "letmein", "welcome", "monkey", "dragon", "master", "login",
     "pass", "passwd", "changeme", "secret", "default", "1q2w3e4r",
 )
-_ZIPCRYPTO_MAXLEN = 3          # 实测：max_len=3 时0.2s，=4 时 17s+
-_ZIPCRYPTO_MAX_CAND = 20_000   # 上限双保险（正常远达不到）
+# ⚠️ 这两个参数是**实测校准**的，不是拍脑袋（2026-10-08）。
+# 旧值 max_len=3 / max_candidates=20_000 有**真实盲区**：
+# `max_candidates` 是**全局累计**（skill 里 tried 超过即整体返回失败），
+# 在 digits+lower+alnum 三表下 20_000 只够走到：
+#     digits 1..4位(11,110) + lower 1..3位(18,278) + alnum 1..2位(3,906)
+# ⇒ **3 位以上的 alnum 混合密码根本没被覆盖**。
+#
+# 仓库自带 fixture `tests/fixtures/zipcrypto_66688.zip`（bkcrack 独立 C 实现
+# 造的样本，密码 **66688 = 5 位数字**）在旧参数下**解不出**：
+#     max_len=3, cap=20_000-> 0.30s  ok=False
+#     max_len=5, cap=20_000     -> 0.27s  ok=False   ← 候选不够，仍失败
+#     max_len=5, cap=2_000_000  -> 1.05s  ok=True  pwd=66688
+#
+# 实测速率（真ZipCrypto 包，密码**不在空间内**⇒ 走满全空间）：
+#     max_len=4, cap=20_000    -> 0.28s
+#     max_len=4, cap=2_000_000 -> 27.95s   ⇒ 约 71,500 候选/秒
+_ZIPCRYPTO_MAXLEN = 6       # 6 位：cap 已先于它耗尽，实际由 cap 决定
+_ZIPCRYPTO_MAX_CAND = 2_000_000   # ≈28s 满空间；实测 5 位数字 1.05s命中
+# 墙钟预算按上面速率反推：2e6 候选 ≈ 28s ⇒ 60s 留足spawn 与 IO 余量。
+# ⚠️ 放宽必须配合 `run_skill_isolated`（墙钟到点**真终止**）。
+# 留在 `to_thread` 时 28s 的活会**占住 worker 直到自然结束**，
+# 多题连续触发即耗尽线程池 ⇒ 全链路变慢（见 core/skill_pool.py 根因说明）。
+_ZIPCRYPTO_WALLCLOCK = 60
 
 
 async def _try_zip_crypto_bruteforce(question) -> Optional[str]:
@@ -1476,15 +1497,25 @@ async def _try_zip_crypto_bruteforce(question) -> Optional[str]:
 
     ⚠️ 墙钟纪律（本函数存在的首要理由）：
     `skills/zip_crypto_bruteforce.run()` 是**同步阻塞**实现
-    （`itertools.product` 双层循环），实测：
+    （`itertools.product` 双层循环）。2026-10-08 重新实测（真ZipCrypto 包，
+    密码**刻意不在搜索空间内** ⇒ 走满全空间，这是最坏情况）：
 
-        max_len=3, max_candidates=2e5→ 0.4s
-        max_len=4, max_candidates=5e5      → 17~19s
-        skill默认值 max_len=6 / 5e7        → 分钟级
+        max_len=3, max_candidates=20_000     -> 0.27s
+        max_len=4, max_candidates=20_000     -> 0.28s
+        max_len=4, max_candidates=2_000_000  -> 27.95s   ⇒ 约 71,500 候选/秒
 
-    所以：① 必须 `to_thread` + `wait_for`（裸 ensure_future 会卡死事件循环）；
-          ② 只走内置弱口令表 + 4 位数字（实测带 dict_path 仅 0.02s）；
-          ③ 预筛 encryption flag，非加密 zip 直接跳过，不浪费任何预算。
+    ⚠️ **修正旧注释的错误数字**：先前写「max_len=4 / cap=5e5 → 17~19s」，
+    实测同样是 4 位但 cap=2e6 才是 27.95s ⇒ **耗时几乎只由 cap 决定**，
+    与 max_len 关系不大（旧数据把两者混在一起了）。
+    这正是「数字必须自己实测、不能沿用」的又一处实例。
+
+    三条纪律：
+        ① 必须 `run_skill_isolated`（隔离子进程，墙钟到点**真终止**）。
+           不能用 `to_thread` —— 线程不可取消，28s 的活会占住 worker
+           到自然结束，多题连续触发即耗尽线程池 ⇒ 全链路变慢。
+        ② 先走内置弱口令表（实测 0.02s，命中 `password` 一类），
+           再做空间爆破；两者分工不是二选一。
+        ③ 预筛 encryption flag，非加密 zip 直接跳过，不浪费任何预算。
     """
     attach = _attachments(question)
     zip_attach = [a for a in attach if str(a).lower().endswith(".zip")]
@@ -1510,7 +1541,6 @@ async def _try_zip_crypto_bruteforce(question) -> Optional[str]:
             logger.debug("[presolve:zip_crypto] %s 非有效 zip: %s", p, exc)
             continue
 
-        # 极小空间 + 线程 + 超时兜底
         params = {
             "zip_path": p,
             "max_len": _ZIPCRYPTO_MAXLEN,
@@ -1518,13 +1548,15 @@ async def _try_zip_crypto_bruteforce(question) -> Optional[str]:
             "charsets": ["digits", "lower", "alnum"],
         }
         try:
-            res = await asyncio.wait_for(
-                asyncio.to_thread(_zc_run_with_common, zc_run, params,
-                                  _ZIPCRYPTO_COMMON),
-                timeout=20,
-            )
-        except asyncio.TimeoutError:
-            logger.debug("[presolve:zip_crypto] %s 超时 20s，跳过", p)
+            # 隔离执行：预算已放宽到 ~28s（cap=2e6），留在 to_thread 会让
+            # 线程跑到自然结束并占住 worker ⇒ 墙钟到点**真终止**子进程。
+            res = await run_skill_isolated(
+                "core.presolve", "_zc_run_with_common",
+                args=(params, _ZIPCRYPTO_COMMON),
+                timeout=_ZIPCRYPTO_WALLCLOCK)
+        except SkillTimeout:
+            logger.info("[presolve:zip_crypto] %s 超时 %ds，子进程已终止",
+                        p, _ZIPCRYPTO_WALLCLOCK)
             continue
         except Exception as exc:  # noqa: BLE001
             logger.debug("[presolve:zip_crypto] %s 异常: %s", p, exc)
@@ -1538,25 +1570,44 @@ async def _try_zip_crypto_bruteforce(question) -> Optional[str]:
     return None
 
 
-def _zc_run_with_common(run_fn, params, common):
-    """先试内置弱口令表，再做极小空间暴力。
+def _zc_run_with_common(params: dict, common: tuple):
+    """先试内置弱口令表，再做空间爆破（**模块级函数**，可跨进程按名定位）。
 
     ⚠️ 契约说明：`skills/zip_crypto_bruteforce.run()` 的入参**只认**
     `zip_path / entry / dict_path / charsets / min_len / max_len / max_candidates`
-    —— **没有**「单密码直试」这种入口（我第一版臆造了 `_single_password`，
+    —— **没有**「单密码直试」这种入口（第一版臆造了 `_single_password`，
     被契约自核查出来）。所以弱口令表必须落成一个临时字典文件走 `dict_path`。
 
-    拆成独立函数是为了能被 `asyncio.to_thread` 直接投递（必须是可调用对象，
-    不能是 coroutine），也便于测试时替换 run_fn。
+    **为什么必须是模块级且自己 import skill**
+    ------------------------------
+    本函数现在要交给 `run_skill_isolated`（spawn 子进程）执行，而 spawn 按
+    `模块名 + 限定名` 重新定位被调函数：
+    - 若是闭包（第一版捕获了外层 `zc_run`）⇒ **无法 pickle**；
+    - 若直接提交 `skills.zip_crypto_bruteforce.run` ⇒ Windows spawn 报
+      `module '__mp_main__' has no attribute 'run'`（实测踩过）。
+    所以形如 `core.presolve._zc_run_with_common` 的**模块级函数**是唯一可行形态，
+    skill 的 import 必须挪进函数体内部。
+
+    实测（本机，真ZipCrypto fixture）：
+      弱口令命中 `password` 之类→ 0.02s；
+      空间爆破 5 位数字 66688 → 1.05s（cap=2e6）；
+      满空间走满 cap=2e6 → 27.95s。
     """
     import tempfile
+
+    try:
+        from skills.zip_crypto_bruteforce import run as run_fn
+    except Exception:  # noqa: BLE001
+        return None
+
     d = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
                                     encoding="utf-8", errors="ignore")
     try:
         d.write(chr(10).join(common) + chr(10))
         d.close()
-        # 第1 轮：内置弱口令表（实测 0.02s，走 dict_path 不做空间爆破）
-        r = run_fn(dict(params, dict_path=d.name, max_candidates=len(common) + 8))
+        # 第 1 轮：内置弱口令表（实测 0.02s，走 dict_path 不做空间爆破）
+        r = run_fn(dict(params, dict_path=d.name,
+                        max_candidates=len(common) + 8))
         if isinstance(r, dict) and r.get("ok") and r.get("flag"):
             return r
     finally:
@@ -1564,7 +1615,7 @@ def _zc_run_with_common(run_fn, params, common):
             os.unlink(d.name)
         except OSError:
             pass
-    # 第 2 轮：极小空间暴力（max_len=3 / 2e4 上限 ⇒ 实测 0.2~0.4s）
+    # 第 2 轮：空间爆破（预算见 _ZIPCRYPTO_MAX_CAND 的实测校准注释）
     return run_fn(params)
 
 
