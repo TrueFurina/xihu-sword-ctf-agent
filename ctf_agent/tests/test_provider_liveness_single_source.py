@@ -20,7 +20,7 @@ B. **源码级**：生产文件里不得出现手写存活声明。用 AST + tok
 
 诚实边界
 --------
-- 源码扫描是**词表匹配**，不是语义理解：换个没进词表的说法（「稳定 beberapa 周」）
+- 源码扫描是**词表匹配**，不是语义理解：换个没进词表的说法（「这几个源还能打」）
   它抓不到。它守的是「历史上反复犯的那一类措辞」，不是所有虚假陈述。
 - 因此配 `TestScannerSelfCheck`：**用合成源码证明扫描器会响**。B 类护栏在真实仓库
   上恒为「当前 0 命中」，不配合成自检的话，把词表清空也没人会发现。
@@ -251,45 +251,45 @@ class TestNoHandwrittenLiveness:
 class TestScannerSelfCheck:
     """合成源码自检：证明扫描器不是空壳。
 
-    B 类护栏在真实仓库上恒为「0 命中」——这种护栏的真实分枝永远跑不到，
-    把词表清空或把正则写反都照样绿。必须用合成数据把两条规则都点亮一次。
+    B 类护栏在真实仓库上恒为「0 命中」——这种护栏的真实分枝永远跑不到，把词表
+    清空、把某条规则删掉、把正则写反，真实数据上的用例全都照样绿。**唯一能抓住
+    弱化型变异体的就是合成数据**。
+
+    ⚠️ 关键约束（本轮变异测试 M7 暴露）：**自检必须穿透唯一入口 `scan_repo_violations`**。
+    初版自检在用例里把「读注释 + 匹配词表」重写了一遍——结果把扫描器的 B 规则整条
+    删掉后，14 个用例全绿。那是**模仿实现，不是测试守卫**——它验证的是自己的副本，
+    不是生产路径。现改为构造合成仓库后调用同一入口。
     """
 
+    @staticmethod
+    def _scan_synthetic(tmp_path, filename: str, source: str):
+        """把合成源码写进临时「仓库」，走与真实扫描完全相同的路径。"""
+        (tmp_path / filename).write_text(source, encoding="utf-8")
+        return scan_repo_violations(root=tmp_path, files=[filename])
+
     def test_detects_comment_claim(self, tmp_path):
-        bad = tmp_path / "evil.py"
-        bad.write_text(
+        hits = self._scan_synthetic(
+            tmp_path, "evil.py",
             "# -*- coding: utf-8 -*-\n"
-            "X = 1  # 改用实测存活源（glm 主 + ark 备用）\n",
-            encoding="utf-8")
-        hits = []
-        for line in _comment_lines(bad):
-            if any(ph in line for ph in LIVENESS_PHRASES) and _PROVIDER_RE.search(line):
-                hits.append(line)
-        assert hits, "合成的手写存活声明未被扫描器发现——护栏为空壳"
+            "X = 1  # 改用实测存活源（glm 主 + ark 备用）\n")
+        assert any(kind == "comment" for _, kind, _ in hits), \
+            "合成的手写存活声明未被扫描器发现——护栏为空壳"
 
     def test_detects_string_claim(self, tmp_path):
-        bad = tmp_path / "evil2.py"
-        bad.write_text(
-            'LABEL = "ultra(11路实测存活: 千帆+智谱+讯飞)"\n',
-            encoding="utf-8")
-        strs = _string_constants(bad)
-        assert any(ph in s for s in strs for ph in LIVENESS_PHRASES), \
+        hits = self._scan_synthetic(
+            tmp_path, "evil2.py",
+            'LABEL = "ultra(11路实测存活: 千帆+智谱+讯飞)"\n')
+        assert any(kind == "string" for _, kind, _ in hits), \
             "合成的字符串常量存活声明未被扫描器发现——护栏为空壳"
 
     def test_ignores_neutral_narrative(self, tmp_path):
         """反向自检：「HTTP 200 但业务码非 00000」这类状态码叙述不该被判违规，
         否则护栏天天假红，最终会被人整段注释掉。"""
-        good = tmp_path / "ok.py"
-        good.write_text(
+        hits = self._scan_synthetic(
+            tmp_path, "ok.py",
             "# ① 先打原始请求校验业务码：HTTP 200 但业务码非 00000 仍属失败\n"
-            "MSG = 'quota exceeded 402 / forbidden 403 / rate limited 429'\n",
-            encoding="utf-8")
-        hits = []
-        for line in _comment_lines(good):
-            if any(ph in line for ph in LIVENESS_PHRASES) and _PROVIDER_RE.search(line):
-                hits.append(line)
-        strs = _string_constants(good)
-        assert not hits and not any(ph in s for s in strs for ph in LIVENESS_PHRASES)
+            "MSG = 'quota exceeded 402 / forbidden 403 / rate limited 429'\n")
+        assert hits == [], f"中性叙述被误判为违规（护栏会天天假红）: {hits}"
 
 
 if __name__ == "__main__":
