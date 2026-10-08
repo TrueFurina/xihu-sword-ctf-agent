@@ -1,0 +1,101 @@
+--- a/bkcrack-1.6.1/src/Attack.cpp
++++ b/bkcrack-1.6.1/src/Attack.cpp
+@@ -6,6 +6,11 @@
+ #include <algorithm>
+ #include <atomic>
+ #include <thread>
++#include <cstring>
++
++extern char second_ciphertext[16];
++extern char second_plaintext[5];
++extern bool g_second_file;
+ 
+ Attack::Attack(const Data& data, std::size_t index, std::vector<Keys>& solutions, std::mutex& solutionsMutex, bool exhaustive, Progress& progress)
+  : data(data), index(index + 1 - Attack::CONTIGUOUS_SIZE), solutions(solutions), solutionsMutex(solutionsMutex), exhaustive(exhaustive), progress(progress)
+@@ -160,6 +165,21 @@
+ 
+     // all tests passed so the keys are found
+ 
++    // the keys seem correct based on eight contiguous bytes, now check the second file
++    if(g_second_file)
++    {
++        Keys keysTest(keysBackward.getX(), keysBackward.getY(), keysBackward.getZ());
++        char poss_plaintext[16];
++        for (int i = 0; i < 16; ++i)
++        {
++            char p = static_cast<char>(second_ciphertext[i] ^ keysTest.getK());
++            poss_plaintext[i] = p;
++            keysTest.update(static_cast<byte>(p));
++        }
++        if (memcmp(poss_plaintext + 11, second_plaintext, 5) != 0)
++            return;
++    }
++
+     // get the keys associated with the initial state
+     keysBackward.updateBackward(data.ciphertext, indexBackward, 0);
+ 
+--- a/bkcrack-1.6.1/src/Data.cpp
++++ b/bkcrack-1.6.1/src/Data.cpp
+@@ -141,8 +141,10 @@
+     // check that there is enough known plaintext
+     if(plaintext.size() < Attack::CONTIGUOUS_SIZE)
+         throw Error("not enough contiguous plaintext ("+std::to_string(plaintext.size())+" bytes available, minimum is "+std::to_string(Attack::CONTIGUOUS_SIZE)+")");
++#if 0
+     if(plaintext.size() + extraPlaintext.size() < Attack::ATTACK_SIZE)
+         throw Error("not enough plaintext ("+std::to_string(plaintext.size() + extraPlaintext.size())+" bytes available, minimum is "+std::to_string(Attack::ATTACK_SIZE)+")");
++#endif
+ 
+     // reorder remaining extra plaintext for filtering
+     {
+--- a/bkcrack-1.6.1/src/main.cpp
++++ b/bkcrack-1.6.1/src/main.cpp
+@@ -13,6 +13,13 @@
+ #include <cassert>
+ #include <iomanip>
+ #include <limits>
++#include <cstdio>
++
++#define SECOND_CIPHERTEXT_FILENAME "second_ciphertext"
++#define SECOND_PLAINTEXT_FILENAME "second_plaintext"
++char second_ciphertext[16];
++char second_plaintext[5];
++bool g_second_file = false;
+ 
+ namespace
+ {
+@@ -106,6 +113,35 @@
+ {
+     // enable virtual terminal support on Windows, no-op on other platforms
+     VirtualTerminalSupport vtSupport;
++
++    // read in second ciphertext and second plaintext if present (ziphhard cross-file filter)
++    {
++        FILE *fp = fopen(SECOND_CIPHERTEXT_FILENAME, "rb");
++        if (fp)
++        {
++            fseek(fp, 0L, SEEK_END);
++            long sz = ftell(fp);
++            fseek(fp, 0L, SEEK_SET);
++            if (sz == 16 && fread(second_ciphertext, 1, 16, fp) == 16)
++            {
++                fclose(fp);
++                fp = fopen(SECOND_PLAINTEXT_FILENAME, "rb");
++                if (fp)
++                {
++                    fseek(fp, 0L, SEEK_END);
++                    long psz = ftell(fp);
++                    fseek(fp, 0L, SEEK_SET);
++                    if (psz == 5 && fread(second_plaintext, 1, 5, fp) == 5)
++                        g_second_file = true;
++                    fclose(fp);
++                }
++            }
++            else
++                fclose(fp);
++        }
++        if (g_second_file)
++            std::cout << "second-file cross-filter enabled" << std::endl;
++    }
+ 
+     // version information
+     std::cout << "bkcrack " BKCRACK_VERSION " - " BKCRACK_VERSION_DATE << std::endl;
