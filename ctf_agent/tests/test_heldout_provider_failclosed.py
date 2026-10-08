@@ -24,41 +24,107 @@ r"""held-out 跑批入口的 fail-closed 护栏（2026-10-08，P0-4 收口）。
 - **不内置 provider 死活清单**。可用性随余额/欠费/平台策略变化，
   手写黑白名单会漂移成**新的假水位**——这正是本项目反复整治的靶子。
   实现里改为指向既有机器实探 `scripts/_preflight_env.py`，此处只保证该提示存在。
-- 覆盖率解析抽成**纯函数** `refuse_reason(args)`：让「是否该拦截」可以脱离
-  真实题库被检验（真题库路径本身较贵，且不应在测试里跑选题）。
 
-变异验证（已做，结果如实记录）
+🔴 2026-10-08 二次收口：判定式搬回生产（project memory ㉚ 同型缺陷）
+────────────────────────────────────────────────────────
+初版把 fail-closed 判定在**本文件**里抄了一份 `refuse_reason()`，理由是「让测试覆盖
+行为而不只是源码文本」。动机正当，后果是**护栏看不见生产侧的漂移**：已实测，把生产
+`main()` 里的 `not args.mock` 摘掉（`--run --mock` 冒烟也被拦——非常符合本仓「再紧一档」
+习惯的改动），本测套仍 **7 passed**。模仿实现的自检验证的是自己那份副本，不是被测入口。
+
+处置：
+  1. 生产抽出 `benchmark_heldout.should_refuse(args) -> str | None`，`main()` 改为调用它；
+     本文件删除本地副本，全部断言打在这一个函数上。
+  2. 新增源码级不变式 `test_main_uses_the_shared_predicate`：用 AST 确认 `main()` 里确有
+     对 `should_refuse` 的调用——防止日后有人把判定重新内联回去，护栏再次退化成读副本。
+  3. 未知原因码由 `refusal_text()` fail-closed 处理（认不出就拒绝放行，不得静默通过）。
+
+变异验证（两轮，结果如实记录）
 ────────────────────────────
-  M1  默认 provider 改回写死 "baidu"  → **1 failed**（`test_provider_default_is_not_baidu`）
-  M2  删掉 fail-closed 守卫           → **2 failed**（CLI 端到端 + `refuse_reason` 用例）
-  M3  `refuse_reason` 恒返回 None     → **2 failed**，且由**合成自检**抓住（真数据的
-      「不拦」路径单独看是正确行为，削弱後只有合成用例能发现问题）。
+修之前（生产漂移不可见）：
+  漂移  生产守卫去掉 `not args.mock`  → **7 passed**（护栏完全没看见，即本次所补之洞）
+修之后（同一漂移重跑）：
+  漂移  生产守卫去掉 `not args.mock`  → **2 failed**（`test_mock_run_needs_no_provider`
+        + `test_all_four_quadrants`）——同样的改动，只是换谁来判定，结论就从绿变红。
+  M1   `should_refuse` 恒返回 None     → 3 failed（CLI 端到端 + 两个合成象限）
+  M2   AST 不变式改为恒通过            → 1 failed（合成自检抓住；真实数据上该分支恒绿）
 """
 
 from __future__ import annotations
 
+import ast
 import os
 import sys
 import unittest
 from argparse import Namespace
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts import benchmark_heldout as bh  # noqa: E402
+
+_BH_SRC = Path(bh.__file__).resolve()
+
+
+def predicate(args):
+    """唯一判定的入口：**直接调生产函数**。
+
+    本文件此前自持一份副本；那份副本与生产漂移时不会有任何用例变红（已实测 7 passed
+    看不见生产把 `--run --mock` 一并拦掉）。现在这里只做转发，不做重述。
+    """
+    return bh.should_refuse(args)
 
 
 def make_args(run=False, mock=False, provider=None):
     return Namespace(run=run, mock=mock, provider=provider)
 
 
-def refuse_reason(args) -> str or None:
-    """纯函数：判断是否应拒绝启动。返回拒绝原因，None = 放行。
+class TestSharedPredicateWiring(unittest.TestCase):
+    """源码级不变式：`main()` 必须真的调用共享判定函数。
 
-    与实现中的守卫保持同一判定式；独立重述是为了让测试能覆盖**行为**而不只是源码文本。
+    这条防的是「把判定重新内联回 main()」——一旦内联，所有行为用例就只能再抄一份副本，
+    护栏立刻退化成本文件自我印证。AST 断言比 grep 稳：docstring / 注释里也写着
+    `should_refuse` 字样，文本匹配会恒绿。
     """
-    if args.run and not args.mock and not args.provider:
-        return "no-provider"
-    return None
+
+    def test_main_uses_the_shared_predicate(self):
+        tree = ast.parse(_BH_SRC.read_text(encoding="utf-8"))
+        mains = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main"]
+        self.assertTrue(mains, "benchmark_heldout.py 里找不到 main()")
+        calls = {n.func.id for n in ast.walk(mains[0])
+                 if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+        self.assertIn("should_refuse", calls,
+                      "main() 不再调用 should_refuse()——判定被内联了？"
+                      "那会让本测套重新变成验证自己的副本（project memory ㉚）")
+
+    def test_no_second_predicate_in_tests(self):
+        """本文件不得再生第二份判定式（副本就是漂移的温床）。"""
+        own = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+        banned = {"refuse_reason"}
+        defined = {n.name for n in own.body if isinstance(n, ast.FunctionDef)}
+        self.assertFalse(defined & banned,
+                         f"本文件又出现了本地判定副本: {sorted(defined & banned)}")
+
+    def test_invariant_detector_is_not_trivially_true(self):
+        """AST 检测器自身的合成自检：给一份「未调用」的源码也必须给出否定结论。
+
+        不配合成数据，把断言写成 `assertIn(..., calls or ["should_refuse"])` 这类恒真式
+        也不会变红（project memory ⑳/M2：当前自洽的护栏，弱化型变异体必然存活）。
+        """
+        self.assertTrue(_main_calls_predicate('def main():\n    return 0\n') is False)
+        self.assertTrue(_main_calls_predicate('def main():\n    return should_refuse(a)\n')
+                        is True)
+
+
+def _main_calls_predicate(src: str) -> bool:
+    """从源码文本判断 main() 是否调用 should_refuse（供自检复用的同一判定逻辑）。"""
+    tree = ast.parse(src)
+    mains = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main"]
+    if not mains:
+        return False
+    calls = {n.func.id for n in ast.walk(mains[0])
+             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+    return "should_refuse" in calls
 
 
 class TestProviderFailClosed(unittest.TestCase):
@@ -107,13 +173,17 @@ class TestProviderFailClosed(unittest.TestCase):
         self.assertEqual([], called, "拒绝前不应产生任何副作用（select/write/run 均无）")
 
     def test_mock_run_needs_no_provider(self):
-        """冒烟路径无需 provider，不得被误拦。"""
-        self.assertIsNone(refuse_reason(make_args(run=True, mock=True, provider=None)))
+        """冒烟路径无需 provider，不得被误拦。
+
+        这条正是「生产把 `not args.mock` 摘掉」时唯一会红的用例——而在把判定搬回生产
+        之前，它验证的是本文件的副本，生产同样的漂移完全看不见（7 passed）。
+        """
+        self.assertIsNone(predicate(make_args(run=True, mock=True, provider=None)))
 
     def test_select_only_is_not_blocked(self):
         """只选题不构成真跑，不得被拦。"""
-        self.assertIsNone(refuse_reason(make_args(run=False, mock=False, provider=None)))
-        self.assertIsNone(refuse_reason(make_args(run=True, mock=False, provider="glm")))
+        self.assertIsNone(predicate(make_args(run=False, mock=False, provider=None)))
+        self.assertIsNone(predicate(make_args(run=True, mock=False, provider="glm")))
 
     def test_env_var_supplies_provider(self):
         """环境变量可作为 provider 来源（保留既有惯例）。"""
@@ -123,7 +193,12 @@ class TestProviderFailClosed(unittest.TestCase):
 
 
 class TestRefuseReasonSelfCheck(unittest.TestCase):
-    """合成自检：四象限全覆盖，防止 `refuse_reason` 被削弱后仍全绿。"""
+    """合成自检：四象限全覆盖 + 未知原因码 fail-closed。
+
+    与上一版的差别：**这里跑的是生产函数 `should_refuse`，不是本文件的副本**。
+    副本型自检在本轮已被证明形同虚设——生产 float drift（去掉 `not args.mock`）时，
+    验证副本的 7 个用例一个都没红。
+    """
 
     def test_all_four_quadrants(self):
         table = [
@@ -133,12 +208,20 @@ class TestRefuseReasonSelfCheck(unittest.TestCase):
             ("未要求跑", make_args(run=False, mock=False, provider=None), None),
         ]
         for label, args, want in table:
-            self.assertEqual(want, refuse_reason(args), "象限错误：%s" % label)
+            self.assertEqual(want, predicate(args), "象限错误：%s" % label)
 
     def test_detector_not_trivially_empty(self):
-        """反向自检：检测器确有检出能力（M3 的杀法）。"""
+        """反向自检：检测器确有检出能力（M1 的杀法）。"""
         self.assertEqual("no-provider",
-                         refuse_reason(make_args(run=True, mock=False, provider=None)))
+                         predicate(make_args(run=True, mock=False, provider=None)))
+
+    def test_unknown_reason_code_is_refused_loudly(self):
+        """认不出的原因码必须拒绝放行而非静默通过（fail-closed）。"""
+        lines = bh.refusal_text("some-unknown-code")
+        self.assertTrue(lines and all(isinstance(x, str) for x in lines))
+        joined = "\n".join(lines)
+        self.assertIn("拒绝放行", joined)
+        self.assertNotIn("None", joined[:20])
 
 
 if __name__ == "__main__":
