@@ -5,7 +5,8 @@
   `flag_matches` 原实现把分支 gate 在 `flag_is_placeholder`（要求 `flag` 字段**本身**
   是 sha256 串）。于是合法形态「`flag=None` + 只有 `flag_sha256`」落进明文分支、
   与 `None` 比对 → **恒 False**。而 `run.py:387` 生产判分正走此路径 ⇒ 该形态的任何
-  正确答案被自己的验证器判 `hallucination`。全库形态实测 `(None,set)=79` 题受影响。
+  正确答案被自己的验证器判 `hallucination`。全库去重实测 `(None,set)=40` 题受影响
+  （初稿记 79：把派生副本 heldout_run 与源库 questions_external 重复计入）。
 
 本测试锁两条：
   A. 三种形态各自正确（正确候选 True / 错误候选 False）；
