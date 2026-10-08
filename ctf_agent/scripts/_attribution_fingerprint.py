@@ -12,6 +12,8 @@
 - LLM 全链路经验下限 LLM_FLOOR_MS=5000：真实 LLM 至少一次 API 往返
   （M2/NYU 实测 8.3s 起；亚 5s 解出与 LLM 决策链路不符）。
 - 解出但无 token 计费（tokens/total_tokens 缺失）= 无任何 LLM 调用证据。
+  schema 感知：报告整体无 token 字段（09-19 旧格式）时该判据不启用，
+  避免对旧报告的合理 LLM 时长误报。
 - 归因字段优先级：item.solved_by / item.method > 报告级 mode。
 - 未解出条目永不判疑（0/N 结论不依赖归因，天然安全）。
 
@@ -39,18 +41,34 @@ def _attributed_to_llm(item: dict[str, Any], report_mode: str) -> bool:
 
 
 def _tokens_recorded(item: dict[str, Any]) -> bool:
-    """是否有任何 token 计费证据。"""
-    return item.get("tokens") is not None or item.get("total_tokens") is not None
+    """是否有 token 计费证据：任一 token 类字段带 >0 的计费值。
+
+    tokens=0 / None / 缺失都算无证据——真实 LLM 调用必然计费 >0
+    （雷 0 实证：假 LLM 解出 tokens=0）。
+    """
+    for k, v in item.items():
+        if "token" in str(k).lower() and isinstance(v, (int, float)) and v > 0:
+            return True
+    return False
 
 
 def audit_report(report: dict[str, Any], llm_floor_ms: int = LLM_FLOOR_MS) -> list[dict[str, Any]]:
     """返回可疑归因列表；空列表 = 干净。
 
     每个可疑项：{id, duration_ms, tokens_recorded, attributed_via, reason}。
+
+    schema 感知（2026-10-08 全库扫史修正）：09-19 时代的报告整个 schema
+    都没有 token 字段，对所有条目报「无 token 证据」是误报——31s/79s/96s
+    的解出时长完全可能是真 LLM。因此：仅当报告中**任一**条目带 token 类
+    字段时，才对无 token 的条目使用该判据；旧 schema 只按时长判。
     """
     mode = str(report.get("mode", ""))
+    results = report.get("results", []) or []
+    schema_records_tokens = any(
+        any("token" in str(k).lower() for k in item) for item in results if isinstance(item, dict)
+    )
     suspects: list[dict[str, Any]] = []
-    for item in report.get("results", []) or []:
+    for item in results:
         if not item.get("solved"):
             continue
         if not _attributed_to_llm(item, mode):
@@ -61,7 +79,7 @@ def audit_report(report: dict[str, Any], llm_floor_ms: int = LLM_FLOOR_MS) -> li
             reasons.append("无解出时长证据")
         elif dur < llm_floor_ms:
             reasons.append(f"解出时长 {dur}ms < LLM 全链路经验下限 {llm_floor_ms}ms")
-        if not _tokens_recorded(item):
+        if schema_records_tokens and not _tokens_recorded(item):
             reasons.append("无 token 计费证据（无 LLM 调用凭证）")
         if reasons:
             suspects.append(
