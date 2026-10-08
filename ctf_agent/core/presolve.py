@@ -28,7 +28,24 @@ import os
 import re
 from typing import Optional
 
+from core.skill_pool import SkillTimeout, run_skill_isolated
+
 logger = logging.getLogger(__name__)
+
+# 长耗时 task 的墙钟预算（秒）。这些 task 由 presolve 以 fire-and-forget 方式并发触发，
+# 历史上用 `asyncio.to_thread` + `wait_for` 兜超时——但**线程不可取消**，超时后线程仍跑到
+# 自然结束并占住默认 executor 的 worker；worker 占满会让后续 `to_thread` 的提交动作本身
+# 阻塞，「不等 task 就返回」的安全阀随之失效（详见 core/skill_pool.py 的根因说明）。
+# 现统一改为 `run_skill_isolated`：每次调用独占一个子进程，墙钟到点**真终止**。
+WALLCLOCK_PCAP = 120
+WALLCLOCK_MBR = 60
+WALLCLOCK_MHK = 600
+WALLCLOCK_PRIMES = 180
+WALLCLOCK_CYCLING = 120
+WALLCLOCK_EMCLS = 120
+WALLCLOCK_LCG = 120
+WALLCLOCK_SVG = 60
+WALLCLOCK_BANANA = 60
 
 _PRESOLVE_ATTEMPTED = "_presolve_attempted"
 _PRESOLVE_CANDIDATES = "_presolve_candidates"  # 2026-08-22 锐评：多候选提取透传（提交迭代用）
@@ -1999,14 +2016,12 @@ async def _try_svg_path_text(question) -> Optional[str]:
             except Exception:  # noqa: BLE001
                 continue
         try:
-            res = await asyncio.wait_for(
-                asyncio.to_thread(svg_run, {"raw": raw}),
-                timeout=60,
-            )
-        except asyncio.TimeoutError:
-            # ⚠️ asyncio.to_thread 不可取消：本超时只让调用方不再等待，
-            #    底层线程仍跑到自然结束（根治需迁 ProcessPoolExecutor）。
-            logger.info("[presolve:svg_path_text] %s 超时 60s，跳过", p)
+            res = await run_skill_isolated(
+                "skills.svg_path_text", "run",
+                args=({"raw": raw},), timeout=WALLCLOCK_SVG)
+        except SkillTimeout:
+            logger.info("[presolve:svg_path_text] %s 超时 %ds，子进程已终止",
+                        p, WALLCLOCK_SVG)
             continue
         except Exception as exc:  # noqa: BLE001
             logger.debug("[presolve:svg_path_text] %s 异常: %s", p, exc)
@@ -2097,7 +2112,11 @@ async def _try_pcap_http_carve(question) -> Optional[str]:
     if not attach:
         return None
     try:
-        from skills.pcap_http_carve import run as pcap_run
+        # 保留 import 只为「早期失败检测」：迁移后真正执行走的是
+        # run_skill_isolated 里的字符串模块名，本地 import 已不参与调用。
+        # 但它能在缺 skill / 语法错误时立刻 warning，
+        # 而不必等到起子进程才以 ModuleNotFoundError 静默返回 None。
+        from skills.pcap_http_carve import run as pcap_run  # noqa: F401
     except Exception as exc:  # noqa: BLE001
         _warn_import_once("skills.pcap_http_carve", exc)
         return None
@@ -2115,14 +2134,14 @@ async def _try_pcap_http_carve(question) -> Optional[str]:
                        b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d"):
             continue
         try:
-            res = await asyncio.wait_for(
-                asyncio.to_thread(pcap_run, {"path": p}),
-                timeout=120,
-            )
-        except asyncio.TimeoutError:
-            # ⚠️ asyncio.to_thread 不可取消：本超时只让调用方不再等待，
-            #    底层线程仍跑到自然结束（根治需迁 ProcessPoolExecutor）。
-            logger.info("[presolve:pcap_http_carve] %s 超时 120s，跳过", p)
+            # 隔离执行：墙钟到点**真终止子进程**（to_thread 的线程杀不掉，
+            # 会一直占住默认 executor 的 worker，见 core/skill_pool.py）
+            res = await run_skill_isolated(
+                "skills.pcap_http_carve", "run",
+                args=({"path": p},), timeout=WALLCLOCK_PCAP)
+        except SkillTimeout:
+            logger.info("[presolve:pcap_http_carve] %s 超时 %ds，子进程已终止",
+                        p, WALLCLOCK_PCAP)
             continue
         except Exception as exc:  # noqa: BLE001
             logger.debug("[presolve:pcap_http_carve] %s 异常: %s", p, exc)
@@ -2186,14 +2205,12 @@ async def _try_banana_script(question) -> Optional[str]:
         if not _is_banana(head):
             continue
         try:
-            res = await asyncio.wait_for(
-                asyncio.to_thread(banana_run, {"path": p}),
-                timeout=60,
-            )
-        except asyncio.TimeoutError:
-            # ⚠️ asyncio.to_thread 不可取消：本超时只让调用方不再等待，
-            #    底层线程仍跑到自然结束（根治需迁 ProcessPoolExecutor）。
-            logger.info("[presolve:banana_script] %s 超时 60s，跳过", p)
+            res = await run_skill_isolated(
+                "skills.banana_script", "run",
+                args=({"path": p},), timeout=WALLCLOCK_BANANA)
+        except SkillTimeout:
+            logger.info("[presolve:banana_script] %s 超时 %ds，子进程已终止",
+                        p, WALLCLOCK_BANANA)
             continue
         except Exception as exc:  # noqa: BLE001
             logger.debug("[presolve:banana_script] %s 异常: %s", p, exc)
@@ -2374,14 +2391,12 @@ async def _try_mbr_sse_verify(question) -> Optional[str]:
         if not _is_mbr(raw):
             continue
         try:
-            res = await asyncio.wait_for(
-                asyncio.to_thread(mbr_run, {"path": p}),
-                timeout=60,
-            )
-        except asyncio.TimeoutError:
-            # ⚠️ asyncio.to_thread 不可取消：本超时只让调用方不再等待，
-            #    底层线程仍跑到自然结束（根治需迁 ProcessPoolExecutor）。
-            logger.info("[presolve:mbr_sse_verify] %s 超时 60s，跳过", p)
+            res = await run_skill_isolated(
+                "skills.mbr_sse_verify", "run",
+                args=({"path": p},), timeout=WALLCLOCK_MBR)
+        except SkillTimeout:
+            logger.info("[presolve:mbr_sse_verify] %s 超时 %ds，子进程已终止",
+                        p, WALLCLOCK_MBR)
             continue
         except Exception as exc:  # noqa: BLE001
             logger.debug("[presolve:mbr_sse_verify] %s 异常: %s", p, exc)
@@ -2530,9 +2545,15 @@ async def _try_knapsack_mhk(question) -> Optional[str]:
     logger.info("[presolve:knapsack_mhk] %s 识别出 MHK2 公钥 n=%d，密文 %d 组",
                 getattr(question, "id", "?"), len(pk["a1"]), len(ct))
     try:
-        res = await asyncio.wait_for(
-            asyncio.to_thread(mhk_run, {"kind": "mhk2_decrypt", "pk": pk, "ct": ct}),
-            timeout=600)
+        res = await run_skill_isolated(
+            "skills.crypto_knapsack_mhk", "run",
+            args=({"kind": "mhk2_decrypt", "pk": pk, "ct": ct},),
+            timeout=WALLCLOCK_MHK,
+        )
+    except SkillTimeout:
+        logger.info("[presolve:knapsack_mhk] %s 超时 %ds，子进程已终止",
+                    getattr(question, "id", "?"), WALLCLOCK_MHK)
+        return None
     except Exception as exc:  # noqa: BLE001
         logger.debug("[presolve:knapsack_mhk] %s 攻击异常: %s",
                      getattr(question, "id", "?"), exc)
@@ -2613,9 +2634,14 @@ async def _try_crypto_primes(question) -> Optional[str]:
     logger.info("[presolve:crypto_primes] %s 反解 n=%d r=%d，开始 Coppersmith",
                 getattr(question, "id", "?"), n, r)
     try:
-        from core.coppersmith import solve_primes
-        msg = await asyncio.wait_for(
-            asyncio.to_thread(solve_primes, q, x, n, r), timeout=180)
+        from core.coppersmith import solve_primes  # noqa: F401
+        msg = await run_skill_isolated(
+            "core.coppersmith", "solve_primes", args=(q, x, n, r),
+            timeout=WALLCLOCK_PRIMES)
+    except SkillTimeout:
+        logger.info("[presolve:crypto_primes] %s 超时 %ds，子进程已终止",
+                    getattr(question, "id", "?"), WALLCLOCK_PRIMES)
+        return None
     except Exception as exc:  # noqa: BLE001
         logger.debug("[presolve:crypto_primes] %s 求解异常: %s",
                      getattr(question, "id", "?"), exc)
@@ -2688,9 +2714,14 @@ async def _try_cycling(question) -> Optional[str]:
     logger.info("[presolve:cycling] %s 识别出 e=%d n=%dbit ct=%dbit，开始 cycling attack",
                 getattr(question, "id", "?"), e, n.bit_length(), ct.bit_length())
     try:
-        from skills.crypto_cycling import solve as _cyc_solve
-        _, flag_bytes = await asyncio.wait_for(
-            asyncio.to_thread(_cyc_solve, e, n, ct), timeout=120)
+        from skills.crypto_cycling import solve as _cyc_solve  # noqa: F401
+        _, flag_bytes = await run_skill_isolated(
+            "skills.crypto_cycling", "solve", args=(e, n, ct),
+            timeout=WALLCLOCK_CYCLING)
+    except SkillTimeout:
+        logger.info("[presolve:cycling] %s 超时 %ds，子进程已终止",
+                    getattr(question, "id", "?"), WALLCLOCK_CYCLING)
+        return None
     except Exception as exc:  # noqa: BLE001
         logger.debug("[presolve:cycling] %s 求解异常: %s",
                      getattr(question, "id", "?"), exc)
@@ -2742,15 +2773,17 @@ async def _try_electric_mayhem_cls(question) -> Optional[str]:
     logger.info("[presolve:emcls] %s 发现轨迹附件 %s，开始 CPA", qid, cand)
     try:
         from skills.crypto_electric_mayhem_cls import (
-            crypto_electric_mayhem_cls as _em_solve,
+            crypto_electric_mayhem_cls as _em_solve,  # noqa: F401
         )
-        res = await asyncio.wait_for(
-            asyncio.to_thread(
-                _em_solve,
-                {"kind": "file", "path": cand, "expected_sha": expected},
-            ),
-            timeout=120,
+        res = await run_skill_isolated(
+            "skills.crypto_electric_mayhem_cls", "crypto_electric_mayhem_cls",
+            args=({"kind": "file", "path": cand, "expected_sha": expected},),
+            timeout=WALLCLOCK_EMCLS,
         )
+    except SkillTimeout:
+        logger.info("[presolve:emcls] %s 超时 %ds，子进程已终止",
+                    qid, WALLCLOCK_EMCLS)
+        return None
     except Exception as exc:  # noqa: BLE001
         logger.debug("[presolve:emcls] %s 求解异常: %s", qid, exc)
         return None
@@ -2799,14 +2832,18 @@ async def _try_lcg_recover(question) -> Optional[str]:
     expected = getattr(question, "flag_sha256", None)
     logger.info("[presolve:lcg] %s 发现 LCG 三件套 %s，开始参数恢复", qid, target_dir)
     try:
-        from skills.crypto_lcg_recover import crypto_lcg_recover as _lcg_solve
-        res = await asyncio.wait_for(
-            asyncio.to_thread(
-                _lcg_solve,
-                {"kind": "dir", "dir": target_dir, "expected_sha": expected},
-            ),
-            timeout=120,
+        from skills.crypto_lcg_recover import (  # noqa: F401
+            crypto_lcg_recover as _lcg_solve,
         )
+        res = await run_skill_isolated(
+            "skills.crypto_lcg_recover", "crypto_lcg_recover",
+            args=({"kind": "dir", "dir": target_dir, "expected_sha": expected},),
+            timeout=WALLCLOCK_LCG,
+        )
+    except SkillTimeout:
+        logger.info("[presolve:lcg] %s 超时 %ds，子进程已终止",
+                    qid, WALLCLOCK_LCG)
+        return None
     except Exception as exc:  # noqa: BLE001
         logger.debug("[presolve:lcg] %s 求解异常: %s", qid, exc)
         return None
