@@ -21,7 +21,7 @@ rem 会模型/端点不匹配 404（16:48 灾难同款根因），故清空。
 set CTF_AGENT_LIGHT_MODEL=
 set CTF_AGENT_HEAVY_MODEL=
 set CTF_AGENT_ENFORCE_WHITELIST=1
-rem 竞速：live(3路: 千帆+moonshot+ark，实测存活)；ultra 16路靠熔断剔除死源
+rem 竞速：live(多源，靠熔断剔除死源)；'谁能用'查 scripts\_llm_pool_status.py 快照，勿手写"实测存活"
 set CTF_AGENT_RACE_PROFILE=live
 rem LLM 矩阵墙钟 150s（数学引擎未命中后快速换题，抢吞吐）
 set CTF_AGENT_RACE_WALLCLOCK=150

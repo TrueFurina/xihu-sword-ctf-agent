@@ -4,6 +4,8 @@
 > 相关约束见 `.workbuddy/memory/MEMORY.md`；终局复盘见 `deliverables/锐评质检/西湖论剑-项目终局复盘-20260923.md`。
 >
 > **🔄 2026-10-03 更新摘要**：① D 层 canonical 注释漂移已修（`6790751`，`heldout_candidates` 注释 10→2）；② presolve **B 组假命中治理**完成（`7859665` 实现 + `5c70e76` 测试）——三池 B 组假命中 **11→1**、A 组真命中不变；③ 未推送提交已由 **6 → 22**，逐条核验**全部属他人会话**；④ **10733 缺口已补齐**（`11e3d05`）——从归档+原始 URL 恢复元数据/附件并建语料条目，**台账-语料漂移 1→0**，`real_corpus` **92→93**；⑤ **Google CTF 扩池**（2021/2022/2025）→ 可选跑池 **17→41**，**能力分母仍 2**；⑥ **已完成推送**——推送前发现远端另有 **3 个文档提交**（本地视图 stale → 实际已分叉），经**合并**（`ad8a17c`）后 fast-forward 推送，远端 `main` 已 = 本地 = `ad8a17c`（`ls-remote` 复核）；⑦ **工程资产移交清单已同步真值源**——初稿（00:21）早于④⑤口径变更，已校正 real_corpus 92→93、runnable_pool 17→41、覆盖率 15.2%→15.1%、presolve `_try_` 53→24、pytest 813→830p/16s、推送状态（详见行动清单 #7）；⑧ **对外文档口径复核（第 3 轮，全仓扫描）**——发现公开文档 `docs/POSTMORTEM.md`（自 09-27 起**无更正声明**，且 §5 自述「引用任何数字前必读」）残留 4 处过期数（题库 92→93 / 覆盖率 15.2%→15.1% / 可选跑池 17→41 / 「唯一那次 LLM 解出 1/2」→ 已作废），已**顶置更正 + 就地刷新**该表；并澄清扩池构成（runnable_pool 41 = 自有 2 + 外部 39，NYU 34 为独立口径）。⑨ **2026-10-08 雷 0（P0-3）二次补修收口**——`ad61c8b` 首修后本文件一度自相矛盾（雷 0 标题已标 ✅，但 TL;DR/体检表/行动清单仍写"未修"）；经回真值源**实跑复核**，发现并非"没修"而是**只改了一半**：更正说明加了、但摘要行仍裸引「LLM 自主推理 1/2」，且口径铁律硬编码「分母是 92」（机器值 93）。已补修 `099011b` + 护栏 `0dc1bcc`，三处状态已对齐（详见雷 0）。
+>
+> **🔄 2026-10-08 补记（接管轮）**：P0-4 已全部收口（`benchmark_heldout.py` 真跑无 provider → fail-closed 拒绝，`c37efe1`/`d94bca3`）；接管的未提交改造流已落地为「**provider 存活单一真值源**」（新增 `scripts/_llm_pool_status.py` + 护栏 `tests/test_provider_liveness_single_source.py`，提交 `e498be8`/`9458606`，遵第 ⑫ 道拆两笔）——「谁活着」不再手写进注释/默认值，一律查 `logs/llm_probe` 新鲜快照（fail-closed，未知≠可用）。同类假承诺残留（`setup.sh`/`start_race.bat`）一并清除。
 
 ---
 
@@ -29,7 +31,7 @@
 | 工作树 | 🔴 | 14 个未提交变更；**`git add -An` = 6854 个文件**（6847 个来自 `2027-prep/cybench/`，完整 vendored 第三方基准仓） |
 | KPI 真值源 | 🟢 **2026-10-08 已收口** | `ad61c8b`（10-01 首修：读 09-29 证据 + 更正说明）→ **10-08 复查发现两处残留**：①摘要行裸引「LLM 自主推理 1/2」无同行作废标记 ②口径铁律硬编码「分母是 92」（机器值 93）。已补修 `099011b` + 护栏 `0dc1bcc` |
 | 门禁脚本 | 🟢 **已修** | `test_file_guard.py` 已于提交 `834bffd` 入库（`git ls-files` 可查） |
-| 跑批默认值 | 🟡 **部分已修** | `eval/benchmark.py` 默认已改 `deepseek`（`d51fdae`）；`benchmark_heldout.py` 因他人在途改动**未改**（仍 baidu + limit 全跑），真实跑批须显式指定 |
+| 跑批默认值 | 🟢 **已修**（2026-10-08） | `eval/benchmark.py` 默认改 `deepseek`（`d51fdae`）；`benchmark_heldout.py` 真跑无 provider **fail-closed 拒绝**（`c37efe1`/`d94bca3`）。另落地「provider 存活单一真值源」（`e498be8`/`9458606`）：可用性一律查 `logs/llm_probe` 新鲜快照，禁手写 |
 | 能力水位 | 🟡 | held-out 大模型自主解出 **0/17**（关早停 + 预算 2.5 倍重测仍 0）；解出 9 题全来自 presolve |
 | 扩池 | 🟢 | 可选跑池 `heldout_runnable_pool` = **41**（`_kpi_canonical.py` 机器真值）= 自有 **2** + 外部 Google CTF 采源入池 **39**（`data/questions_external/`，2021–2025，40 题经排除链）。另有纽约大学（NYU）采源池 `data/questions_ext/` = **34 题**，属**独立口径**（供 `_envelope_band.py` 分档，A 档=`nyu_static_envelope`），**不并入** runnable_pool。均 gitignore 不入库。**能力分母仍 2，两口径禁混算** |
 | 计划文件 | 🟢 | 本文件已重建（原为空且停更于 09-21） |
@@ -94,13 +96,13 @@
 - **处置**：**单独成一个提交**入库；或加白名单/改名（改名需同步改 `pre-commit:172`）。
 - **✅ 2026-10-01 已修复**：提交 `834bffd`（只含该脚本一个文件，符合第 ⑫ 道）。`git ls-files` 已可查到；全闸门绿（⑥ 快速回归 152 passed、⑦ 文档一致性、⑩ 反注水、⑪ 结构、⑫ 测试文件守卫）。**新克隆拦死提交的隐患已解除。**
 
-### 雷 1.5 🟡 部分已修（提交 `d51fdae`，2026-10-01）跑批默认值 =「死 provider ＋ 全量烧钱」（P0-4）
+### 雷 1.5 ✅ 已收口（`d51fdae` 2026-10-01 + `c37efe1`/`d94bca3` 2026-10-08）跑批默认值 =「死 provider ＋ 全量烧钱」（P0-4）
 - **证据**：`eval/benchmark.py:340` 与 `scripts/benchmark_heldout.py:486` 的 `--provider` 默认均 **`baidu`**（MEMORY ④：欠费 `403 account_overdue`）；`benchmark_heldout.py:489` 的 `--limit` 默认 **`0`＝全部**；`:31/:33` 文档串仍教 `--provider baidu`、`真跑需要 baidu 凭证可达`（已过期）。
 - **冲突**：违反跑批铁律「真跑一律 deepseek、先跑 ≤5 题、先估成本报授权」。
 - **处置**：付费试跑**之前**补 fail-closed 安全前置——默认值改 deepseek（或取消默认、强制显式指定）、`limit` 默认 5、更新过期文档串。**这是 5 题试跑的前置条件。**
 - **🟡 2026-10-01 部分修复**：
   - ✅ `eval/benchmark.py:340` 默认已由 `baidu` 改为 `deepseek`，帮助文本同步注明 baidu 欠费不可用（提交 `d51fdae`）。未改其 `--limit` 默认（mock 回归依赖跑全量）。
-  - ⛔ **`scripts/benchmark_heldout.py:486`（provider）与 `:489`（limit=0 全跑）未改**——该文件当前存在并发会话的在途修改，按并发红线「他人改动严禁代提交」本次不动。**待对方收口后再处理；在此之前，真实跑批必须显式 `--provider deepseek` 且显式给 `--limit`。**
+  - ✅ **2026-10-08 已由原会话补齐 `scripts/benchmark_heldout.py`**（`c37efe1` 实现 + `d94bca3` 测试）：`--provider` 默认取 `CTF_AGENT_LLM_PROVIDER`；`--run`（非 mock）无 provider → **RC=2 且在选题之前拒绝**（零副作用）；真跑前强制打印规模+provider。工作树当前无其未提交改动，本条全部收口。
 
 ### 雷 2 ✅ 已非破坏性收口（提交 `596b056`，2026-10-01）6847 个竞赛遗留文件会被误提交（P0-1）
 - **证据**：`git add -An` = 6854 个文件，其中 **6847 个在 `2027-prep/cybench/`**（vendored 第三方基准仓：Dockerfile / LICENSE 11KB / grade_benchmark.py / run_benchmark.py …）。
@@ -300,7 +302,7 @@
 | # | 动作 | 归属 | 成本 | 验收标准 |
 |---|---|---|---|---|
 | 1 | ~~P0-3 KPI 口径收口（canonical 不再输出过期数）~~ | **✅ 已完成**（终值依据由 10-01 独立复现坐实；`ad61c8b` 首修、**`099011b` 补修摘要行裸引 + 硬编码分母 92**、`0dc1bcc` 护栏入 CI） | ¥0 | canonical 输出分母取自机器真值；历史作废数与作废标记**同行**；两处若有回退即红 |
-| 2 | ~~P0-4 跑批默认值 fail-closed~~ | **🟡 部分完成**（`eval/benchmark.py` ✅ `d51fdae`；`benchmark_heldout.py` ⛔ 被并发会话在途改动阻塞） | ¥0 | 剩余部分待对方收口 |
+| 2 | ~~P0-4 跑批默认值 fail-closed~~ | **✅ 已完成**（`eval/benchmark.py` `d51fdae`；`benchmark_heldout.py` `c37efe1`/`d94bca3`；存活单源 `e498be8`/`9458606`） | ¥0 | 真跑无 provider 即拒绝；可用性只查 `logs/llm_probe` 新鲜快照 |
 | 3 | ~~P0-2 `test_file_guard.py` 入库~~ | **✅ 已完成**（提交 `834bffd`） | ¥0 | 新克隆钩子可跑通，不再拦死提交 |
 | 4 | P0-1 `2027-prep` 排除或归档（M2 先迁出） | **需你拍板** | ¥0 | `git add -An` 从 6854 降到个位数 |
 | 5 | NYU 池 5 题大模型试跑 | **需你授权**（且须先完成 #2） | per_q 80K / global 80 万 token；deepseek ≈¥1–2；DashScope 免费档（deepseek-v3.1 每模型 1M 免费至 2026-12-05）可近零 | 5 题真实解出数 + token 账；**不与"分母 2"混算** |
