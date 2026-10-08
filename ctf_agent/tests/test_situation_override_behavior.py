@@ -52,6 +52,20 @@ def test_override_reduces_idle_steps():
         f"OVERRIDE=ON 空转步应更少：{on['idle_steps']} vs {off['idle_steps']}")
 
 
+def test_run_scenario_restores_global_presolve():
+    """run_scenario 不得把 core.presolve.presolve 的 mock 泄漏到进程全局。
+
+    2026-10-08 修复的回归锁：此前 _build_agent 裸赋值永久替换 presolve，
+    导致同进程后续测试（test_svg_path_text 端到端）拿到假 presolve 必红。
+    """
+    import core.presolve as ps
+
+    orig = ps.presolve
+    asyncio.run(run_scenario(True))
+    assert ps.presolve is orig, (
+        "run_scenario 结束后 core.presolve.presolve 必须还原为原函数")
+
+
 def teardown_module(module):
     # 还原默认（关闭），避免污染其它测试的环境
     os.environ["CTF_AGENT_SITUATION_OVERRIDE"] = "0"
