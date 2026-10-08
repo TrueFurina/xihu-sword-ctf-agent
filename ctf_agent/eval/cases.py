@@ -132,13 +132,22 @@ class Question:
         return None
 
     def flag_matches(self, candidate: Optional[str]) -> bool:
-        """正确性判定：明文比对（flag 为明文时）或 sha256 比对（flag 为占位时）。"""
+        """正确性判定：有 sha256 预期值则 sha256 比对，否则明文比对。
+
+        2026-10-08 修复：原实现把「走哪条分支」gate 在 `flag_is_placeholder`
+        （要求 `flag` 字段**本身**是 sha256 串），于是第三种合法形态
+        「`flag=None` + 只有 `flag_sha256`」（外部题常见，全库实测 79 题）落进明文分支、
+        与 `None` 比对 → **恒 False**：正确答案被自己的验证器判 hallucination
+        （`run.py:387` 生产判分正走此路径）。改为直接取 `expected_sha256`
+        （其优先级「flag_sha256 字段 > flag 占位」已由本类定义），三种形态全覆盖：
+        flag 明文（无 sha256）/ flag=sha256 占位 / flag=None+flag_sha256。
+        实测形态分布：`(None,set)=79 / (sha256,set)=124 / (plain,none)=57 /
+        (None,none)=1 / (plain,set)=0` —— `(plain,set)=0` 保证本次改动对未来题库
+        无行为变更。"""
         if not candidate:
             return False
-        if self.flag_is_placeholder:
-            exp = self.expected_sha256
-            if not exp:
-                return False
+        exp = self.expected_sha256
+        if exp:
             import hashlib
             return hashlib.sha256(str(candidate).encode("utf-8")).hexdigest() == exp
         return str(candidate) == str(self.flag)
