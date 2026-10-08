@@ -41,10 +41,13 @@ def _item(qid: str, solved: bool, dur=None, tokens=None, by=None):
 
 
 def test_presolve_fingerprint_flagged():
-    """雷 0 指纹：11ms 解出 + tokens None + main_agent_llm → 必报可疑。"""
+    """雷 0 指纹：11ms 解出 + tokens=0 + main_agent_llm → 必报可疑。
+
+    fixture 对齐真实事故（09-29 报告有 token 字段但计费为 0）。
+    """
     report = {
         "mode": "real_main_agent",
-        "results": [_item("synth_q1", True, dur=11, by="main_agent_llm")],
+        "results": [_item("synth_q1", True, dur=11, tokens=0, by="main_agent_llm")],
     }
     suspects = fp.audit_report(report)
     assert len(suspects) == 1
@@ -107,6 +110,44 @@ def test_threshold_boundary():
     }
     ids = [s["id"] for s in fp.audit_report(report)]
     assert ids == ["q_low"]
+
+
+def test_legacy_schema_no_token_field_not_token_flagged():
+    """旧 schema（全报告无任何 token 字段，09-19 格式）：仅凭「无 token」不得判疑。
+
+    2026-10-08 全库扫史修正：heldout_rerun20260919_selftruth_full 里 31s 解出
+    曾被误标——旧格式根本不记 token，31s 是合理 LLM 时长。
+    """
+    report = {
+        "mode": "real_main_agent",
+        "results": [_item("q_slow_legacy", True, dur=31271, by="main_agent_llm")],
+    }
+    assert fp.audit_report(report) == []
+
+
+def test_legacy_schema_short_duration_still_flagged():
+    """旧 schema 下时长判据不受影响：亚 5s 仍必报，且理由不含 token 判据。"""
+    report = {
+        "mode": "real_main_agent",
+        "results": [_item("q_fast_legacy", True, dur=2309, by="main_agent_llm")],
+    }
+    suspects = fp.audit_report(report)
+    assert [s["id"] for s in suspects] == ["q_fast_legacy"]
+    assert "token" not in suspects[0]["reason"]
+    assert "5000" in suspects[0]["reason"]
+
+
+def test_mixed_schema_token_reason_applies():
+    """混合 schema：任一条目带 token 字段，则无 token 的其他条目仍按该判据。"""
+    report = {
+        "mode": "real_main_agent",
+        "results": [
+            _item("q_with_tok", True, dur=30000, tokens=100, by="main_agent_llm"),
+            _item("q_no_tok", True, dur=30000, by="main_agent_llm"),
+        ],
+    }
+    suspects = fp.audit_report(report)
+    assert [s["id"] for s in suspects] == ["q_no_tok"]
 
 
 def test_cli_exit_codes(tmp_path):
