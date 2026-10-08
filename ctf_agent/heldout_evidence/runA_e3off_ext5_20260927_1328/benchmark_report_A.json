@@ -1,0 +1,154 @@
+{
+  "mode": "real_main_agent",
+  "disclaimer": "mock 数字禁止引用；真实模式=主 Agent 全链路可引用",
+  "summary": {
+    "total": 5,
+    "solved": 0,
+    "solve_rate": 0.0,
+    "by_category": {
+      "crypto": {
+        "total": 4,
+        "solved": 0,
+        "durations": [
+          9757,
+          60946,
+          46257,
+          112952
+        ],
+        "retries": [
+          1,
+          2,
+          2,
+          2
+        ],
+        "solve_rate": 0.0,
+        "avg_duration_ms": 57478.0,
+        "avg_retries": 1.75
+      },
+      "misc": {
+        "total": 1,
+        "solved": 0,
+        "durations": [
+          69404
+        ],
+        "retries": [
+          3
+        ],
+        "solve_rate": 0.0,
+        "avg_duration_ms": 69404.0,
+        "avg_retries": 3.0
+      }
+    },
+    "by_provenance": {
+      "real_past_ctf": {
+        "total": 5,
+        "solved": 0,
+        "solve_rate": 0.0
+      }
+    },
+    "by_solved_by": {
+      "main_agent_llm": {
+        "total": 3,
+        "solved": 0,
+        "solved_list": [],
+        "solve_rate": 0.0
+      },
+      "unknown": {
+        "total": 2,
+        "solved": 0,
+        "solved_list": [],
+        "solve_rate": 0.0
+      }
+    },
+    "by_error": {
+      "race_abandon": 3,
+      "budget_exceeded": 2
+    },
+    "integrity": {
+      "attempted": 5,
+      "zero_work_not_attempted": 0,
+      "not_attempted_ids": [],
+      "truncated": 5,
+      "truncated_ids": [
+        "ext_gctf2023_cursved",
+        "ext_gctf2023_least-common-genominator",
+        "ext_gctf2023_mhk2",
+        "ext_gctf2023_papapapa",
+        "ext_gctf2023_primes"
+      ],
+      "interpretable": false
+    },
+    "tokens": {
+      "global_total": 330593,
+      "per_question": {
+        "ext_gctf2023_cursved": 24615,
+        "ext_gctf2023_least-common-genominator": 64294,
+        "ext_gctf2023_mhk2": 80431,
+        "ext_gctf2023_papapapa": 80596,
+        "ext_gctf2023_primes": 80657
+      }
+    }
+  },
+  "results": [
+    {
+      "question_id": "ext_gctf2023_cursved",
+      "category": "crypto",
+      "provenance": "real_past_ctf",
+      "solved": false,
+      "solved_by": "main_agent_llm",
+      "flag": null,
+      "confidence": 0.0,
+      "error": "race_abandon",
+      "duration_ms": 9757,
+      "retries": 1
+    },
+    {
+      "question_id": "ext_gctf2023_least-common-genominator",
+      "category": "crypto",
+      "provenance": "real_past_ctf",
+      "solved": false,
+      "solved_by": "main_agent_llm",
+      "flag": null,
+      "confidence": 0.0,
+      "error": "race_abandon",
+      "duration_ms": 60946,
+      "retries": 2
+    },
+    {
+      "question_id": "ext_gctf2023_mhk2",
+      "category": "crypto",
+      "provenance": "real_past_ctf",
+      "solved": false,
+      "solved_by": "unknown",
+      "flag": null,
+      "confidence": 0.0,
+      "error": "budget_exceeded",
+      "duration_ms": 46257,
+      "retries": 2
+    },
+    {
+      "question_id": "ext_gctf2023_papapapa",
+      "category": "misc",
+      "provenance": "real_past_ctf",
+      "solved": false,
+      "solved_by": "unknown",
+      "flag": null,
+      "confidence": 0.0,
+      "error": "budget_exceeded",
+      "duration_ms": 69404,
+      "retries": 3
+    },
+    {
+      "question_id": "ext_gctf2023_primes",
+      "category": "crypto",
+      "provenance": "real_past_ctf",
+      "solved": false,
+      "solved_by": "main_agent_llm",
+      "flag": null,
+      "confidence": 0.0,
+      "error": "race_abandon",
+      "duration_ms": 112952,
+      "retries": 2
+    }
+  ]
+}

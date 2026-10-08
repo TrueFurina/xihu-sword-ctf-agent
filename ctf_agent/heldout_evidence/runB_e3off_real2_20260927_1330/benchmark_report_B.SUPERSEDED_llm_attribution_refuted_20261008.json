@@ -1,0 +1,104 @@
+{
+  "mode": "real_main_agent",
+  "disclaimer": "mock 数字禁止引用；真实模式=主 Agent 全链路可引用",
+  "summary": {
+    "total": 2,
+    "solved": 2,
+    "solve_rate": 1.0,
+    "by_category": {
+      "crypto": {
+        "total": 1,
+        "solved": 1,
+        "durations": [
+          2309
+        ],
+        "retries": [
+          1
+        ],
+        "solve_rate": 1.0,
+        "avg_duration_ms": 2309.0,
+        "avg_retries": 1.0
+      },
+      "reverse": {
+        "total": 1,
+        "solved": 1,
+        "durations": [
+          1078
+        ],
+        "retries": [
+          1
+        ],
+        "solve_rate": 1.0,
+        "avg_duration_ms": 1078.0,
+        "avg_retries": 1.0
+      }
+    },
+    "by_provenance": {
+      "real_past_ctf": {
+        "total": 2,
+        "solved": 2,
+        "solve_rate": 1.0
+      }
+    },
+    "by_solved_by": {
+      "main_agent_llm": {
+        "total": 1,
+        "solved": 1,
+        "solved_list": [
+          "real_crypto_dnui_keyboard"
+        ],
+        "solve_rate": 1.0
+      },
+      "presolve": {
+        "total": 1,
+        "solved": 1,
+        "solved_list": [
+          "real_reverse_js"
+        ],
+        "solve_rate": 1.0
+      }
+    },
+    "by_error": {},
+    "integrity": {
+      "attempted": 2,
+      "zero_work_not_attempted": 0,
+      "not_attempted_ids": [],
+      "truncated": 0,
+      "truncated_ids": [],
+      "interpretable": true
+    },
+    "tokens": {
+      "global_total": 8243,
+      "per_question": {
+        "real_crypto_dnui_keyboard": 6554,
+        "real_reverse_js": 1689
+      }
+    }
+  },
+  "results": [
+    {
+      "question_id": "real_crypto_dnui_keyboard",
+      "category": "crypto",
+      "provenance": "real_past_ctf",
+      "solved": true,
+      "solved_by": "main_agent_llm",
+      "flag": "flag{CLCKOUTHK}",
+      "confidence": 0.9,
+      "error": null,
+      "duration_ms": 2309,
+      "retries": 1
+    },
+    {
+      "question_id": "real_reverse_js",
+      "category": "reverse",
+      "provenance": "real_past_ctf",
+      "solved": true,
+      "solved_by": "presolve",
+      "flag": "flag{cslhahldlnst0day}",
+      "confidence": 0.9,
+      "error": null,
+      "duration_ms": 1078,
+      "retries": 1
+    }
+  ]
+}

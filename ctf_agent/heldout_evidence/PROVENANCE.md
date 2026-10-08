@@ -28,3 +28,19 @@
 ## 运行与仓库元数据
 - 两 run 均由**另一并发会话**执行（非本目录作者）；作者仅直读其报告原文并**原样**归档。
 - 归档日期：2026-09-19。
+
+---
+
+## 新增归档（2026-10-08，全权接管轮）
+
+以下报告原为**未跟踪残留**（并发会话产出但未提交），2026-10-08 接管时按本目录约定**原样入库**（未改任何数字）。sha256 为入库时实测，可 `sha256sum` 自校验。
+
+| 本目录副本 | sha256（入库实测） | 内容摘要 |
+|---|---|---|
+| `benchmark_report_glm4flash_nyu5_20261005.json` | `4f94e94838b0d5e9249b252a36b02d80d14d4cb9edf1b47dff7df3be56689ebe` | `mode=real_main_agent`，total=7，solved=2；`by_solved_by={presolve:2/2, main_agent_llm:0/2, unknown:0/3}`；失败=`wallclock_timeout×3`/`race_abandon×2`。**solved 2 全为 presolve**（`real_crypto_dnui_keyboard`/`real_reverse_js`），LLM 主链路 0 |
+| `runA_e3off_ext5_20260927_1328/benchmark_report_A.json` | `16f5c6c85281897fe4cb8d0389d4e4ee699f8cd47023f8f5824ce80facb5e96a` | E3 OFF 组 5 题（external），solved=0；`by_solved_by={main_agent_llm:0/3, unknown:0/2}`；失败=`race_abandon×3`/`budget_exceeded×2` |
+| `runB_e3off_real2_20260927_1330/benchmark_report_B.SUPERSEDED_llm_attribution_refuted_20261008.json` | `67d759df8d35c138399e2399798d3d33aefa1b2b0ed894a80ced049d30c56a55` | ⚠️ **归因已作废**：`by_solved_by.main_agent_llm` 记 1 题（`real_crypto_dnui_keyboard`）**实为 presolve**——10-01 冷黑板+E3 ON+deepseek 复跑判该题 `solved_by=presolve`（78ms、tokens≈0）。**引用本报告须以 presolve 为准，勿引「LLM 自主 1」。** 该报告另有 presolve 解 `real_reverse_js` 1 题有效 |
+
+- `runA/runB` 目录内 `progress_A.jsonl`（逐题 progress 记录，无 flag）一并入库；`run_A.log`/`run_B.log` 因 `.gitignore` `*.log` 排除，未入库。
+- 溯源：三份报告均由**另一并发会话**（2026-09-27 / 10-05 跑批）产出，本目录作者仅直读原样归档，未修改内容。
+- 🔴 纪律：`runB` 的 LLM 自主归因已被本仓独立复跑证伪，故文件名打 `.SUPERSEDED_llm_attribution_refuted_20261008` 标记——**任何下游引用不得据此宣称「LLM 自主解出」。**
