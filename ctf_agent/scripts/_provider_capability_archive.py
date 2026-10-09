@@ -25,10 +25,15 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # 便于 import _truth_guard
+from _truth_guard import write_truth  # noqa: E402  统一机器真值写入口
+
+BENCHMARKS = ROOT / "benchmarks"
 
 # provider 失败（基础设施类）——不计入"能力"分母
 INFRA_ERRORS = {
@@ -126,28 +131,17 @@ def load_run(run_dir: Path) -> dict | None:
     return d
 
 
-def guard_schema_overwrite(outp: Path, new_schema: str) -> None:
-    """写前 schema 守卫：拒绝覆盖**异构 schema** 的既有档案。
-
-    🔴 2026-10-10 两个实测教训写在这里，别再踩：
-    1) **必须前置**：初版把守卫放在 collect() 之后，于是"目录里没有 run 产物"时
-       脚本提前 return 1，永远走不到守卫——守卫看起来存在，实际在真实调用路径上
-       根本不会被触发。守卫要放在任何"提前返回"之前。
-    2) **必须用专属退出码**：初版用裸 SystemExit（码 1），与"无可聚合产物"的 1
-       撞车，变异测试因此判不出守卫是否被删。专属码 4。
-    """
-    if not outp.is_file():
+def _probe_schema(path: Path, schema: str) -> None:
+    """写前只做"异构拒写"预检，不落盘（实际写入在数据组装完成后）。"""
+    if not path.is_file():
         return
     try:
-        old = json.loads(outp.read_text(encoding="utf-8"))
-        old_schema = old.get("schema")
+        old = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return  # 损坏/空文件视为无档案，允许写入
-    if old_schema and old_schema != new_schema:
-        print(f"[toolcap-agg] 拒绝覆盖异构档案: {outp.name} 现有 schema={old_schema!r}，"
-              f"本次要写 {new_schema!r}。两种档案必须用不同文件名"
-              f"（探针=provider_probe.json / 归档=provider_capability.json）")
-        raise SystemExit(4)
+        return
+    old_schema = old.get("schema") if isinstance(old, dict) else None
+    if old_schema and old_schema != schema:
+        raise SystemExit(4)   # 与 _truth_guard 的 RC_REFUSED 一致
 
 
 def collect(results_dir: Path) -> list[dict]:
@@ -286,10 +280,16 @@ def main() -> int:
     ap.add_argument("--out", default=str(ROOT / "benchmarks" / "provider_capability.json"))
     args = ap.parse_args()
 
-    # 🔴 守卫必须先于 collect：否则"无可聚合产物"的提前返回会绕过守卫（见 guard 注释）
+    # 🔴 统一写入口（2026-10-10）：schema 登记 + 异构拒写都归 scripts/_truth_guard.py，
+    # 不再各脚本自己实现一份——本脚本初版自己写了一份守卫，结果犯了"守卫放在 collect
+    # 之后 → 空目录提前返回时根本走不到"和"退出码与其它失败撞车"两个错。
+    # strict_path=False：允许测试写到临时目录。
     outp = Path(args.out)
-    outp.parent.mkdir(parents=True, exist_ok=True)
-    guard_schema_overwrite(outp, "provider_capability_archive/v2")
+    # 严格性按"输出是否落在 benchmarks/ 下"判定：测试写临时目录时自动放宽
+    _strict = str(outp.resolve()).startswith(str(BENCHMARKS.resolve()))
+
+    # 守卫必须**先于** collect：空产物目录会提前 return，不能绕过守卫
+    _probe_schema(outp, "provider_capability_archive/v2")
 
     runs = collect(Path(args.results_dir))
     if not runs:
@@ -309,7 +309,11 @@ def main() -> int:
         "per_provider": agg,
         "recommendation": rec,
     }
-    outp.write_text(json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8")
+    doc.pop("written_at", None)   # 由 write_truth 统一补
+    doc.pop("written_by", None)
+    doc.pop("git_head", None)
+    write_truth(outp, doc, schema="provider_capability_archive/v2",
+                by="scripts/_provider_capability_archive.py", strict_path=_strict)
 
     print(f"[toolcap-agg] 扫描 {len(runs)} 个 run，聚合 {len(agg)} 个 provider")
     for e in agg:

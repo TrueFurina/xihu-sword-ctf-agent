@@ -687,5 +687,8 @@
  "recommendation": {
   "recommended": "deepseek",
   "why": "多样本(n=213题/10跑批) LLM独立解出率 0.109, 基础设施失败率 0.183, 有效题均 token 58284.2。"
- }
+ },
+ "written_at": "2026-10-10T02:03:08",
+ "written_by": "scripts/_provider_capability_archive.py",
+ "git_head": "e98f2dd2"
 }

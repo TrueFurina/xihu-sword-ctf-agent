@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -93,10 +94,21 @@ def main() -> int:
     bench_ok, bench_msg = benchmark_ok()
 
     if args.update:
-        BASELINE.parent.mkdir(parents=True, exist_ok=True)
-        BASELINE.write_text(json.dumps(
-            {"updated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"), "pools": cur},
-            ensure_ascii=False, indent=1), encoding="utf-8")
+        # 统一机器真值写入口（2026-10-10）：此前本文件是 benchmarks/ 下**唯一没有
+        # schema 字段**的真值文件——任何脚本都能覆盖它，且事后无法判断这份基线
+        # 是哪一版统计规则产生的。现与其它真值统一受守卫保护。
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from _truth_guard import write_truth, TruthWriteRefused, RC_REFUSED
+        try:
+            write_truth(BASELINE, {"pools": cur, "tracked_pools": list(TRACKED_POOLS)},
+                        schema="corpus_health_baseline/v1",
+                        by="scripts/check_corpus_health.py")
+        except TruthWriteRefused as exc:
+            # 友好报错 + 专属退出码；不要裸抛堆栈（调用方多为脚本/CI）
+            print(f"[health] ❌ 拒绝写基线: {exc}")
+            print("[health] 若确认该文件来源无误，一次性迁移："
+                  "python scripts/_truth_guard.py --migrate-legacy")
+            return RC_REFUSED
         print(f"[health] 基线已刷新：{BASELINE}")
         for p, v in cur.items():
             print(f"  {p:32s} 总 {v['total']:>3} 可用 {v['ok']:>3} 坏题 {v['broken']:>3}")

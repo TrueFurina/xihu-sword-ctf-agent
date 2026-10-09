@@ -170,8 +170,11 @@ def main() -> int:
         "profiles": profiles,
         "recommendation": recommend(profiles),
     }
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding="utf-8")
+    # 统一机器真值写入口（2026-10-10）：schema 登记 + 异构拒写 + 可追溯元信息
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _truth_guard import write_truth
+    write_truth(OUT, rep, schema="provider_capability/v1",
+                by="scripts/_provider_toolcap_probe.py")
     print(f"[toolcap] 档案已写 {OUT}")
     print(f"[toolcap] 推荐: {rep['recommendation']['recommended']}｜依据: {rep['recommendation']['why']}")
     return 0

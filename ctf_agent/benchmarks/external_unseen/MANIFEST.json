@@ -1,7 +1,7 @@
 {
  "schema": "external_unseen_benchmark/v1",
- "generated_at": "2026-10-10T01:29:55",
- "git_head": "a6d75829",
+ "generated_at": "2026-10-10T02:03:39",
+ "git_head": "e98f2dd2",
  "selection_rules": [
   "载荷完整：所有声明附件在磁盘存在",
   "无答案泄漏：附件字节不含真值（sha256 精确比对 + flag{}/裸值形态扫描）",
@@ -89,5 +89,7 @@
   "duplicate_id_across_pools": 6
  },
  "judge": "scripts/_run_validity_guard.py（跑批有效性）+ ctf_agent/verify/flag_checker.py::sha256_matches（判真值）",
- "answers": "本目录不含任何明文答案，仅 flag_sha256 占位"
+ "answers": "本目录不含任何明文答案，仅 flag_sha256 占位",
+ "written_at": "2026-10-10T02:03:39",
+ "written_by": "scripts/_build_external_benchmark.py"
 }

@@ -156,8 +156,11 @@ def write_manifest(built: dict) -> dict:
         "judge": "scripts/_run_validity_guard.py（跑批有效性）+ ctf_agent/verify/flag_checker.py::sha256_matches（判真值）",
         "answers": "本目录不含任何明文答案，仅 flag_sha256 占位",
     }
-    (OUT_DIR / "MANIFEST.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1),
-                                           encoding="utf-8")
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _truth_guard import write_truth
+    write_truth(OUT_DIR / "MANIFEST.json", manifest,
+                schema="external_unseen_benchmark/v1",
+                by="scripts/_build_external_benchmark.py", strict_path=False)
     return manifest
 
 

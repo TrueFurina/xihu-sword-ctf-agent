@@ -1,5 +1,4 @@
 {
- "updated_at": "2026-10-10T01:30:13",
  "pools": {
   "questions_real": {
    "total": 93,
@@ -43,5 +42,19 @@
    "leaky": 0,
    "broken": 0
   }
- }
+ },
+ "tracked_pools": [
+  "questions_real",
+  "questions_external",
+  "questions_ext",
+  "questions_ext_cybench",
+  "questions_ext_A_20261001",
+  "questions_ext_A_20261001",
+  "questions_ext_trial5_20261001",
+  "questions_real_kpi9"
+ ],
+ "schema": "corpus_health_baseline/v1",
+ "written_at": "2026-10-10T02:04:03",
+ "written_by": "scripts/check_corpus_health.py",
+ "git_head": "e98f2dd2"
 }
