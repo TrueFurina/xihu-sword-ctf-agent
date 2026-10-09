@@ -176,6 +176,105 @@ class TestRecommend(unittest.TestCase):
         self.assertEqual(arch.recommend(agg)["recommended"], "good")
 
 
+class TestSchemaGuardBlocksHeterogeneousOverwrite(unittest.TestCase):
+    """🔴 回归点（2026-10-10 数据丢失事故）：v2 覆盖 v1 档案。
+
+    v1 单题探针档案与 v2 归档档案曾**共用** `benchmarks/provider_capability.json`。
+    v2 跑一次就把 v1 的探针数据（解析失败数/兜底次数/步数）整段覆盖掉——
+    工作树上无声丢数据，只在 git 历史里还找得回来。这是"交付物静默腐烂"的同型：
+    两种 schema 挤在一个文件名里，后跑的永远是赢家，先跑的结论无声消失。
+
+    守护两条：①写前 schema 不一致必须拒绝覆盖（退出码非 0 /抛 SystemExit）
+    ②同 schema 刷新才允许（档案要能更新，不能一次写死就不许再写）。
+    """
+
+    def _run_agg_into(self, path: Path, existing_schema: str | None) -> int:
+        if existing_schema is not None:
+            path.write_text(json.dumps({"schema": existing_schema,
+                                        "old": True}), encoding="utf-8")
+        import subprocess
+        import sys
+        r = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "_provider_capability_archive.py"),
+             "--results-dir", str(path.parent), "--out", str(path)],
+            capture_output=True, text=True)
+        return r.returncode
+
+    def test_refuses_to_overwrite_foreign_schema(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "provider_capability.json"
+            out.write_text(json.dumps({"schema": "provider_capability/v1",
+                                       "profiles": ["keepme"]}), encoding="utf-8")
+            rc = self._run_agg_into(out, None)
+            # 拒绝覆盖：档案内容必须原封不动
+            data = json.loads(out.read_text(encoding="utf-8"))
+            # 整个文件必须原封不动（含旧字段），一个字节都没被改写
+            self.assertEqual(data, {"schema": "provider_capability/v1",
+                                    "profiles": ["keepme"]})
+            # 🔴 专属退出码 4：不能只断言"非 0"——"目录无 run 产物"也是非 0，
+            # 那样删掉守卫后断言照样通过（变异存活）。必须精确咬住 4。
+            self.assertEqual(rc, 4, "拒绝覆盖必须用专属退出码 4（与其它失败原因区分）")
+
+    def test_guard_fires_even_when_no_runs_found(self):
+        """🔴 回归点（2026-10-10 变异 M2 存活后补）：守卫必须**先于**产物收集。
+
+        初版把守卫放在 collect() 之后，于是"目录里没有 run 产物"时脚本提前 return 1，
+        永远走不到守卫——守卫看起来存在，在真实调用路径上却不会触发。
+        本用例构造「有异构档案 + 空产物目录」：这正是最容易绕过守卫的组合，
+        守卫必须仍然拒绝覆盖（rc=4），而不是返回 1（"无产物"）后放行。
+        """
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "provider_capability.json"
+            out.write_text(json.dumps({"schema": "provider_capability/v1",
+                                       "old": True}), encoding="utf-8")
+            rc = self._run_agg_into(out, None)
+            self.assertEqual(rc, 4,
+                             "空产物目录也必须先触发 schema 守卫，而不是被'无产物'提前返回绕过")
+            self.assertEqual(json.loads(out.read_text(encoding="utf-8"))["schema"],
+                             "provider_capability/v1")
+
+    def test_same_schema_refresh_is_allowed(self):
+        """同 schema 必须允许刷新——否则档案一次写死就再也不能更新，
+        "守卫"会退化成"冻结"（另一个方向的假门禁）。"""
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "provider_capability.json"
+            out.write_text(json.dumps({"schema": "provider_capability_archive/v2"}),
+                           encoding="utf-8")
+            rc = self._run_agg_into(out, None)
+            data = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(data["schema"], "provider_capability_archive/v2")
+            # 临时目录里没有 run 产物 → 脚本提前退出（rc=1）且不写档案，
+            # 这里的断言是"旧档案未被异构内容污染"，而不是"新档案已生成"。
+            self.assertEqual(data, {"schema": "provider_capability_archive/v2"})
+            self.assertNotEqual(rc, 4, "同 schema 刷新不得触发守卫（否则守卫退化成冻结）")
+
+
+class TestProbeAndArchiveUseDistinctFiles(unittest.TestCase):
+    """两个 provider 档案必须落在**不同文件**，否则重演覆盖事故。"""
+
+    def test_output_paths_differ(self):
+        probe_src = (ROOT / "scripts" / "_provider_toolcap_probe.py").read_text(
+            encoding="utf-8")
+        arch_src = (ROOT / "scripts" / "_provider_capability_archive.py").read_text(
+            encoding="utf-8")
+        self.assertIn("provider_probe.json", probe_src)
+        self.assertNotIn('OUT = ROOT / "benchmarks" / "provider_capability.json"',
+                         probe_src, "探针不得再写归档器的文件名")
+        self.assertIn("provider_capability.json", arch_src)
+
+    def test_both_archives_exist_with_distinct_schemas(self):
+        pb = ROOT / "benchmarks" / "provider_probe.json"
+        pc = ROOT / "benchmarks" / "provider_capability.json"
+        self.assertTrue(pb.is_file(), "缺 v1 探针档案（曾被 v2 覆盖丢失）")
+        self.assertTrue(pc.is_file(), "缺 v2 归档档案")
+        s1 = json.loads(pb.read_text(encoding="utf-8"))["schema"]
+        s2 = json.loads(pc.read_text(encoding="utf-8"))["schema"]
+        self.assertNotEqual(s1, s2, "两份档案的 schema 必须不同，否则是同一份东西")
+
+
 class TestZeroFailureRateNotTreatedAsTotal(unittest.TestCase):
     """🔴 回归点（2026-10-10 生产 bug）：`(x or 1)` 的 falsy 陷阱。
 
