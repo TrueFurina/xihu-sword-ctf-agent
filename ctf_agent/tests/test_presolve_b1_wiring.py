@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core import presolve as P  # noqa: E402
 from core.lattice import has_backend  # noqa: E402
+from skills.crypto_zip_bkcrack import find_bkcrack, _crc32_4byte_preimage, crc32_pkzip  # noqa: E402
 
 pytestmark = pytest.mark.skipif(
     not has_backend(), reason="python-flint 未安装（格后端缺失）")
@@ -47,6 +48,7 @@ PRIMES_QID = "ext_gctf2023_primes"
 CYCLING_QID = "ext_gctf2022_cycling"
 CLS_QID = "ext_gctf2022_electric-mayhem-cls"
 LCG_QID = "ext_gctf2023_least-common-genominator"
+ZIP_QID = "ext_gctf2023_zip"
 
 
 def _big(rng, bits=136):
@@ -72,7 +74,8 @@ def test_b1_skills_are_wired():
                     ("skills.crypto_primes_subset", "_try_crypto_primes"),
                     ("skills.crypto_cycling", "_try_cycling"),
                     ("skills.crypto_electric_mayhem_cls", "_try_electric_mayhem_cls"),
-                    ("skills.crypto_lcg_recover", "_try_lcg_recover")):
+                    ("skills.crypto_lcg_recover", "_try_lcg_recover"),
+                    ("skills.crypto_zip_bkcrack", "_try_zip_bkcrack")):
         assert mod in wired, f"{mod} 未接线（只是库，不算能力）"
         assert callable(getattr(P, fn, None)), f"{fn} 未定义"
 
@@ -175,6 +178,80 @@ def test_presolve_lcg_solves_real_problem():
     assert q is not None, f"题库里找不到 {LCG_QID}"
     truth = str(getattr(q, "flag_sha256", "") or "")
     flag = asyncio.run(P._try_lcg_recover(q))
+    assert flag, "presolve 接线路径未解出 flag"
+    assert hashlib.sha256(flag.encode()).hexdigest() == truth
+
+
+# --------------------------------------------------------------------------
+# 3.5) ziphard：CRC32 实现与 checked-in 资产校验（不依赖 bkcrack 二进制，快）
+# --------------------------------------------------------------------------
+def test_zip_bkcrack_binary_candidates_include_fixed_build():
+    """bkcrack 候选表必须包含 1.6.1+crossfilter 修复版二进制的本机路径。
+
+    背景（2026-10-09）：原候选表只指向 ``logs/bkcrack_build/``（gitignored，已被
+    清理过一轮），真机上全军缺席 → ``find_bkcrack()`` 恒空 → 接线形同虚设。
+    修复版（MSVC 静态构建）在 ziphard 真跑中恢复的密钥与官方 solution README
+    逐字一致。机器无关断言：只查「候选表字符串包含该路径」，不查文件存在。
+    """
+    from skills.crypto_zip_bkcrack import _bkcrack_candidates
+    joined = "\n".join(_bkcrack_candidates())
+    assert "ziphard_run/bkcrack-patched.exe" in joined.replace("\\", "/"), (
+        "候选表应包含 1.6.1+crossfilter 修复版二进制路径（ziphard_run）"
+    )
+
+
+def test_zip_bkcrack_crc32_impl_and_asset():
+    """crc32_pkzip 实现必须正确（标准校验值），且 checked-in second_plaintext 资产
+    与 junk CRC(0x3b3953bc) 自洽（首字节=CRC MSB 0x3b，余 4 字节 crc32==0x3b3953bc）。
+
+    CI 安全：优先用 skill 内嵌常量 ``ZIPHARD_SECOND_PLAINTEXT``（随仓库复现），
+    回退到磁盘资产；不再强依赖未入库的 ``logs/`` 目录。
+
+    变异验证：把 `_CRC` 预计算表逻辑改错 → 标准校验值断言 FAIL。
+    """
+    # 标准 CRC32 校验向量
+    assert crc32_pkzip(b"123456789") == 0xCBF43926
+    # 优先用 skill 内嵌常量（在库内、CI 可复现），回退磁盘资产
+    sp = None
+    try:
+        from skills.crypto_zip_bkcrack import ZIPHARD_SECOND_PLAINTEXT
+        sp = ZIPHARD_SECOND_PLAINTEXT
+    except Exception:
+        sp = None
+    if not sp:
+        sp = find_second_plaintext_on_disk()
+    assert sp is not None and len(sp) == 5, "ziphard second_plaintext 资产缺失"
+    assert sp[0] == 0x3b, "second_plaintext[0] 应为 junk CRC 的 MSB (0x3b)"
+    assert crc32_pkzip(sp[1:5]) == 0x3b3953bc, "second_plaintext[1:5] 的 crc32 应等于 junk CRC"
+
+
+def find_second_plaintext_on_disk():
+    """定位 checked-in second_plaintext（ziphard 资产），找不到返回 None。"""
+    import os as _os
+    cand = [
+        _os.path.join(_os.path.dirname(__file__), "..", "..",
+                      "logs", "bkcrack_build", "attack", "second_plaintext"),
+    ]
+    for c in cand:
+        if _os.path.isfile(c):
+            return open(c, "rb").read()
+    return None
+
+
+# --------------------------------------------------------------------------
+# 3.6) ziphard：真实题目端到端（慢，需 bkcrack 二进制）
+# --------------------------------------------------------------------------
+@pytest.mark.slow
+def test_presolve_ziphard_solves_real_problem():
+    import asyncio
+
+    if not find_bkcrack():
+        pytest.skip("bkcrack 二进制缺失（编译 logs/bkcrack_build 后重试）")
+    q = _load(ZIP_QID)
+    assert q is not None, f"题库里找不到 {ZIP_QID}"
+    truth = str(getattr(q, "flag_sha256", "") or "")
+    assert truth, "本题应有 flag_sha256 真值"
+    flag = asyncio.run(P._try_zip_bkcrack(q))
     assert flag, "presolve 接线路径未解出 flag"
     assert hashlib.sha256(flag.encode()).hexdigest() == truth
 
