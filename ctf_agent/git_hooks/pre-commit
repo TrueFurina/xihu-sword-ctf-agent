@@ -170,3 +170,18 @@ echo "=== [5/5] 测试文件禁改守卫 ==="
 # ctf_agent/ctf_agent/scripts/...（文件不存在 → 恒 exit 1 → 拦死所有提交）。
 # 同时裸 `python` 与其余门禁的 "$PY"（.venv）不一致，一并统一为 "$PY"。
 "$PY" scripts/test_file_guard.py --staged || exit 1
+
+# ── ⑫ 数据真值/基准门禁聚合（2026-10-10 新增）──
+# 起因：三道**数据类**门禁（机器真值 schema 审计 / 正式基准清单 vs 磁盘 / 题库健康基线）
+# 此前**一道都没接进钩子**，只能靠人记得手动跑——每道门禁自己都能发现问题，
+# 但"记得跑"是最弱的一环，纸面门禁等于没有门禁。
+# 聚合器 scripts/_run_all_gates.py：0.85s 跑全，失败即阻断（fail-closed）。
+# 题库健康门禁只在**回归**时红（questions_real 有 77 道已知历史坏题，
+# 按"坏题>0 即红"会天天假红，而天天假红的护栏最终一定被整段注释掉）。
+echo "── ⑫ 数据真值/基准门禁（真值 schema + 基准一致性 + 题库健康）──"
+"$PY" scripts/_run_all_gates.py || {
+    echo "❌ 数据门禁未过：机器真值可能已被异构覆盖，或正式基准清单与磁盘不一致。"
+    echo "   诊断：.venv/Scripts/python.exe scripts/_run_all_gates.py --verbose"
+    echo "   修复后重试；确属口径变更需更新基线时见各脚本 --help"
+    exit 1
+}
