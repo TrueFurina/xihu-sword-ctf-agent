@@ -24,7 +24,7 @@ Most "CTF agents" are just an LLM with a shell. This one is the opposite: **dete
 ctf_agent/
 ├── core/          main loop, presolve static analyzer, supervisor agent, wall-clock stop-loss
 ├── agents/        per-category solvers (crypto_toolkit / misc / web / reverse / pwn …)
-├── skills/        72 deterministic skills (run(params) -> dict interface; machine count = `scripts/_kpi_canonical.py`)
+├── skills/        73 deterministic skills (run(params) -> dict interface; machine count = `scripts/_kpi_canonical.py`)
 ├── llm/           LLM client (provider whitelist, fail-closed circuit breaking)
 ├── ctfplatform/   contest-platform client (DASCTF-style), retry / fail-open submit path
 ├── sandbox/       code-execution sandbox (subprocess isolation)
@@ -41,12 +41,12 @@ ctf_agent/
 
 ```
 platform poll → triage/classify → attachment download + target probe
-             → deterministic skills (72) ⇄ LLM reasoning (whitelisted providers)
+             → deterministic skills (73) ⇄ LLM reasoning (whitelisted providers)
              → flag validation → platform submit (fail-closed on request errors)
 ```
 
 - **Supervisor architecture**: `core/main_agent.py` plans per challenge, `core/supervisor_agent.py` enforces step budgets, tool-first discipline, and the request-failure-vs-wrong-flag separation (the post-incident fix for a submit-circuit-breaker bug).
-- **Deterministic-first**: `skills/` holds 72 runnable skills (`scripts/_kpi_canonical.py` machine count). `core/presolve.py` runs them before any LLM token is spent.
+- **Deterministic-first**: `skills/` holds 73 runnable skills (`scripts/_kpi_canonical.py` machine count). `core/presolve.py` runs them before any LLM token is spent.
 - **Whitelisted LLM only** (contest rule §3); multi-source fallback with 401/402 circuit breaking, per-question token budgets, heavy-model upgrade policy.
 - **Race harness**: `scripts/_race_start.py --compete` = first-blood scan → stable polling → final report, with a mandatory e2e data-link preflight (fail-closed).
 
