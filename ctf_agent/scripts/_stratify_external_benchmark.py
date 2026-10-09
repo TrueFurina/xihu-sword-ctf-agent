@@ -67,6 +67,37 @@ def matches_truth(candidate: bytes, truth_digest: str) -> bool:
     return bool(m) and sha256_hex(m.group(1)) == truth
 
 
+UUID_LIKE = re.compile(r"^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$")
+HEX32 = re.compile(r"^[0-9a-fA-F]{32}$")
+
+
+def content_is_answer(raw: bytes, truth: str) -> bool:
+    """附件内容本身就是答案（**裸值形态**，没有 flag{{...}} 外壳）。
+
+    2026-10-10 实测补充：初版只认 flag{{...}} 形态 → longjian 4 题的 flag.txt 里存的是
+    裸值（32 位 hex / uuid），哈希逐字匹配真值，却被误判成"附件无答案"进了推理层。
+    这类附件等于答案键，若同时没有真实载荷，该题是**坏题**（必然 0 分），不是推理题。
+    """
+    txt = raw.decode("utf-8", errors="ignore").strip()
+    if not txt:
+        return False
+    if sha256_hex(txt.encode()) == truth:
+        return True
+    # 有些题库把外壳剥掉但内容里仍带花括号形态，matches_truth 已覆盖裸字节分支
+    return matches_truth(txt.encode(), truth)
+
+
+def looks_like_answer_key(name: str, raw: bytes) -> bool:
+    """无真值时的启发式：文件名像答案键（flag/answer/key/pass）且内容是短裸值。"""
+    base = name.lower()
+    if not any(k in base for k in ("flag", "answer", "key", "pass", "secret")):
+        return False
+    txt = raw.decode("utf-8", errors="ignore").strip()
+    if len(txt) > 200:
+        return False
+    return bool(HEX32.match(txt) or UUID_LIKE.match(txt))
+
+
 def detect_kind(head: bytes, name: str) -> str:
     low = name.lower()
     for kind, magics in MAGIC.items():
@@ -89,6 +120,7 @@ def stratify(bench_path: Path, att_root: Path) -> dict:
         atts = list(p.get("attachments") or ([p["attachment"]] if p.get("attachment") else []))
         truth = str(p.get("flag_sha256") or "").lower()
         scanned, direct_hit, cand_count, kinds_here = 0, False, 0, Counter()
+        key_attach = False
         for a in atts:
             fp = (att_root / a)
             if not fp.is_file():
@@ -105,13 +137,23 @@ def stratify(bench_path: Path, att_root: Path) -> dict:
             # 会被整题漏掉 → 答案明明躺在附件里却被判成 L2「纯推理层」，污染能力分母。
             # 仅对 <=4KB 附件做（真答案文件都是几十字节），不对 pcap/二进制全文做无意义比对；
             # 仍走 matches_truth 精确摘要比对，且未命中不计入 cand_count（不影响 L1/L2 判定）。
+            if content_is_answer(raw, truth) or looks_like_answer_key(fp.name, raw):
+                key_attach = True
             if len(raw) <= 4096:
                 for c in [raw.strip()] + [ln.strip() for ln in raw.splitlines()]:
                     if c and matches_truth(c, truth):
                         direct_hit = True
                         cand_count += 1
                         break
-        if not atts:
+        if key_attach and not direct_hit:
+            # 附件里有"答案键"形态文件但真值没直接命中：要么真实载荷缺失（坏题），
+            # 要么答案经过了变换。坏题必须单列——否则会混进推理分母虚高能力。
+            key_only = all(
+                content_is_answer((att_root / a).read_bytes(), truth) or
+                looks_like_answer_key(Path(a).name, (att_root / a).read_bytes())
+                for a in atts if (att_root / a).is_file()) if scanned else True
+            level = "LB_answer_key_only" if key_only else "L0b_answer_key_attachment"
+        elif not atts:
             level = "L3_no_payload"          # 题面本就无附件
         elif scanned == 0:
             # 声明有附件但本机一份都没读到——不能记成"无附件"，那会把
@@ -126,6 +168,7 @@ def stratify(bench_path: Path, att_root: Path) -> dict:
         kinds[level] += 1
         cats[p.get("category", "?")] += 1
         rows.append({"id": qid, "category": p.get("category", ""), "level": level,
+                     "answer_key_attachment": bool(key_attach),
                      "flag_shaped_strings_in_attachments": cand_count,
                      "attachments_scanned": scanned,
                      "attachment_kinds": dict(kinds_here),
@@ -156,8 +199,11 @@ def to_markdown(rep: dict) -> str:
         "L2_pure_reasoning": ("附件无 flag 形态串，必须真解题", "✅ 能"),
         "L3_no_payload": ("题面声明无附件", "✅ 能（但样本少）"),
         "LX_attachment_unavailable": ("声明有附件但本机读不到", "⚠️ 不可用（须先补齐载荷）"),
+        "L0b_answer_key_attachment": ("附件含答案键形态文件（另有真实载荷）", "❌ 不能（已泄漏）"),
+        "LB_answer_key_only": ("附件**只有答案键**、真实载荷缺失", "❌ 坏题（必然 0 分，须剔除）"),
     }
-    for k in ("L0_direct_read", "L1_single_candidate", "L2_pure_reasoning",
+    for k in ("L0_direct_read", "L0b_answer_key_attachment", "LB_answer_key_only",
+              "L1_single_candidate", "L2_pure_reasoning",
               "L3_no_payload", "LX_attachment_unavailable"):
         n = rep["by_level"].get(k, 0)
         d, judge = desc[k]

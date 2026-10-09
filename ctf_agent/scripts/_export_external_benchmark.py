@@ -267,8 +267,14 @@ def collect(include_trained: bool = True, src: Path | None = None,
             excluded.append({"file": fp.name, "id": qid,
                              "reason": reason, "detail": detail})
 
-        # ① 真值可判定
+        # ① 真值可判定：flag_sha256 优先；缺失时接受 flag 字段本身是 64 位 sha256 占位
+        # （与题库约定一致：真 flag 红线下明文已迁出，flag 字段承载 sha256 占位）。
+        # 2026-10-10 实测：此前只认 flag_sha256，把 4 道带占位真值的可用题误剔了。
         truth = str(q.get("flag_sha256") or "").strip().lower()
+        if not HEX64.match(truth):
+            _ph = str(q.get("flag") or "").strip().lower()
+            if HEX64.match(_ph):
+                truth = _ph
         if not HEX64.match(truth):
             drop("no_verifiable_truth", "缺 flag_sha256，无法机器判定真伪")
             continue
