@@ -1,0 +1,12 @@
+{
+  "name": "crypto_zip_bkcrack",
+  "purpose": "Google CTF 2023「ZIP」(ziphard) 确定性求解器：PKZIP 兼容加密的 Biham-Kocher 已知明文攻击（bkcrack）。利用 flag.txt 的 BOM+CTF{ 已知明文（7B）+ 末字节 } 与自动 check byte 拼成 8 连续字节，并用 junk.dat 的 CRC 逆推 4 字节明文作 second-file 交叉过滤，恢复内部密钥后解密 flag.txt",
+  "input_spec": "params = {'kind': 'solve', 'zip': <hard.zip 绝对路径>}",
+  "output_spec": "solve → flag 明文 bytes；crypto_zip_bkcrack → {'flag': <CTF{...}>}",
+  "categories": ["crypto", "zip", "pkzip", "known-plaintext", "bkcrack"],
+  "version": "1.0",
+  "external_dependencies": [
+    "预编译 bkcrack 二进制（logs/bkcrack_build/bkcrack-1.5.0/bkcrack150_omp.exe，或 env BKRACK_BIN）",
+    "second_ciphertext / second_plaintext 资产（确定性生成，默认复用 logs/bkcrack_build/attack/）"
+  ]
+}
