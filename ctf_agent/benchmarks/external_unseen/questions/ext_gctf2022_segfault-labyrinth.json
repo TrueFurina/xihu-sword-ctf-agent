@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2022_segfault-labyrinth",
+ "category": "misc",
+ "title": "Segfault Labyrinth",
+ "description": "Be careful! One wrong turn and the whole thing comes crashing down",
+ "flag_sha256": "4e395272277002866e79b6a451001f94dcb05f94839d379a573992785d9f39e3",
+ "flag": "4e395272277002866e79b6a451001f94dcb05f94839d379a573992785d9f39e3",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\misc\\ext_gctf2022_segfault-labyrinth\\_attachments\\challenge"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

@@ -1,0 +1,15 @@
+{
+ "id": "ext_gctf2025_merkurated",
+ "category": "crypto",
+ "title": "Merkurated",
+ "description": "Can you rugpull my crypto?",
+ "flag_sha256": "5a1c3a795a9d1a4e1902927af958bda3c659da3b52199f9d5b70c8bb0d6ca0d4",
+ "flag": "5a1c3a795a9d1a4e1902927af958bda3c659da3b52199f9d5b70c8bb0d6ca0d4",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2025_merkurated\\_attachments\\chall.py",
+  "data\\questions_external\\crypto\\ext_gctf2025_merkurated\\_attachments\\requirements.txt"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

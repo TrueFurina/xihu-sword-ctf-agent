@@ -1,0 +1,16 @@
+{
+ "id": "ext_gctf2022_custom-protocol",
+ "category": "crypto",
+ "title": "Custom Protocol",
+ "description": "I like to implement crypto myself. Please, take a look at my new implementation. It looks amazing, right?",
+ "flag_sha256": "2eb85cf5344b86a105e233b8945420f6f38359c5be175cf45be712a7fb20b41e",
+ "flag": "2eb85cf5344b86a105e233b8945420f6f38359c5be175cf45be712a7fb20b41e",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2022_custom-protocol\\_attachments\\msgs.proto",
+  "data\\questions_external\\crypto\\ext_gctf2022_custom-protocol\\_attachments\\msgs_pb2.py",
+  "data\\questions_external\\crypto\\ext_gctf2022_custom-protocol\\_attachments\\server.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

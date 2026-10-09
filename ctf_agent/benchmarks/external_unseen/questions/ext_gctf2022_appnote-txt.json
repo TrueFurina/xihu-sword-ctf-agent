@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2022_appnote-txt",
+ "category": "misc",
+ "title": "APPNOTE.TXT",
+ "description": "Every single archive manager unpacks this to a different file...",
+ "flag_sha256": "08c49a6674c68e5f9a94f939d6c2cfa5d3983e9c28a55630f1e99cf2e279056c",
+ "flag": "08c49a6674c68e5f9a94f939d6c2cfa5d3983e9c28a55630f1e99cf2e279056c",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\misc\\ext_gctf2022_appnote-txt\\_attachments\\dump.zip"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

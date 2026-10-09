@@ -1,0 +1,16 @@
+{
+ "id": "ext_gctf2022_electric-mayhem-pqc",
+ "category": "crypto",
+ "title": "Electric Mayhem PQC",
+ "description": "The server presents power traces of a secret firmware crypto operation. The goal is to recover the secret key.",
+ "flag_sha256": "726be233db051afadfcbf60894793874dd808d8f071f3da879b6550a3c8786af",
+ "flag": "726be233db051afadfcbf60894793874dd808d8f071f3da879b6550a3c8786af",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2022_electric-mayhem-pqc\\_attachments\\elmo.tgz",
+  "data\\questions_external\\crypto\\ext_gctf2022_electric-mayhem-pqc\\_attachments\\firmware.tgz",
+  "data\\questions_external\\crypto\\ext_gctf2022_electric-mayhem-pqc\\_attachments\\stm32f0_kyber512.json.gz"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

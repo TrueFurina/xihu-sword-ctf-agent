@@ -1,0 +1,14 @@
+{
+ "id": "ext_nyu_ctf_bench_2018q_for_whyos",
+ "category": "forensics",
+ "title": "CSAW-Quals 2018 whyOS",
+ "description": "Have fun digging through that one. No device needed. Note: the flag is a hex string.",
+ "flag_sha256": "3c39de2d00899cbe4f6e2c9d24a80fbb18c97b1c91ca6ab2b32f18cc4e3ed4e4",
+ "flag": "3c39de2d00899cbe4f6e2c9d24a80fbb18c97b1c91ca6ab2b32f18cc4e3ed4e4",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data/questions_ext/_attachments/forensics/2018q-for-whyos/com.yourcompany.whyos_4.2.0-28+debug_iphoneos-arm.deb"
+ ],
+ "difficulty": "MEDIUM",
+ "source_pool": "questions_ext"
+}

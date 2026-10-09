@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2024_hwsim",
+ "category": "misc",
+ "title": "hwsim",
+ "description": "You are the hardware supplier for  G.U.G.L. Can you sneak past the formal verification?",
+ "flag_sha256": "a8665b054e21c5b63617befa0f5af67827c67b904403a14a27faf04158e1e009",
+ "flag": "a8665b054e21c5b63617befa0f5af67827c67b904403a14a27faf04158e1e009",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\misc\\ext_gctf2024_hwsim\\_attachments\\hwsim.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

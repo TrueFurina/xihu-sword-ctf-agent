@@ -1,0 +1,47 @@
+{
+ "updated_at": "2026-10-10T01:30:13",
+ "pools": {
+  "questions_real": {
+   "total": 93,
+   "ok": 14,
+   "leaky": 2,
+   "broken": 77
+  },
+  "questions_external": {
+   "total": 43,
+   "ok": 40,
+   "leaky": 0,
+   "broken": 3
+  },
+  "questions_ext": {
+   "total": 37,
+   "ok": 33,
+   "leaky": 1,
+   "broken": 3
+  },
+  "questions_ext_cybench": {
+   "total": 13,
+   "ok": 11,
+   "leaky": 2,
+   "broken": 0
+  },
+  "questions_ext_A_20261001": {
+   "total": 12,
+   "ok": 12,
+   "leaky": 0,
+   "broken": 0
+  },
+  "questions_ext_trial5_20261001": {
+   "total": 5,
+   "ok": 5,
+   "leaky": 0,
+   "broken": 0
+  },
+  "questions_real_kpi9": {
+   "total": 8,
+   "ok": 8,
+   "leaky": 0,
+   "broken": 0
+  }
+ }
+}

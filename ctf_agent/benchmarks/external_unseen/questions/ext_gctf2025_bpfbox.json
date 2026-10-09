@@ -1,0 +1,20 @@
+{
+ "id": "ext_gctf2025_bpfbox",
+ "category": "misc",
+ "title": "BpfBox",
+ "description": "I heard people can write LSMs using BPF, so I built one.",
+ "flag_sha256": "f47d97b0da61e829a95fdd72d26ceb7ecb1acd2ab51b18971d8d3dd418c8507a",
+ "flag": "f47d97b0da61e829a95fdd72d26ceb7ecb1acd2ab51b18971d8d3dd418c8507a",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\misc\\ext_gctf2025_bpfbox\\_attachments\\Dockerfile",
+  "data\\questions_external\\misc\\ext_gctf2025_bpfbox\\_attachments\\flag.txt",
+  "data\\questions_external\\misc\\ext_gctf2025_bpfbox\\_attachments\\flake.lock",
+  "data\\questions_external\\misc\\ext_gctf2025_bpfbox\\_attachments\\flake.nix",
+  "data\\questions_external\\misc\\ext_gctf2025_bpfbox\\_attachments\\init\\go.mod",
+  "data\\questions_external\\misc\\ext_gctf2025_bpfbox\\_attachments\\init\\main.go",
+  "data\\questions_external\\misc\\ext_gctf2025_bpfbox\\_attachments\\run_qemu"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

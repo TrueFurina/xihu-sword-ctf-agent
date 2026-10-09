@@ -1,0 +1,17 @@
+{
+ "id": "ext_gctf2021_abc-arm-and-amd",
+ "category": "misc",
+ "title": "abc arm and amd",
+ "description": "Provide a payload that prints the contents of the 'flag' file and runs on both\nx86-64 and arm64v8.",
+ "flag_sha256": "6d0457f9be5c0605a13cecc2a2f66d215fab8d2a3c01be034112104ca4ff95d5",
+ "flag": "6d0457f9be5c0605a13cecc2a2f66d215fab8d2a3c01be034112104ca4ff95d5",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\misc\\ext_gctf2021_abc-arm-and-amd\\_attachments\\chal-aarch64",
+  "data\\questions_external\\misc\\ext_gctf2021_abc-arm-and-amd\\_attachments\\chal-x86-64",
+  "data\\questions_external\\misc\\ext_gctf2021_abc-arm-and-amd\\_attachments\\libc-aarch64.so",
+  "data\\questions_external\\misc\\ext_gctf2021_abc-arm-and-amd\\_attachments\\libc-x86-64.so"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

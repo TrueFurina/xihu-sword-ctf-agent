@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2021_story",
+ "category": "crypto",
+ "title": "story",
+ "description": "Please, tell me a beautiful story.",
+ "flag_sha256": "87103faa49dd5ef5028fbd9a4e5d34480a074400e70c453add814de9d0c8d400",
+ "flag": "87103faa49dd5ef5028fbd9a4e5d34480a074400e70c453add814de9d0c8d400",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2021_story\\_attachments\\server.dart"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

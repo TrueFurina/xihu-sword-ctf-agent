@@ -1,0 +1,17 @@
+{
+ "id": "ext_gctf2024_mceliece",
+ "category": "crypto",
+ "title": "McEliece",
+ "description": "Mceliece cryptosystem was developed in 1978 and has resisted cryptanalysis so far.\nLets make allies with better error correcting codes which may call ease on the sizes of keys.",
+ "flag_sha256": "c8353fcb0d2548a3967df6526b934c011a39878abcc0d2e59bf1ab8d4cd6fec3",
+ "flag": "c8353fcb0d2548a3967df6526b934c011a39878abcc0d2e59bf1ab8d4cd6fec3",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2024_mceliece\\_attachments\\chall.sage",
+  "data\\questions_external\\crypto\\ext_gctf2024_mceliece\\_attachments\\flag_enc.sobj",
+  "data\\questions_external\\crypto\\ext_gctf2024_mceliece\\_attachments\\params.sobj",
+  "data\\questions_external\\crypto\\ext_gctf2024_mceliece\\_attachments\\pubkey.sobj"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

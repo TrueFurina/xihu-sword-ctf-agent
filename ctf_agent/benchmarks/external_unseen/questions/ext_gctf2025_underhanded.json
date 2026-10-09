@@ -1,0 +1,15 @@
+{
+ "id": "ext_gctf2025_underhanded",
+ "category": "crypto",
+ "title": "Underhanded",
+ "description": "Proudly sharing our Python implementation of AES.\nBy the way, we sneakily hid a backdoor. Can you see sharp and see what went wrong?",
+ "flag_sha256": "090f21dbb33b0995569b9e9c4136aaa93a0ad8b58d0c2ac102052899b6984554",
+ "flag": "090f21dbb33b0995569b9e9c4136aaa93a0ad8b58d0c2ac102052899b6984554",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2025_underhanded\\_attachments\\aes.py",
+  "data\\questions_external\\crypto\\ext_gctf2025_underhanded\\_attachments\\chall.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

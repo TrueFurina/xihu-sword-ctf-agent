@@ -1,0 +1,19 @@
+{
+ "id": "ext_gctf2021_tonality",
+ "category": "crypto",
+ "title": "tonality",
+ "description": "In this challenge, you have access to a signing oracle.\nGood luck!",
+ "flag_sha256": "f45b85bb3e940c3a413b7e9b6de097a99f295293c098a74745208f385dcac1be",
+ "flag": "f45b85bb3e940c3a413b7e9b6de097a99f295293c098a74745208f385dcac1be",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2021_tonality\\_attachments\\challenge.pb.go",
+  "data\\questions_external\\crypto\\ext_gctf2021_tonality\\_attachments\\challenge.proto",
+  "data\\questions_external\\crypto\\ext_gctf2021_tonality\\_attachments\\challenge_pb2.py",
+  "data\\questions_external\\crypto\\ext_gctf2021_tonality\\_attachments\\challenger.go",
+  "data\\questions_external\\crypto\\ext_gctf2021_tonality\\_attachments\\client_skel.py",
+  "data\\questions_external\\crypto\\ext_gctf2021_tonality\\_attachments\\server.go"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

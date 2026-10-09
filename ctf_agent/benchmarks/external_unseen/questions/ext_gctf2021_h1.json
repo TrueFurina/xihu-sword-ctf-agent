@@ -1,0 +1,15 @@
+{
+ "id": "ext_gctf2021_h1",
+ "category": "crypto",
+ "title": "H1",
+ "description": "Crypto is not real hacking, they say.",
+ "flag_sha256": "c62e7c1804e27b9b53bdb9e63f8a6e08c8ed2e11e4ffa9384f24d6317ab0d2df",
+ "flag": "c62e7c1804e27b9b53bdb9e63f8a6e08c8ed2e11e4ffa9384f24d6317ab0d2df",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2021_h1\\_attachments\\chall.py",
+  "data\\questions_external\\crypto\\ext_gctf2021_h1\\_attachments\\output.txt"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

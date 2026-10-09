@@ -1,0 +1,17 @@
+{
+ "id": "ext_gctf2025_filtermaze",
+ "category": "crypto",
+ "title": "filtermaze",
+ "description": "I have left a key to the chest at the end of the maze.",
+ "flag_sha256": "2a4fdc4b4f3011e7c21d477297e2b7a5188908c36cd733254ed8652fb9512cdf",
+ "flag": "2a4fdc4b4f3011e7c21d477297e2b7a5188908c36cd733254ed8652fb9512cdf",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2025_filtermaze\\_attachments\\filtermaze.py",
+  "data\\questions_external\\crypto\\ext_gctf2025_filtermaze\\_attachments\\flag",
+  "data\\questions_external\\crypto\\ext_gctf2025_filtermaze\\_attachments\\graph.json",
+  "data\\questions_external\\crypto\\ext_gctf2025_filtermaze\\_attachments\\lwe_pub_params.json"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2022_maybe-someday",
+ "category": "crypto",
+ "title": "Maybe Someday",
+ "description": "Leave me your ciphertexts. I will talk to you later.",
+ "flag_sha256": "119b199b2399c36c551469e1551360965adf168cc76158a3f7a3f4d7877abc3d",
+ "flag": "119b199b2399c36c551469e1551360965adf168cc76158a3f7a3f4d7877abc3d",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2022_maybe-someday\\_attachments\\chall.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

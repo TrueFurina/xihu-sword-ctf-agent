@@ -1,0 +1,18 @@
+{
+ "id": "ext_gctf2025_numerology",
+ "category": "crypto",
+ "title": "numerology",
+ "description": "I made a new cipher, can you help me test it? I'll give you the key, please use it to decrypt my ciphertext.",
+ "flag_sha256": "6e1f6526c3d9a298be5b1a2ae36759b77de2508d3061480b8e8cfedfb5cf7e16",
+ "flag": "6e1f6526c3d9a298be5b1a2ae36759b77de2508d3061480b8e8cfedfb5cf7e16",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2025_numerology\\_attachments\\__pycache__\\crypto_numerology.cpython-312.pyc",
+  "data\\questions_external\\crypto\\ext_gctf2025_numerology\\_attachments\\ctf_challenge_package.json",
+  "data\\questions_external\\crypto\\ext_gctf2025_numerology\\_attachments\\flag.txt",
+  "data\\questions_external\\crypto\\ext_gctf2025_numerology\\_attachments\\init.sh",
+  "data\\questions_external\\crypto\\ext_gctf2025_numerology\\_attachments\\readme.md"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

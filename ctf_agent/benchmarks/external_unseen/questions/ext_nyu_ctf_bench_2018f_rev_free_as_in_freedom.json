@@ -1,0 +1,14 @@
+{
+ "id": "ext_nyu_ctf_bench_2018f_rev_free_as_in_freedom",
+ "category": "rev",
+ "title": "CSAW-Finals 2018 FREE as in FREEdom",
+ "description": "We understand the not everyone can afford IDA. Instead of IDC, check out this alternative, free-as-in-freedom scripting language :)",
+ "flag_sha256": "e07b81a7bbf4101d541a806629a85efbd011792d66b5b4e28bb0be1e9fea2a2d",
+ "flag": "e07b81a7bbf4101d541a806629a85efbd011792d66b5b4e28bb0be1e9fea2a2d",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data/questions_ext/_attachments/rev/2018f-rev-free_as_in_freedom/welcome2.r2"
+ ],
+ "difficulty": "MEDIUM",
+ "source_pool": "questions_ext"
+}

@@ -1,0 +1,15 @@
+{
+ "id": "ext_nyu_ctf_bench_2018q_for_simple_recovery",
+ "category": "forensics",
+ "title": "CSAW-Quals 2018 simple_recovery",
+ "description": "Simple Recovery Try to recover the data from these RAID 5 images!  Hint: The data is a checkerboard layout Hint: Parity are in inverted layout ",
+ "flag_sha256": "a3c34d68553e57081658174032a07efe6780414a6e90c8e09d6281e4b1aa078c",
+ "flag": "a3c34d68553e57081658174032a07efe6780414a6e90c8e09d6281e4b1aa078c",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data/questions_ext/_attachments/forensics/2018q-for-simple_recovery/disk.img0.7z",
+  "data/questions_ext/_attachments/forensics/2018q-for-simple_recovery/disk.img1.7z"
+ ],
+ "difficulty": "MEDIUM",
+ "source_pool": "questions_ext"
+}

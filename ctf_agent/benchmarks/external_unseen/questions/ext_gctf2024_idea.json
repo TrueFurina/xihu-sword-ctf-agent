@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2024_idea",
+ "category": "crypto",
+ "title": "IDEA",
+ "description": "We have a new idea about a cipher which we think may provide pretty good privacy\nSo bruce for impact as we may patent our new proposed encryption standard",
+ "flag_sha256": "3b17e7f55d09e143d4acfe5647ce167b8e21539c5453a362ffbbe4c0c7d13435",
+ "flag": "3b17e7f55d09e143d4acfe5647ce167b8e21539c5453a362ffbbe4c0c7d13435",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2024_idea\\_attachments\\chall.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

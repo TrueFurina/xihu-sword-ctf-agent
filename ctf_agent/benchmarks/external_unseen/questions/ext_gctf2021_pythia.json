@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2021_pythia",
+ "category": "crypto",
+ "title": "pythia",
+ "description": "Yet another oracle, but the queries are costly and limited so be frugal with them.",
+ "flag_sha256": "57bbf5cf67e49a3f39b7efb20b80e47edaf5537d675cd8d1d5d3afc8fab79037",
+ "flag": "57bbf5cf67e49a3f39b7efb20b80e47edaf5537d675cd8d1d5d3afc8fab79037",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2021_pythia\\_attachments\\server.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

@@ -1,0 +1,16 @@
+{
+ "id": "ext_gctf2022_legit",
+ "category": "misc",
+ "title": "LeGit",
+ "description": "I built this CLI for exploring git repositories. It's still WIP but I find it pretty cool! What do you think about it?",
+ "flag_sha256": "765bffcabc23224b0ebbb7342169b0c0040dfe9be911446254b3bb90ae8f5079",
+ "flag": "765bffcabc23224b0ebbb7342169b0c0040dfe9be911446254b3bb90ae8f5079",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\misc\\ext_gctf2022_legit\\_attachments\\Dockerfile",
+  "data\\questions_external\\misc\\ext_gctf2022_legit\\_attachments\\nsjail.cfg",
+  "data\\questions_external\\misc\\ext_gctf2022_legit\\_attachments\\server.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

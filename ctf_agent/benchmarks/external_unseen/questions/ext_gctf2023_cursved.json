@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2023_cursved",
+ "category": "crypto",
+ "title": "Cursved",
+ "description": "This new signature scheme I built should be super secure. I know that you do not have a quantum computer, so what could possibly go wrong.",
+ "flag_sha256": "8185f0adaafb18b0f95d0ee11fd8e5cf3225cccfb117457bef7defa8b6482e7f",
+ "flag": "8185f0adaafb18b0f95d0ee11fd8e5cf3225cccfb117457bef7defa8b6482e7f",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2023_cursved\\_attachments\\chal.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

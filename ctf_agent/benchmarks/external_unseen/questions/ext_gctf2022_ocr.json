@@ -1,0 +1,18 @@
+{
+ "id": "ext_gctf2022_ocr",
+ "category": "misc",
+ "title": "OCR",
+ "description": "Train our neural network to read handwritten letters! I'm sure with the newest technological advances, you'll be able to do it with a tiny network and just a handful of training images.",
+ "flag_sha256": "3ead8d846f12a2074dd6eb60456893da3c9a119ed560656ba9b19560b4cd45c8",
+ "flag": "3ead8d846f12a2074dd6eb60456893da3c9a119ed560656ba9b19560b4cd45c8",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\misc\\ext_gctf2022_ocr\\_attachments\\images\\00.png",
+  "data\\questions_external\\misc\\ext_gctf2022_ocr\\_attachments\\images\\01.png",
+  "data\\questions_external\\misc\\ext_gctf2022_ocr\\_attachments\\images\\02.png",
+  "data\\questions_external\\misc\\ext_gctf2022_ocr\\_attachments\\images\\03.png",
+  "data\\questions_external\\misc\\ext_gctf2022_ocr\\_attachments\\server.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

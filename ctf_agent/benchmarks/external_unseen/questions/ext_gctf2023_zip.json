@@ -1,0 +1,15 @@
+{
+ "id": "ext_gctf2023_zip",
+ "category": "crypto",
+ "title": "ZIP",
+ "description": "Someone rolled their own implementation of PKZIP-compatible encryption to produce an encrypted ZIP file. The PKZIP-compatible cipher is old and known to be weak, but did the author leak sufficient information for you to decrypt the flag?",
+ "flag_sha256": "d3109ddee29b5916e1b3356a863bd4203bd356cbfa76a5d5467c62cac692a69e",
+ "flag": "d3109ddee29b5916e1b3356a863bd4203bd356cbfa76a5d5467c62cac692a69e",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2023_zip\\_attachments\\hard.py",
+  "data\\questions_external\\crypto\\ext_gctf2023_zip\\_attachments\\hard.zip"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

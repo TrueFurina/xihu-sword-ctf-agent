@@ -1,0 +1,16 @@
+{
+ "id": "ext_gctf2024_zkpok",
+ "category": "crypto",
+ "title": "ZKPOK",
+ "description": "If you know the flag... you know the flag!",
+ "flag_sha256": "b2b94d189a30bf906abea043a54c562b66f28f524b957e195414cc08c74ad11d",
+ "flag": "b2b94d189a30bf906abea043a54c562b66f28f524b957e195414cc08c74ad11d",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2024_zkpok\\_attachments\\chall.py",
+  "data\\questions_external\\crypto\\ext_gctf2024_zkpok\\_attachments\\generate.py",
+  "data\\questions_external\\crypto\\ext_gctf2024_zkpok\\_attachments\\param.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}
