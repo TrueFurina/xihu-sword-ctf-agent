@@ -54,6 +54,8 @@ import asyncio
 import importlib
 import logging
 import multiprocessing
+import os
+import sys
 from typing import Any, Callable, Mapping, Optional, Sequence
 
 logger = logging.getLogger(__name__)
@@ -61,6 +63,85 @@ logger = logging.getLogger(__name__)
 # 单个 task 的进程启动宽限：spawn + import skill 的时间不计入task 墙钟。
 # 实测 spawn+init ≈ 220ms，给2s 足够覆盖冷启动与首次 import 开销。
 SPAWN_GRACE_SECONDS = 2.0
+
+
+def _win_job_initializer():
+    """Pool worker 初始化器（仅 Windows 生效）：把 worker 进程挂进
+    KILL_ON_JOB_CLOSE 的 Job Object。
+
+    语义：worker 独占持有 Job 句柄 → worker 被 terminate 时句柄随进程关闭
+    → **内核级联终止 Job 内所有进程**——包括 skill 在 worker 里再起的
+    孙进程（实测 2026-10-09：ziphard e2e 超时杀掉 skill 子进程后，
+    孙进程 bkcrack150_omp 孤儿存活 40+ 分钟吃满 8 核，级联打红下一个测试）。
+
+    POSIX 侧不启用（pool.terminate 对 worker 的 SIGTERM 不传导孙进程的
+    问题在 POSIX 需 killpg + pgid 回传管道，复杂度不成比例；本仓库
+    生产与比赛机均为 Windows）。任何失败都静默降级——Job 挂不上时
+    行为退化为修复前（只杀 worker），不阻塞 skill 执行。
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        k32 = ctypes.windll.kernel32
+        hjob = k32.CreateJobObjectW(None, None)
+        if not hjob:
+            return
+
+        class _BasicLimit(ctypes.Structure):
+            _fields_ = [
+                ("PerProcessUserTimeLimit", ctypes.c_int64),
+                ("PerJobUserTimeLimit", ctypes.c_int64),
+                ("LimitFlags", ctypes.c_uint32),
+                ("MinimumWorkingSetSize", ctypes.c_size_t),
+                ("MaximumWorkingSetSize", ctypes.c_size_t),
+                ("ActiveProcessLimit", ctypes.c_uint32),
+                ("Affinity", ctypes.c_size_t),
+                ("PriorityClass", ctypes.c_uint32),
+                ("SchedulingClass", ctypes.c_uint32),
+            ]
+
+        class _IoCounters(ctypes.Structure):
+            _fields_ = [
+                (n, ctypes.c_uint64)
+                for n in ("ReadOperationCount", "WriteOperationCount",
+                          "OtherOperationCount", "ReadTransferCount",
+                          "WriteTransferCount", "OtherTransferCount")
+            ]
+
+        class _ExtLimit(ctypes.Structure):
+            _fields_ = [
+                ("BasicLimitInformation", _BasicLimit),
+                ("IoInfo", _IoCounters),
+                ("ProcessMemoryLimit", ctypes.c_size_t),
+                ("JobMemoryLimit", ctypes.c_size_t),
+                ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                ("PeakJobMemoryUsed", ctypes.c_size_t),
+            ]
+
+        info = _ExtLimit()
+        # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
+        info.BasicLimitInformation.LimitFlags = 0x00002000
+        # JobObjectExtendedLimitInformation = 9
+        if not k32.SetInformationJobObject(hjob, 9, ctypes.byref(info),
+                                           ctypes.sizeof(info)):
+            return
+        # ⚠️ 不能用 GetCurrentProcess() 伪句柄：AssignProcessToJobObject 需要
+        # 带权限的**真实**句柄，伪句柄报 ERROR_INVALID_HANDLE(6)（2026-10-09 实测）。
+        # 改 OpenProcess 自身 pid 拿真句柄（自进程天然有完全访问权）。
+        PROCESS_ALL_ACCESS = 0x1F0FFF
+        hself = k32.OpenProcess(PROCESS_ALL_ACCESS, False, os.getpid())
+        if not hself:
+            return
+        ok = k32.AssignProcessToJobObject(hjob, hself)
+        k32.CloseHandle(hself)
+        if not ok:
+            return
+        # 句柄刻意不关闭——worker 退出时句柄关闭触发 KILL_ON_JOB_CLOSE，
+        # 孙进程随之被内核收割。
+    except Exception:  # noqa: BLE001 - 初始化失败静默降级，绝不阻塞 skill
+        return
 
 
 class SkillTimeout(TimeoutError):
@@ -98,7 +179,9 @@ def _run_isolated_blocking(module_name: str, func_name: str,
     不会像裸 `to_thread(skill)` 那样变成新的不可取消点。
     """
     ctx = multiprocessing.get_context("spawn")
-    pool = ctx.Pool(processes=1)
+    # 2026-10-09：worker 挂进 KILL_ON_JOB_CLOSE 的 Job（见 _win_job_initializer）——
+    # terminate 杀 worker 时句柄关闭，孙进程（skill 再起的 bkcrack 等）被内核级联收割。
+    pool = ctx.Pool(processes=1, initializer=_win_job_initializer)
     try:
         return _blocking_call(pool, module_name, func_name, args, kwargs, timeout)
     except multiprocessing.TimeoutError:
