@@ -525,6 +525,44 @@ def _recover_script_from_code(content: str) -> Optional[dict]:
     return None
 
 
+# ── 解析失败留样（2026-10-10）────────────────────────────────────────────
+# 起因：agent 实际走的是异步路径，而只有同步路径打印原文样本 → 异步解析失败
+# （弱模型高发：xfyun 4 次 / glm 8 次 / deepseek 0 次）时**没有任何原文证据**，
+# 导致"该改解析器还是换模型"只能靠猜。这里补齐证据链。
+#
+# 三条纪律：
+#   1. 限量：只留前 200 字；
+#   2. 脱敏：疑似密钥/长 base64 一律打码（样本要能进日志，就不能带凭据）；
+#   3. 去重：同一模型反复吐同一种坏格式，只留首次样本，否则日志被刷爆。
+_UNPARSABLE_SEEN: set = set()
+
+_SECRET_PATTERNS = (
+    re.compile(r"sk-[A-Za-z0-9_\-]{8,}"),
+    re.compile(r"ak_[A-Za-z0-9_\-]{8,}"),
+    re.compile(r"(?i)(api[_-]?key|token|secret|password)\s*[=:]\s*\S{8,}"),
+    re.compile(r"[A-Za-z0-9+/]{40,}={0,2}"),   # 长 base64 块
+)
+
+
+def _redact_for_log(text: str) -> str:
+    """把疑似凭据打码后再落日志（样本可进日志 = 不得含凭据）。"""
+    out = str(text)[:200]
+    for pat in _SECRET_PATTERNS:
+        out = pat.sub("***REDACTED***", out)
+    return out.replace("\n", " ")[:200]
+
+
+def _log_unparsable_sample(content: Any, tag: str = "async") -> None:
+    """解析失败时留一条脱敏样本；同一样本只留一次。"""
+    import hashlib as _hl
+    body = _redact_for_log(content if isinstance(content, str) else str(content))
+    key = _hl.sha1(body.encode("utf-8", "ignore")).hexdigest()[:12]
+    if key in _UNPARSABLE_SEEN:
+        return
+    _UNPARSABLE_SEEN.add(key)
+    logger.warning("[parse-sample:%s] %s", tag, body)
+
+
 def ai_chat_json_with_usage(
     messages: list[dict],
     system: Optional[str] = None,
@@ -555,6 +593,7 @@ def ai_chat_json_with_usage(
         return None, usage
     if obj is None:
         logger.warning("LLM 返回内容无法解析为 JSON 对象")
+        _log_unparsable_sample(content, "async")
         if recover_script:
             recovered = _recover_script_from_code(content)
             if recovered is not None:

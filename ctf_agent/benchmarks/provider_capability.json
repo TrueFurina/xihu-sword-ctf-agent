@@ -1,0 +1,55 @@
+{
+ "schema": "provider_capability/v1",
+ "generated_at": "2026-10-10T01:48:20",
+ "probe_question": "ext_gctf2021_ican-tbelieveit-snotcrypto.json",
+ "probe_budget": "20000",
+ "probe_wallclock": "120",
+ "metrics": {
+  "json_parse_failures": "解析失败次数（>0 = 模型吐不出本 agent 的动作协议）",
+  "code_salvage_hits": "代码围栏兜底恢复次数（>0 = 确实产生了动作）",
+  "plan_timeouts": "单步 plan 超时次数（>0 = 太慢，预算会烧光）",
+  "drives_tool_loop": "综合判定：能产生动作且不靠解析失败"
+ },
+ "profiles": [
+  {
+   "provider": "glm",
+   "probe_seconds": 77.3,
+   "exit_code": 0,
+   "json_parse_failures": 0,
+   "code_salvage_hits": 0,
+   "parse_samples": 0,
+   "steps": 9,
+   "plan_timeouts": 0,
+   "log": "logs\\toolcap_glm.log",
+   "solved": 0,
+   "total": 1,
+   "tokens": 21023,
+   "error": "race_abandon",
+   "drives_tool_loop": true,
+   "alive": true,
+   "status": "OK"
+  },
+  {
+   "provider": "xfyun",
+   "probe_seconds": 38.3,
+   "exit_code": 0,
+   "json_parse_failures": 0,
+   "code_salvage_hits": 0,
+   "parse_samples": 0,
+   "steps": 9,
+   "plan_timeouts": 0,
+   "log": "logs\\toolcap_xfyun.log",
+   "solved": 0,
+   "total": 1,
+   "tokens": 21930,
+   "error": "race_abandon",
+   "drives_tool_loop": true,
+   "alive": true,
+   "status": "OK"
+  }
+ ],
+ "recommendation": {
+  "recommended": "glm",
+  "why": "活着 + 零解析失败（探针未解出）"
+ }
+}
