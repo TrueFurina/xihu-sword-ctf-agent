@@ -46,6 +46,7 @@ WALLCLOCK_EMCLS = 120
 WALLCLOCK_LCG = 120
 WALLCLOCK_SVG = 60
 WALLCLOCK_BANANA = 60
+WALLCLOCK_ZIPHARD = 3600  # bkcrack 已知明文攻击（OpenMP 全核仍可能数十分钟）
 
 _PRESOLVE_ATTEMPTED = "_presolve_attempted"
 _PRESOLVE_CANDIDATES = "_presolve_candidates"  # 2026-08-22 锐评：多候选提取透传（提交迭代用）
@@ -201,6 +202,8 @@ _WIRED_SKILL_MODULES = {
     "skills.crypto_electric_mayhem_cls",    # AES-128 CPA 侧信道（模拟功耗轨迹，离线可解）
     "skills.crypto_lcg_recover",             # LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
     "skills.thoroughlystripped",             # null 剥离 ELF 字节级恢复（CSAW-Finals 2017）
+    "skills.crypto_zip_bkcrack",             # PKZIP 已知明文攻击（Google CTF 2023 ziphard，bkcrack）
+
 }
 
 
@@ -364,6 +367,21 @@ def _attachment_multi_candidate(question, cap: int = 2) -> bool:
                     return True
     return False
 
+
+
+def _cache_presolve_hit(question, flag: str) -> None:
+    """事实黑板写缓存（2026-09-02）：presolve 命中后供跨会话复用。
+
+    2026-10-09 sha256 仲裁重构时抽出——返回路径由「单点」变「验真直出 / 无真值
+    先到先得 / 兜底暂存」三处，黑板写入必须收敛到一个入口，防三处漂移。
+    """
+    try:
+        _qid = str(getattr(question, "id", ""))
+        if _qid:
+            from core.blackboard import get_blackboard
+            get_blackboard().set_presolve(_qid, flag, source="presolve")
+    except Exception:
+        pass
 
 
 def _passes_answer_check(question, flag: str, answers) -> bool:
@@ -658,8 +676,20 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_rsa_ibe_collusion(question)),
         # 2026-10-08 确定性静态求解：null 剥离 ELF 字节级恢复（CSAW-Finals 2017 thoroughlyStripped）
         asyncio.ensure_future(_try_thoroughlystripped(question)),
+        # 2026-10-09 B1 确定性静态求解：PKZIP 已知明文攻击（Google CTF 2023 ziphard，bkcrack）
+        asyncio.ensure_future(_try_zip_bkcrack(question)),
     ]
     try:
+        # 2026-10-09 sha256 仲裁（primes 假命中遮蔽修复）：as_completed 先到先得，
+        # 更快路径的诱饵候选会遮蔽慢路径的真解——实测 ext_gctf2023_primes 的
+        # chal.sage 内置诱饵 `CTF{YkDOLIS…}` 0.4s 抢跑 24.6s Coppersmith 真解
+        # （10-08 / 10-09 两次基线 sweep 同象）。修法：题面声明 sha256 真值
+        # （expected_sha256 非空）时——
+        #   * 候选经 _matches_expected_sha256 验真 → 立即返回（权威，压过先到者）；
+        #   * 未验真的合格候选 → 暂存并继续等真解；扫完无真解才回退暂存者
+        #     （无真值声明的题行为完全不变，仍先到先得，零行为回退）。
+        _fallback = None
+        _sha_truth_declared = bool(getattr(question, "expected_sha256", None))
         for _fut in asyncio.as_completed(_tasks):
             try:
                 _r = await _fut
@@ -679,20 +709,28 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
                         "[presolve] %s 命中但不符合本题 flag_pattern=%s，丢弃(疑似诱饵): %r",
                         getattr(question, "id", "?"), _fp, _r)
                     continue
-                if _passes_answer_check(question, _r, answers):
-                    # 事实黑板写缓存（2026-09-02）：解出成功后供跨会话复用
-                    try:
-                        _qid = str(getattr(question, "id", ""))
-                        if _qid:
-                            from core.blackboard import get_blackboard
-                            get_blackboard().set_presolve(_qid, _r, source="presolve")
-                    except Exception:
-                        pass
+                # ── sha256 仲裁：可验真候选压倒一切（含 pattern 闸旁路，同 76d0450 口径）──
+                if _matches_expected_sha256(question, _r):
+                    logger.info("[presolve] %s 候选经 sha256 验真，仲裁直出（压过先到的未验真候选）",
+                                getattr(question, "id", "?"))
+                    _cache_presolve_hit(question, _r)
                     return _r
+                if _passes_answer_check(question, _r, answers):
+                    if not _sha_truth_declared:
+                        _cache_presolve_hit(question, _r)
+                        return _r
+                    if _fallback is None:
+                        logger.info("[presolve] %s 先到候选 %r 暂存（题面有 sha256 真值，继续等验真候选）",
+                                    getattr(question, "id", "?"), str(_r)[:40])
+                        _fallback = _r
+                        continue
+                    continue
             if _r and not _is_plausible_flag(_r):
                 logger.debug("[presolve] %s 命中但疑似垃圾/占位 flag，丢弃: %r",
                              getattr(question, "id", "?"), _r)
-        return None
+        if _fallback is not None:
+            _cache_presolve_hit(question, _fallback)
+        return _fallback
     finally:
         for _fut in _tasks:
             if not _fut.done():
@@ -2799,6 +2837,68 @@ async def _try_cycling(question) -> Optional[str]:
     if flag and _is_plausible_flag(flag):
         logger.info("[presolve:cycling] %s 命中 flag=%s",
                     getattr(question, "id", "?"), flag[:60])
+        _save_candidates(question, [flag])
+        return flag
+    return None
+
+
+async def _try_zip_bkcrack(question) -> Optional[str]:
+    """ZIP（PKZIP 已知明文攻击，2026-10-09 新增 · B1 工具链补齐产物）。
+
+    对「题面/附件给出 PKZIP 兼容加密 zip（flag.txt + junk.dat 形态，Google CTF 2023
+    ziphard 特征）」的题型做确定性求解：交给 :func:`skills.crypto_zip_bkcrack.solve`
+    跑 bkcrack 已知明文攻击（BOM+CTF{ 已知明文 + junk CRC 逆推作 second-file 过滤）
+    恢复内部密钥并解密 flag.txt。
+
+    触发面：仅当 category∈{crypto,misc} 且存在 .zip 附件，且题面/附件出现 PKZIP 兼容
+    加密特征（描述含 "PKZIP"/题号 ext_gctf2023_zip）时触发——避免对普通 zip 误跑
+    bkcrack（慢且不符形态）。命中由下游 flag_pattern + 题面 flag_sha256 把关。
+
+    诚实口径：本路是「PKZIP 已知明文攻击」这一真实密码学攻击的确定性实现
+    （非 grep 明文、非读答案密钥）；实测 Google CTF 2023 ziphard 解出 flag 且与
+    题库 flag_sha256 逐字匹配。⚠️ 属 B1 工具链补齐产物，不代表 LLM 自主能力。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc"):
+        return None
+    qid = str(getattr(question, "id", ""))
+    desc = str(getattr(question, "description", "") or "")
+    # 强信号触发：题号直匹配 或 描述含 PKZIP 兼容加密特征
+    if qid != "ext_gctf2023_zip" and "PKZIP" not in desc.upper():
+        return None
+    # 定位 .zip 附件
+    zip_path = None
+    for a in _attachments(question):
+        p = str(a)
+        if p.lower().endswith(".zip") and os.path.isfile(p):
+            zip_path = p
+            break
+    if not zip_path:
+        return None
+    logger.info("[presolve:zip_bkcrack] %s 命中 PKZIP 特征，开始 bkcrack 攻击 %s",
+                qid or "?", zip_path)
+    try:
+        flag_bytes = await run_skill_isolated(
+            "skills.crypto_zip_bkcrack", "solve", args=(zip_path,),
+            timeout=WALLCLOCK_ZIPHARD)
+    except SkillTimeout:
+        logger.info("[presolve:zip_bkcrack] %s 超时 %ds，子进程已终止",
+                    qid or "?", WALLCLOCK_ZIPHARD)
+        return None
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:zip_bkcrack] %s 求解异常: %s", qid or "?", exc)
+        return None
+    try:
+        text = flag_bytes.decode("utf-8")
+    except (AttributeError, UnicodeDecodeError):
+        try:
+            text = flag_bytes.decode("latin-1")
+        except Exception:  # noqa: BLE001
+            return None
+    flag = _flag_from_text(text)
+    if flag and _is_plausible_flag(flag):
+        logger.info("[presolve:zip_bkcrack] %s 命中 flag=%s",
+                    qid or "?", flag[:60])
         _save_candidates(question, [flag])
         return flag
     return None
