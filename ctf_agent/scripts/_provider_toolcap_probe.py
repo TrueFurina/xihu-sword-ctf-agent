@@ -10,7 +10,7 @@
 活着却跑不了循环的 provider，会把整轮跑批变成"基础设施失败伪装成能力数字"。
 
 本脚本对每个候选 provider 跑**同一道题**的最小探针，产出机器可读档案
-（benchmarks/provider_capability.json），并给出推荐：优先"活着 + 零解析失败 + 有解"，
+（benchmarks/provider_probe.json），并给出推荐：优先"活着 + 零解析失败 + 有解"，
 否则退"活着 + 零解析失败"。零解析失败是硬指标——解析失败意味着模型吐不出协议格式。
 
 用法
@@ -32,7 +32,11 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "benchmarks" / "provider_capability.json"
+# 🔴 输出文件名必须与 v2 归档器**分开**（2026-10-10 修）：两者曾共用
+# benchmarks/provider_capability.json，v2 跑一次就把 v1 的探针数据
+# （解析失败数/兜底次数/步数）整段覆盖掉——两种 schema 挤在一个文件名里，
+# 后跑的永远是赢家，先跑的结论无声消失。修复=各自独立文件 + 写前 schema 守卫。
+OUT = ROOT / "benchmarks" / "provider_probe.json"
 PROBE_BUDGET = "20000"
 PROBE_WALLCLOCK = "120"
 

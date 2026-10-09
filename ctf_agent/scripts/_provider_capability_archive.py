@@ -126,6 +126,30 @@ def load_run(run_dir: Path) -> dict | None:
     return d
 
 
+def guard_schema_overwrite(outp: Path, new_schema: str) -> None:
+    """写前 schema 守卫：拒绝覆盖**异构 schema** 的既有档案。
+
+    🔴 2026-10-10 两个实测教训写在这里，别再踩：
+    1) **必须前置**：初版把守卫放在 collect() 之后，于是"目录里没有 run 产物"时
+       脚本提前 return 1，永远走不到守卫——守卫看起来存在，实际在真实调用路径上
+       根本不会被触发。守卫要放在任何"提前返回"之前。
+    2) **必须用专属退出码**：初版用裸 SystemExit（码 1），与"无可聚合产物"的 1
+       撞车，变异测试因此判不出守卫是否被删。专属码 4。
+    """
+    if not outp.is_file():
+        return
+    try:
+        old = json.loads(outp.read_text(encoding="utf-8"))
+        old_schema = old.get("schema")
+    except (OSError, json.JSONDecodeError):
+        return  # 损坏/空文件视为无档案，允许写入
+    if old_schema and old_schema != new_schema:
+        print(f"[toolcap-agg] 拒绝覆盖异构档案: {outp.name} 现有 schema={old_schema!r}，"
+              f"本次要写 {new_schema!r}。两种档案必须用不同文件名"
+              f"（探针=provider_probe.json / 归档=provider_capability.json）")
+        raise SystemExit(4)
+
+
 def collect(results_dir: Path) -> list[dict]:
     """扫描所有 run 目录，逐个算指标。"""
     out = []
@@ -262,6 +286,11 @@ def main() -> int:
     ap.add_argument("--out", default=str(ROOT / "benchmarks" / "provider_capability.json"))
     args = ap.parse_args()
 
+    # 🔴 守卫必须先于 collect：否则"无可聚合产物"的提前返回会绕过守卫（见 guard 注释）
+    outp = Path(args.out)
+    outp.parent.mkdir(parents=True, exist_ok=True)
+    guard_schema_overwrite(outp, "provider_capability_archive/v2")
+
     runs = collect(Path(args.results_dir))
     if not runs:
         print("[toolcap-agg] 无可聚合的历史跑批产物")
@@ -280,8 +309,6 @@ def main() -> int:
         "per_provider": agg,
         "recommendation": rec,
     }
-    outp = Path(args.out)
-    outp.parent.mkdir(parents=True, exist_ok=True)
     outp.write_text(json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8")
 
     print(f"[toolcap-agg] 扫描 {len(runs)} 个 run，聚合 {len(agg)} 个 provider")
