@@ -1,5 +1,19 @@
---- a/bkcrack-1.6.1/src/Attack.cpp
-+++ b/bkcrack-1.6.1/src/Attack.cpp
+Copyright 2023 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+diff -ruN '--exclude=obj' base/bkcrack-1.6.1/src/Attack.cpp mod/bkcrack-1.6.1/src/Attack.cpp
+--- a/bkcrack-1.6.1/src/Attack.cpp	2024-01-23 05:38:27.000000000 +0800
++++ b/bkcrack-1.6.1/src/Attack.cpp	2026-10-09 14:03:41.103124800 +0800
 @@ -6,6 +6,11 @@
  #include <algorithm>
  #include <atomic>
@@ -12,11 +26,18 @@
  
  Attack::Attack(const Data& data, std::size_t index, std::vector<Keys>& solutions, std::mutex& solutionsMutex, bool exhaustive, Progress& progress)
   : data(data), index(index + 1 - Attack::CONTIGUOUS_SIZE), solutions(solutions), solutionsMutex(solutionsMutex), exhaustive(exhaustive), progress(progress)
-@@ -160,6 +165,21 @@
- 
-     // all tests passed so the keys are found
+@@ -163,6 +168,28 @@
+     // get the keys associated with the initial state
+     keysBackward.updateBackward(data.ciphertext, indexBackward, 0);
  
 +    // the keys seem correct based on eight contiguous bytes, now check the second file
++    // NOTE: must run AFTER the rewind above. keysBackward must hold the password-init
++    // state (shared by every entry under the same password) before it can decrypt the
++    // second file's 12-byte encryption header + 4-byte ciphertext. Testing the
++    // mid-stream state of the first file rejects EVERY true candidate, which shows up
++    // as "100% scanned, Could not find the keys" (bug found 2026-10-09, GCTF23 ziphard;
++    // verified by synthetic known-password zip: fixed build finds the true keys,
++    // pre-fix build rejects them).
 +    if(g_second_file)
 +    {
 +        Keys keysTest(keysBackward.getX(), keysBackward.getY(), keysBackward.getZ());
@@ -31,11 +52,12 @@
 +            return;
 +    }
 +
-     // get the keys associated with the initial state
-     keysBackward.updateBackward(data.ciphertext, indexBackward, 0);
- 
---- a/bkcrack-1.6.1/src/Data.cpp
-+++ b/bkcrack-1.6.1/src/Data.cpp
+     {
+         const auto lock = std::scoped_lock{solutionsMutex};
+         solutions.push_back(keysBackward);
+diff -ruN '--exclude=obj' base/bkcrack-1.6.1/src/Data.cpp mod/bkcrack-1.6.1/src/Data.cpp
+--- a/bkcrack-1.6.1/src/Data.cpp	2024-01-23 05:38:27.000000000 +0800
++++ b/bkcrack-1.6.1/src/Data.cpp	2026-10-09 14:03:08.993687100 +0800
 @@ -141,8 +141,10 @@
      // check that there is enough known plaintext
      if(plaintext.size() < Attack::CONTIGUOUS_SIZE)
@@ -47,8 +69,9 @@
  
      // reorder remaining extra plaintext for filtering
      {
---- a/bkcrack-1.6.1/src/main.cpp
-+++ b/bkcrack-1.6.1/src/main.cpp
+diff -ruN '--exclude=obj' base/bkcrack-1.6.1/src/main.cpp mod/bkcrack-1.6.1/src/main.cpp
+--- a/bkcrack-1.6.1/src/main.cpp	2024-01-23 05:38:27.000000000 +0800
++++ b/bkcrack-1.6.1/src/main.cpp	2026-10-09 14:03:08.997627000 +0800
 @@ -13,6 +13,13 @@
  #include <cassert>
  #include <iomanip>
@@ -63,11 +86,10 @@
  
  namespace
  {
-@@ -106,6 +113,35 @@
- {
+@@ -107,6 +114,35 @@
      // enable virtual terminal support on Windows, no-op on other platforms
      VirtualTerminalSupport vtSupport;
-+
+ 
 +    // read in second ciphertext and second plaintext if present (ziphhard cross-file filter)
 +    {
 +        FILE *fp = fopen(SECOND_CIPHERTEXT_FILENAME, "rb");
@@ -96,6 +118,7 @@
 +        if (g_second_file)
 +            std::cout << "second-file cross-filter enabled" << std::endl;
 +    }
- 
++
      // version information
      std::cout << "bkcrack " BKCRACK_VERSION " - " BKCRACK_VERSION_DATE << std::endl;
+ 
