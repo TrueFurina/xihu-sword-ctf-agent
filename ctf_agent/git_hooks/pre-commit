@@ -126,7 +126,19 @@ echo "── ⑥ 快速回归（防错体系核心测试）──"
 #   ② tmp 回收：pytest 会话启动的 tmp 垃圾回收会批量删除（>50 文件）→ 触发环境
 #      safe-delete 守卫 → pytest 非零退出 → 假红。已在 pytest.ini 固定
 #      tmp_path_retention_count（不删旧 tmp），此处不再重复传参，配置单一来源。
-env -u GIT_INDEX_FILE "$PY" -m pytest \
+#   ③ 2026-10-11 补：只 -u GIT_INDEX_FILE **不够**——常规 `git commit`（不带 -- paths）
+#      同样会导出 GIT_DIR（实测 = 本车道 worktree 的 gitdir）、GIT_WORK_TREE 等一整批
+#      "本地环境变量"（权威清单：`git rev-parse --local-env-vars`）。⑥ 里在 tmp_path
+#      构造临时仓库的用例继承 GIT_DIR 后，`git init`/`git add`/`git config` 全落在
+#      **主仓**：3 个用例假红 + 测试文件被提交成垃圾 commit + local git config 被改写。
+#      测试侧已在 tests/conftest.py 用 clean_git_env() 隔离（权威层）；此处按同一清单
+#      一并 -u，兜住未来任何"忘了传 env=" 的临时仓库用例。
+env -u GIT_ALTERNATE_OBJECT_DIRECTORIES \
+    -u GIT_COMMON_DIR -u GIT_CONFIG -u GIT_CONFIG_COUNT -u GIT_CONFIG_PARAMETERS \
+    -u GIT_DIR -u GIT_GRAFT_FILE -u GIT_IMPLICIT_WORK_TREE -u GIT_INDEX_FILE \
+    -u GIT_NO_REPLACE_OBJECTS -u GIT_OBJECT_DIRECTORY -u GIT_PREFIX \
+    -u GIT_REPLACE_REF_BASE -u GIT_SHALLOW_FILE -u GIT_WORK_TREE \
+    "$PY" -m pytest \
     tests/test_lease.py tests/test_lease_multiwriter.py \
     tests/test_sign.py tests/test_honesty_scan.py \
     tests/test_doc_consistency.py tests/test_facts.py \
