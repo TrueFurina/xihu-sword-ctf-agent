@@ -17,6 +17,8 @@ sys.path.insert(0, SCRIPTS)
 import _git_guard  # noqa: E402
 import _git_snapshot  # noqa: E402
 
+from conftest import clean_git_env  # noqa: E402  （2026-10-11：隔离 git 本地环境变量）
+
 GUARD = os.path.join(SCRIPTS, "_git_guard.py")
 SNAP = os.path.join(SCRIPTS, "_git_snapshot.py")
 PY = sys.executable
@@ -45,6 +47,9 @@ def _mk_fake_git(root, refs=True, packed=False, head="ref: refs/heads/master\n",
 
 
 def _run(script, args, **kw):
+    # 子进程默认继承 clean env：被真实 commit 拉起时父进程带 GIT_DIR / GIT_INDEX_FILE，
+    # 透传下去会让 `_git_guard.py` 去体检/操作**主仓**（2026-10-11 实锤）。
+    kw.setdefault("env", clean_git_env())
     return subprocess.run([PY, script, *args], capture_output=True, text=True,
                           encoding="utf-8", errors="replace", timeout=120, **kw)
 
@@ -228,12 +233,15 @@ def test_snapshot_daily_skips_when_fresh(tmp_path):
     """
     repo = os.path.join(str(tmp_path), "repo")
     os.makedirs(repo)
+    clean = clean_git_env()  # GIT_DIR/GIT_INDEX_FILE 等仓库绑定变量一律剔除
     for a in (["init", "-q"], ["config", "user.email", "d@d"], ["config", "user.name", "d"]):
-        subprocess.run(["git", *a], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", *a], cwd=repo, check=True, capture_output=True, env=clean)
     with open(os.path.join(repo, "f.txt"), "w") as f:
         f.write("x")
-    subprocess.run(["git", "add", "f.txt"], cwd=repo, check=True, capture_output=True)
-    subprocess.run(["git", "commit", "-q", "-m", "x"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "add", "f.txt"], cwd=repo, check=True,
+                   capture_output=True, env=clean)
+    subprocess.run(["git", "commit", "-q", "-m", "x"], cwd=repo, check=True,
+                   capture_output=True, env=clean)
     gitdir = os.path.join(repo, ".git")
 
     d = os.path.join(str(tmp_path), "bundles")

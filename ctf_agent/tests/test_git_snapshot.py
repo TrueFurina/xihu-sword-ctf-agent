@@ -16,6 +16,8 @@ sys.path.insert(0, SCRIPTS)
 
 import _git_snapshot as snap  # noqa: E402
 
+from conftest import clean_git_env  # noqa: E402  （2026-10-11：隔离 git 本地环境变量）
+
 
 # ── 1. 纯函数：节流判定 ───────────────────────────────────────────────────
 def test_should_bundle_no_bundle_always():
@@ -66,8 +68,10 @@ def test_sidecar_tip_and_prune_removes_sidecar(tmp_path):
 
 # ── 3. 端到端：真实 git bundle + verify + "落后即补" ─────────────────────
 def _git(repo, *args):
-    return subprocess.run(["git", *args], cwd=repo, capture_output=True,
-                          text=True, check=True)
+    # env=clean_git_env()：必须显式隔离。真实 `git commit` 时钩子会导出 GIT_DIR /
+    # GIT_INDEX_FILE，继承下去会让本函数操作**主仓**而非 tmp 仓库（2026-10-11 实锤）。
+    return subprocess.run(["git", *args], cwd=repo, env=clean_git_env(),
+                          capture_output=True, text=True, check=True)
 
 
 def _init_repo(tmp):
@@ -93,7 +97,7 @@ def test_make_bundle_and_verify(tmp_path):
     assert os.path.isfile(path + snap.HEAD_SIDECAR_SUFFIX)
     # git bundle verify 必须通过
     v = subprocess.run(["git", "bundle", "verify", path], cwd=repo,
-                       capture_output=True, text=True)
+                       env=clean_git_env(), capture_output=True, text=True)
     assert v.returncode == 0, v.stderr
 
 
@@ -122,10 +126,11 @@ def test_daily_throttle_bundles_when_behind_then_skips(tmp_path):
     assert s2 == "ok" and p2 and p2 != p1, "第二次提交后必须出现新 bundle"
     assert len(snap.list_bundles(outdir)) == 2
     v = subprocess.run(["git", "bundle", "verify", p2], cwd=repo,
-                       capture_output=True, text=True)
+                       env=clean_git_env(), capture_output=True, text=True)
     assert v.returncode == 0, v.stderr
     # p2 的边车应记录最新 HEAD
     tip = snap.bundle_tip(p2, gitdir)
     head = subprocess.run(["git", "--git-dir", gitdir, "rev-parse", "HEAD"],
-                          capture_output=True, text=True).stdout.strip()
+                          env=clean_git_env(), capture_output=True,
+                          text=True).stdout.strip()
     assert tip == head
