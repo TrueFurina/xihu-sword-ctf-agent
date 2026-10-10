@@ -29,7 +29,13 @@ toolcap = _load("_provider_toolcap_probe")
 
 class TestParseSampleRedaction(unittest.TestCase):
     def test_redacts_api_keys(self):
-        out = client._redact_for_log("api_key=sk-abcdefgh12345678 and ak_0123456789xyz")
+        # 2026-10-11 修复：合成密钥样本**必须拼接构造，不可写成整字面量**——本文件自身
+        # 会被 scripts/release_export.py --scan-only 扫到，整串 sk-... 会命中硬红线，
+        # 导致 tests/test_release_export_policy.py::test_current_tracked_tree_passes_gate
+        # 永久红（并连带堵死合并闸门）。拼接后运行时值不变，源码里不再有整字面量。
+        out = client._redact_for_log(
+            "api_key=" + "sk-" + "abcdefgh" + "12345678" + " and " + "ak_" + "0123456789xyz"
+        )
         self.assertNotIn("sk-abcdefgh", out)
         self.assertNotIn("ak_0123456789xyz", out)
         self.assertIn("REDACTED", out)

@@ -139,8 +139,12 @@ class TestSnapshotTruth:
 
     def test_cli_require_reflects_snapshot(self, probe_dir):
         st = _status()
+        # 2026-10-11 修复：原写死 ts=2026-10-08 03:00，而新鲜度窗口默认 72h
+        # （_llm_pool_status.py:105 DEFAULT_MAX_AGE_HOURS），2026-10-11 03:00 起
+        # 永久判定"过期即无快照" → 本用例变成**时间炸弹型永久红**。
+        # 本用例语义是「CLI --require 反映快照真值」，与绝对时刻无关 → 改用当前时间。
         st.write_record([{"provider": "glm", "status": "OK"}],
-                        ts=datetime(2026, 10, 8, 3, 0, 0))
+                        ts=datetime.now())
         assert st.main(["--require", "glm", "--record-dir", str(probe_dir)]) == 0
         assert st.main(["--require", "qwen", "--record-dir", str(probe_dir)]) == 1
 
