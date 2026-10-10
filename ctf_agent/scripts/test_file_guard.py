@@ -12,6 +12,7 @@
   - 只改实现 → 放行。
 退出码：0=放行；1=警告拦截（stderr 给出建议）
 """
+import os
 import re
 import subprocess
 import sys
@@ -39,7 +40,33 @@ def staged_files() -> list:
     return [f.strip().replace("\\", "/") for f in out.splitlines() if f.strip()]
 
 
+def _merge_in_progress() -> bool:
+    """合并上下文检测（2026-10-11）。
+
+    本守卫的语义是「同一次提交里既改实现又改测试 = 为过测试而改测试的逃逸信号」。
+    但 **merge commit 天然包含分支上的全部改动**（实现侧 + 测试侧），它不是逃逸信号，
+    而是合并这一动作本身的性质。未加此判据前，任何含实现+测试的合并都会被本守卫
+    拦死（而 merge 无法拆成两笔提交，拆了就不是合并）——属守卫的设计缺口，非门禁松弛。
+
+    判据：MERGE_HEAD 存在。注意仅在 **pre-commit** 路径可靠（git 在 pre-commit 前已
+    落盘 MERGE_HEAD）；pre-merge-commit 在 git 2.55 上尚未落盘，不适用本函数。
+    """
+    try:
+        r = subprocess.run(["git", "rev-parse", "--absolute-git-dir"],
+                           capture_output=True, text=True, timeout=10)
+        gd = r.stdout.strip()
+        if not gd:
+            return False
+        return os.path.exists(os.path.join(gd, "MERGE_HEAD"))
+    except Exception:  # 不在 git 仓库 / git 不可用 → 按非合并处理（fail-closed 到原逻辑）
+        return False
+
+
 def check(files: list) -> int:
+    if _merge_in_progress():
+        print("ℹ️ 合并上下文（MERGE_HEAD 存在）：暂存集天然同时含实现与测试，"
+              "非「改测试让实现通过」的逃逸信号 → 放行")
+        return 0
     tests = [f for f in files if is_test(f)]
     impls = [f for f in files if (not is_test(f)) and IMPL_EXT.search(f)]
     if tests and impls:

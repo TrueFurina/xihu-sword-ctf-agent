@@ -30,6 +30,8 @@ sys.path.insert(0, _AGENT)
 
 import scripts.release_export as rel  # noqa: E402
 
+from conftest import clean_git_env  # noqa: E402  （2026-10-11：隔离 git 本地环境变量）
+
 # 每条 SECRET_PATTERNS 规则的合成样本（用于"只许追加、不许削弱"的逐条体检）。
 #
 # ⚠️ **必须用拼接构造，不可写成整字面量**：本文件自身会被 scripts/release_export.py
@@ -169,7 +171,10 @@ def test_redact_question_flags_covers_only_top_level_flag(tmp_path):
 # ───────────────────────── ⑤ 双向变异（防松弛 / 防过严） ─────────────────────────
 
 def _git(repo, *args):
-    return subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True)
+    # env=clean_git_env()：隔离 git 导出的 GIT_DIR / GIT_INDEX_FILE，
+    # 否则真实提交上下文里会把文件 add 进**主仓**索引（2026-10-11 实锤）。
+    return subprocess.run(["git", *args], cwd=str(repo), env=clean_git_env(),
+                          capture_output=True, text=True)
 
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="需要 git")
