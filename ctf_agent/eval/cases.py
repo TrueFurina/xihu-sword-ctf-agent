@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from core.answer_key_filter import filter_answer_key_attachments  # ITEM4-A：隔离答案密钥附件
+
 logger = logging.getLogger(__name__)
 
 # 真 flag 红线（2026-08-24）：题库 JSON 不再存明文 flag，只存 flag_sha256 占位。
@@ -112,8 +114,10 @@ class Question:
         parts = [f"题目: {self.title}"]
         if self.description:
             parts.append(self.description)
-        if self.attachments:
-            parts.append(f"附件: {', '.join(self.attachments)}")
+        # ITEM4-A：只列出真实输入附件，不把答案密钥文件名（如 flag.txt）暴露给 LLM
+        _real_atts = filter_answer_key_attachments(self, self.attachments)
+        if _real_atts:
+            parts.append(f"附件: {', '.join(_real_atts)}")
         parts.append(f"flag 格式: {self.flag_pattern}")
         return "\n".join(parts)
 

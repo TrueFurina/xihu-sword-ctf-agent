@@ -13,7 +13,9 @@ Held-out 未见题自主解题基准（续评-20260917 P0）。
 ------------------------------------
 从 data/questions_real/ 递归抓题，逐题判定：
   - 在 _antifraud.AUTHORIZED_KPI_SOLVES（14 个已训练/已写 bespoke solver）→ 排除（已见）
-  - 附件含 flag.txt（读泄露答案型，非能力）→ 排除（数据集已知"答案密钥泄露"）
+  - 附件（内容级）即答案密钥 → 排除 known-leak(answer-key-only)（数据集已知"答案密钥泄露"；
+    内容级判定：附件归一化 sha256 命中题面真值才剔除，命名 flag.txt 的合法输入如
+    anwang 八进制密文不误伤）
   - 附件文件内容含真实明文 flag（sha256 命中题面 flag_sha256，如源码泄露题
     gongye_web2：flag 明文写在 index.php / 前端 html 里）→ 排除（读源码即拿答案，
     非自主推理；且题面 flag 字段只是 64-hex 占位，旧 leaked-attachment 只拦 flag.txt 漏掉它）
@@ -72,20 +74,24 @@ SELF_AUTHORED_MARKERS = ("self_authored_training", "self-authored", "training")
 
 
 def _is_leaked_attachment(q: dict) -> bool:
-    """附件路径含 flag.txt（本地数据集的「答案即附件」特征）。
+    """题的所有附件都是答案密钥（内容级判定）→ 即 KNOWN_LEAK，不可作能力分母。
+
+    ITEM4-B（2026-10-10）：改用 `core.answer_key_filter.is_answer_key_only` 做
+    **内容级**判定（归一化 sha256 命中题面真值），取代原纯文件名启发式
+    （路径含 flag.txt 即判泄露）。原因：real_crypto_anwang_crypto1 的 flag.txt
+    是**八进制密文输入**（解码后才得 flag），内容≠答案，原文件名启发式会把它
+    误判为泄露、错误踢出能力分母。内容级判定只剔除「内容真=答案」的附件，
+    合法输入即使命名 flag.txt 也保留。
 
     ⚠️ 外部题源豁免（2026-09-22）：外部题在 fetch/ingest 阶段已对**附件内容**
-    做字节级 flag 泄露扫描（`fetch_google_ctf.py`：命中即整题剔除），故路径含
-    "flag.txt" 不再自动判泄露——Google CTF 的 `attachments/flag.txt` 常是
-    **密文诱饵**（明文 flag 并不在其中），路径启发式是为本地数据集设计的，会误伤。
+    做字节级 flag 泄露扫描（`fetch_google_ctf.py`：命中即整题剔除），故此处
+    直接放行——Google CTF 的 `attachments/flag.txt` 常是密文诱饵，复用本地
+    内容级判定会误伤。
     """
     if q.get("provenance") == "real_past_ctf" and q.get("external_source"):
         return False
-    for a in (q.get("attachments") or []):
-        s = str(a).lower()
-        if any(m in s for m in LEAK_MARKERS):
-            return True
-    return False
+    from core.answer_key_filter import is_answer_key_only
+    return is_answer_key_only(q)
 
 
 def _has_plaintext_flag_in_question(q: dict) -> bool:
@@ -311,7 +317,7 @@ def select_candidates(require_sha256: bool = True,
             elif _is_writeup_reconstructed(q):
                 reason_excluded = "writeup-reconstructed(non-genuine)"
             elif not include_neutralized and _is_leaked_attachment(q):
-                reason_excluded = "leaked-attachment(flag.txt)"
+                reason_excluded = "known-leak(answer-key-only)"
             elif not include_neutralized and has_plain:
                 reason_excluded = "plaintext-flag-in-question"
             elif source_leaked:
@@ -330,6 +336,7 @@ def select_candidates(require_sha256: bool = True,
                 "has_plaintext_flag": has_plain,
                 "source_leaked_flag": source_leaked,
                 "leaked_attachment": _is_leaked_attachment(q),
+                "known_leak": _is_leaked_attachment(q),
                 "excluded": reason_excluded,
             }
             all_recs.append(rec)
@@ -350,7 +357,7 @@ def write_manifest(cands: list[dict], all_recs: list[dict], require_sha256: bool
                     "（隐藏 flag.txt/明文答案，agent 读不到答案）"
                     + ("；has flag_sha256 或可合成(validatable)" if require_sha256 else ""))
     else:
-        criteria = ("unseen(NOT in AUTHORIZED_KPI_SOLVES) AND NOT leaked-attachment(flag.txt) "
+        criteria = ("unseen(NOT in AUTHORIZED_KPI_SOLVES) AND NOT known-leak(answer-key-only) "
                     "AND NOT plaintext-flag-in-question AND NOT source-leaked-flag(sha256-in-attachment) "
                     "AND NOT answer_disclosed "
                     "AND NOT self_authored_training AND NOT writeup-reconstructed(non-genuine)"

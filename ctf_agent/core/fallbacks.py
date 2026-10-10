@@ -11,6 +11,8 @@ build_web_fallback_script / build_reverse_fallback_script。
 
 from typing import Optional
 
+from core.answer_key_filter import filter_answer_key_attachments  # ITEM4-A：隔离答案密钥附件
+
 
 def build_crypto_fallback_script(ctx) -> Optional[str]:
     """Crypto 兜底：委托 CryptoToolkit 按附件内容嗅探构造攻击脚本。
@@ -18,7 +20,8 @@ def build_crypto_fallback_script(ctx) -> Optional[str]:
     旧版按题目描述关键词选模板，是对本地题库的过拟合（决赛代码审查风险项）；
     现改为只嗅探附件本身的参数行/哈希/字符集特征，与题目描述解耦。
     """
-    attach = getattr(ctx.question, "attachments", None)
+    attach = filter_answer_key_attachments(  # ITEM4-A：答案密钥不进兜底脚本
+        ctx.question, list(getattr(ctx.question, "attachments", None) or []))
     if not attach:
         return None
     try:
@@ -36,7 +39,8 @@ def build_misc_fallback_script(ctx) -> Optional[str]:
     同 crypto：与题目描述解耦，只看附件字节特征（ZIP/PNG 魔数、
     base64/摩斯/Brainfuck/DNS 流量字符集）。
     """
-    attach = getattr(ctx.question, "attachments", None)
+    attach = filter_answer_key_attachments(  # ITEM4-A：答案密钥不进兜底脚本
+        ctx.question, list(getattr(ctx.question, "attachments", None) or []))
     if not attach:
         return None
     try:
@@ -82,7 +86,8 @@ def build_reverse_fallback_script(ctx) -> Optional[str]:
     - 若附件含 pyc/字节码/反编译关键词：同样全文搜索
     """
     q = ctx.question
-    attach = getattr(q, "attachments", None)
+    attach = filter_answer_key_attachments(  # ITEM4-A：答案密钥不进 reverse 兜底脚本
+        q, list(getattr(q, "attachments", None) or []))
     if not attach:
         return None
     # 多附件完整性（2026-08-21 攻坚修复）：reverse_js 真 flag 在第二个附件

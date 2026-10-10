@@ -11,6 +11,8 @@ build_self_reflection / infer_skill_require。
 
 from typing import Optional
 
+from core.answer_key_filter import filter_answer_key_attachments  # ITEM4-A：隔离答案密钥附件
+
 from verify.error_classifier import ERR_TOOL_FAILURE  # noqa: F401 - 反思归因用
 
 
@@ -59,8 +61,10 @@ def build_plan_prompt(ctx, attempt: int) -> str:
     parts = [f"题目: {getattr(q, 'title', '')}",
              f"题型: {getattr(q, 'category', '')}",
              str(getattr(q, 'description', '') or '')]
-    if getattr(q, 'attachments', None):
-        parts.append(f"附件: {', '.join(q.attachments)}")
+    # ITEM4-A：plan prompt 只列出真实输入附件，不把答案密钥文件名暴露给 LLM
+    _q_atts = filter_answer_key_attachments(q, getattr(q, 'attachments', None) or [])
+    if _q_atts:
+        parts.append(f"附件: {', '.join(_q_atts)}")
     # E3（2026-08-25 桶C攻坚）：file_analyze 全文强制注入 plan prompt。
     # 桶C=证据不进脑——附件已读但 prompt 仅含路径/截断摘要，模型空转。
     # 把累积的附件全文整段重投，不受 steps 窗口（近3步）挤出，且不做 1200 截断。

@@ -26,6 +26,7 @@ from core.main_agent import (
     VERDICT_UPGRADE,
     GOAL_SYSTEM_PROMPT,
 )
+from core.answer_key_filter import filter_answer_key_attachments  # ITEM4-A：隔离答案密钥附件
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +53,13 @@ async def plan_step(agent, ctx: AgentContext, attempt: int) -> dict:
                 "target_url": _url, "stage": STAGE_RECON, "done": False,
                 "_forced_web_probe": True}
 
-    has_attachment = bool(getattr(ctx.question, "attachments", None))
+    # ITEM4-A：仅真实输入附件计入"有附件"（答案密钥 flag.txt 等同无数据）
+    _real_atts = filter_answer_key_attachments(
+        ctx.question, list(getattr(ctx.question, "attachments", None) or []))
+    has_attachment = bool(_real_atts)
     attachment_hint = ""
     if has_attachment:
-        _atts = list(getattr(ctx.question, "attachments", None) or [])
+        _atts = _real_atts
         _seen = getattr(ctx, "_attachments_seen", None) or set()
         _unseen = [str(a) for a in _atts if str(a) not in _seen]
         if _unseen:
@@ -265,7 +269,8 @@ async def act_step(agent, ctx: AgentContext, plan: dict, attempt: int) -> dict:
 
     if (
         action not in ("tool", "script")
-        and getattr(ctx.question, "attachments", None)
+        and filter_answer_key_attachments(  # ITEM4-A：答案密钥不算可分析附件
+            ctx.question, list(getattr(ctx.question, "attachments", None) or []))
         and not ctx._attachment_analyzed
         and agent.registry is not None
     ):

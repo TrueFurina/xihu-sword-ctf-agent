@@ -8,6 +8,8 @@ main_agent 原实现一致（提取不重构）。
 兜底脚本归 fallbacks.py、工具执行归本模块、主循环/校验留 main_agent。
 """
 
+from core.answer_key_filter import filter_answer_key_attachments  # ITEM4-A：隔离答案密钥附件
+
 
 async def execute_tool(registry, ctx, plan: dict, detail: str) -> dict:
     """执行工具调用（tool 分支）：工具名 + 自动注入附件路径 + registry.run。
@@ -30,7 +32,8 @@ async def execute_tool(registry, ctx, plan: dict, detail: str) -> dict:
             params["url"] = params.pop("target_url")
     # ── file_analyze 未指定 path → 遍历分析全部未读附件 ──
     if tool_name == "file_analyze" and not plan.get("path"):
-        attachments = list(getattr(ctx.question, "attachments", None) or [])
+        attachments = filter_answer_key_attachments(  # ITEM4-A：答案密钥不进 file_analyze
+            ctx.question, list(getattr(ctx.question, "attachments", None) or []))
         unseen = [str(a) for a in attachments if str(a) not in ctx._attachments_seen]
         if unseen:
             parts = []
@@ -57,8 +60,11 @@ async def execute_tool(registry, ctx, plan: dict, detail: str) -> dict:
         return {"kind": "tool", "tool": tool_name,
                 "output": "全部附件已分析过，请基于已有附件内容继续解题（计算/解密用 script，网络用 http_request）。"}
     # ── 其他工具 / file_analyze 显式指定 path ──
-    if not plan.get("path") and getattr(ctx.question, "attachments", None):
-        params["path"] = str(ctx.question.attachments[0])
+    if not plan.get("path"):
+        _real_atts = filter_answer_key_attachments(  # ITEM4-A：默认分析首个真实输入附件
+            ctx.question, list(getattr(ctx.question, "attachments", None) or []))
+        if _real_atts:
+            params["path"] = str(_real_atts[0])
         if tool_name == "file_analyze":
             ctx._attachment_analyzed = True
     out = await registry.run(tool_name, params)
@@ -87,7 +93,8 @@ async def execute_forced_file_analyze(registry, ctx) -> dict:
     """附件强制分析（兜底：有附件但未分析且模型未主动调工具 → 强制先读全部附件）。"""
     if registry is None or not registry.has("file_analyze"):
         return {"kind": "reason", "output": ""}
-    attachments = list(getattr(ctx.question, "attachments", None) or [])
+    attachments = filter_answer_key_attachments(  # ITEM4-A：答案密钥不进强制分析
+        ctx.question, list(getattr(ctx.question, "attachments", None) or []))
     if not attachments:
         return {"kind": "reason", "output": ""}
     # 多附件完整性：一次读完全部未读附件（2026-08-21 攻坚修复）

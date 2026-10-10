@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from core.goal_directive import GOAL_SYSTEM_PROMPT, GoalLogger, parse_skill_require
+from core.answer_key_filter import filter_answer_key_attachments  # ITEM4-A：隔离答案密钥附件
 
 logger = logging.getLogger(__name__)
 
@@ -828,7 +829,8 @@ class MainAgent:
                         )
                         logger.info("[%s] 连续 reason 空转检测：强制转工具调用", question.id)
                     _cat = str(getattr(question, "category", "")).lower()
-                    _atts = list(getattr(question, "attachments", []) or [])
+                    _atts = filter_answer_key_attachments(  # ITEM4-A：答案密钥不进 solver
+                        question, list(getattr(question, "attachments", []) or []))
                     if _atts:
                         import re as _re
                         _hit = None
@@ -892,7 +894,8 @@ class MainAgent:
                     _qextra = getattr(question, "extra", {}) or {}
                     _platform_meta = _qextra.get("platform_meta") or {}
                     _detail_failed = bool(_platform_meta.get("_detail_fetch_failed"))
-                    has_attachment = bool(getattr(question, "attachments", None))
+                    has_attachment = bool(filter_answer_key_attachments(  # ITEM4-A：仅真实输入算"有附件"
+                        question, list(getattr(question, "attachments", None) or [])))
                     has_target = any(k in str(getattr(question, "description", "") or "")
                                      for k in ("http://", "https://", "靶机", "host:", "url:", "端口"))
                     has_any_data = has_attachment or has_target or bool(getattr(question, "description", ""))
@@ -922,7 +925,8 @@ class MainAgent:
                 # 修复：题面关键词命中专用 solver 且 LLM 尚未调用过 → 强制调用一次（确定性救已知可解题）。
                 _kb_kw = ("键盘", "keyboard", "坐标", "九宫格", "手机键盘", "telnet", "按键", "键盘布局")
                 _qtext = (str(getattr(question, "description", "") or "") + " " +
-                          " ".join(str(a) for a in getattr(question, "attachments", []) or [])).lower()
+                          " ".join(str(a) for a in filter_answer_key_attachments(  # ITEM4-A
+                              question, list(getattr(question, "attachments", []) or [])))).lower()
                 if (self.registry and self.registry.get("crypto_keyboard_path")
                         and any(k in _qtext for k in _kb_kw)):
                     _already = any(getattr(s, "tool_used", "") == "crypto_keyboard_path"
@@ -932,7 +936,8 @@ class MainAgent:
                             import re as _re_kb
                             _fo = await self.registry.run(
                                 "crypto_keyboard_path",
-                                {"attachments": list(getattr(question, "attachments", []) or [])})
+                                {"attachments": filter_answer_key_attachments(  # ITEM4-A
+                                    question, list(getattr(question, "attachments", []) or []))})
                             _txt = getattr(_fo, "text", "") or ""
                             _m = _re_kb.search(r"flag\{[^}\s]{3,}\}", _txt, _re_kb.IGNORECASE)
                             if _m:

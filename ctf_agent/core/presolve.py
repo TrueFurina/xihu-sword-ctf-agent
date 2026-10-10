@@ -29,6 +29,7 @@ import re
 from typing import Optional
 
 from core.skill_pool import SkillTimeout, run_skill_isolated
+from core.answer_key_filter import filter_answer_key_attachments  # ITEM4-A：隔离答案密钥附件
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +238,7 @@ def _attachments(question) -> list:
     """
     attach = [str(a) for a in (getattr(question, "attachments", None) or [])]
     if attach:
-        return attach
+        return filter_answer_key_attachments(question, attach)  # ITEM4-A：剔除答案密钥
     # 兜底 1：platform_meta 附件字段（平台详情可能已补全）
     extra = getattr(question, "extra", None) or {}
     pm = extra.get("platform_meta") or {}
@@ -247,7 +248,7 @@ def _attachments(question) -> list:
             vals = v if isinstance(v, list) else [v]
             attach = [str(a) for a in vals]
             if attach:
-                return attach
+                return filter_answer_key_attachments(question, attach)  # ITEM4-A
     # 兜底 2：题面 json 路径推断（questions_real 真题集，附件在 _attachments 目录）
     qid = getattr(question, "id", "")
     cat = str(getattr(question, "category", "")).lower()
@@ -258,7 +259,8 @@ def _attachments(question) -> list:
             try:
                 d = _json.load(open(cand, encoding="utf-8"))
                 att = (d.get("data") or d).get("attachments") or []
-                return [str(a) for a in att if os.path.exists(a)]
+                return filter_answer_key_attachments(  # ITEM4-A
+                    question, [str(a) for a in att if os.path.exists(a)])
             except Exception:
                 pass
     return []
