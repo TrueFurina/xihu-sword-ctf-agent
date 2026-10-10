@@ -8,6 +8,7 @@
 """
 import os
 import sys
+import json
 import tempfile
 from pathlib import Path
 import pytest
@@ -277,7 +278,8 @@ def test_heldout_status_internally_consistent():
 
 @pytest.mark.local
 def test_heldout_pool_matches_machine_denominator():
-    """报告池数必须 == 机器真值算出的能力分母（KPI 防漂移的最后一道闸）。
+    """报告池数必须 == 机器真值算出的能力分母，或二者分歧可由已知 desc_leak 解释
+    （KPI 防漂移的最后一道闸）。
 
     ⚠️ 必须保持 local，且**不要因为「它让 CI 红」而进一步豁免/删除**：
     分母 = `scripts.benchmark_heldout.select_candidates()` 的扫描结果，依赖**完整题池**
@@ -285,15 +287,29 @@ def test_heldout_pool_matches_machine_denominator():
     ⇒ CI 上分母必然偏离真值（实测：CI 环境算出 3、空环境算出 0、真值 2），
     在 CI 上断言必然失败。这是**环境性不可验证**，不是缺陷。
 
-    拆分说明（2026-10-07）：此前本条与 4 条内部一致性断言被捆在一起、整条标 local，
-    导致内部一致性这 4 条也一并脱管。现已拆开：能验的留 CI（见上条），
-    只有真正依赖题池的「与分母对齐」留在本地。
+    2026-10-10 口径补强：历史 clean-2 实测报告（保留不删改）的 pool_total 含事后认定为
+    desc_leak 的 real_crypto_dnui_keyboard（题面自带答案，读描述即得、非自主推理），
+    而严格能力分母已将其剔除。故报告 pool_total 与分母可合法分歧——但分歧量必须恰好等于
+    报告结果中的 desc_leak 题数，且 canonical 声明须显式说明该剔除（防静默漂移）。
     """
+    from scripts.benchmark_heldout import desc_leak_ids
+    from scripts._kpi_canonical import _HELDOUT_CLEAN_REPORT
     st = heldout_status()
-    assert st["pool_total"] == count_heldout_candidates(), \
-        (f"报告池数 {st['pool_total']} ≠ select_candidates 能力分母 "
-         f"{count_heldout_candidates()}（同一池出现两套数字）")
-    print(f"✓ test_heldout_pool_matches_machine_denominator (pool={st['pool_total']})")
+    denom = count_heldout_candidates()
+    if st["pool_total"] == denom:
+        print(f"✓ test_heldout_pool_matches_machine_denominator (pool={st['pool_total']}==denom)")
+        return
+    diff = st["pool_total"] - denom
+    report = json.loads(Path(_HELDOUT_CLEAN_REPORT).read_text(encoding="utf-8"))
+    dl = desc_leak_ids()
+    n_dl_in_report = sum(1 for r in report.get("results", []) if r.get("question_id") in dl)
+    assert diff == n_dl_in_report, (
+        f"报告池数 {st['pool_total']} 与能力分母 {denom} 的分歧({diff}) "
+        f"≠ 报告结果中的 desc_leak 题数({n_dl_in_report})——存在未解释的口径漂移")
+    stmt = canonical_kpi()["statement"]
+    assert "desc_leak" in stmt, "desc_leak 剔除未在 canonical 声明中说明（静默漂移）"
+    print(f"✓ test_heldout_pool_matches_machine_denominator (pool={st['pool_total']} "
+          f"含 {n_dl_in_report} 道 desc_leak → 分母 {denom}，分歧已解释)")
 
 
 def test_summarize_benchmark_report_follows_input():

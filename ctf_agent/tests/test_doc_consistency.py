@@ -255,15 +255,20 @@ def test_kpi_contribution_denominator_13_detected(monkeypatch, tmp_path):
     assert any("分母非法" in h and "13" in h for h in hits), hits
 
 
-def test_kpi_contribution_zh_denominator_1_detected(monkeypatch, tmp_path):
-    """D3 变异：ZH `自主推理贡献` 行 `0 / 1`（无来源分母）→ 必须红。"""
+def test_kpi_contribution_zh_denominator_illegal_detected(monkeypatch, tmp_path):
+    """D3 变异：ZH `自主推理贡献` 行 `0 / 3`（无来源分母）→ 必须红。
+
+    ⚠️ 2026-10-10 修正：原用例用 `0 / 1`，但 held-out 能力分母经 desc_leak 剔除后
+    已合法为 1（real_reverse_js），故 1 不再是无来源分母；改用 3（不在
+    {KPI集=14, heldout=1} 白名单内）作非法分母。
+    """
     _mk_repo(
         monkeypatch, tmp_path,
-        zh_readme="| LLM 自主推理贡献 | **0 / 1**（唯一未解题为数据集缺陷） |\n",
+        zh_readme="| LLM 自主推理贡献 | **0 / 3**（唯一未解题为数据集缺陷） |\n",
     )
     monkeypatch.setattr(dc, "machine_kpi_truth", lambda: (14, 14, 14))
     hits = dc.check_kpi_inline_idiom_drift()
-    assert any("分母非法" in h and "1" in h for h in hits), hits
+    assert any("分母非法" in h and "3" in h for h in hits), hits
 
 
 def test_kpi_contribution_valid_denominators_green(monkeypatch, tmp_path):
