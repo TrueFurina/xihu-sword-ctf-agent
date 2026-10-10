@@ -21,6 +21,7 @@
   python scripts/_merge_gate.py            # 全量：KPI 双通道 + 全量测试
   python scripts/_merge_gate.py --kpi-only # 只做 KPI 双通道（快速，供 pre-commit ⑧ 复用）
   python scripts/_merge_gate.py --full-baseline  # 全量 15 道真题真值跑，落盘基线（每日定时，不阻塞合并）
+  python scripts/_merge_gate.py --merge-context  # pre-merge-commit 钩子专用：跳过收尾门禁，KPI+测试照跑
 """
 import argparse
 import json
@@ -207,7 +208,7 @@ REGRESSION_CHECKS = [
 KNOWN_GAP: list = []
 
 
-def dirty_check() -> bool:
+def dirty_check(merge_context: bool = False) -> bool:
     """收尾门禁（2026-08-24 调控落地；2026-08-26 修正误杀合法合并的 bug）：合并回 main 前工作树必须干净。
 
     在飞改动（未收尾的 M/D）= 禁止合并——防"改了不提交就消失"的
@@ -221,8 +222,30 @@ def dirty_check() -> bool:
         一律忽略——它们不会被合并吞入，且本仓库长期存在，不应阻断合法合并。
       只统计"已跟踪文件的在飞改动"（M/D/R/C/A 列，含 staged/unstaged），
       这才是真正的炸弹场景（改了没提交就进 main 会丢失）。
+
+    2026-10-11 追加 merge_context 参数（修复 pre-merge-commit 时序误杀）：
+      git 2.55.0 在 pre-merge-commit 钩子执行时尚未把 .git/MERGE_HEAD 落盘
+      （裁判在临时仓库复现：钩子内 ls .git/MERGE_HEAD → No such file or directory），
+      故下方 MERGE_HEAD 检测在该钩子里恒为假 → 把合并产生的 staged 改动误判为
+      "在飞改动" → 打印「收尾门禁：工作树有 N 处已跟踪在飞改动」→ exit 1，
+      本宿主上任何 --no-ff 合并都被误杀（KPI 与 pytest 根本没机会跑）。
+      merge_context=True 由 pre-merge-commit 钩子经 --merge-context 传入，
+      语义等价于"调用方已是合并上下文"，直接跳过收尾门禁。
+      风险兜底（不做更宽豁免的原因）：合并上下文下"在飞改动被吞"的风险由
+        ① git merge 自身的覆盖保护（未提交的本地改动与目标分支冲突时 merge 直接
+           中止，不会静默吞掉）；
+        ② pre-commit 第⑧道兜底——该路径在 merge commit 之后运行，此时 MERGE_HEAD
+           已落盘，走的是下方 MERGE_HEAD 检测分支（本函数保留该逻辑不动）。
+      ⚠️ merge_context 只影响本函数的收尾门禁判定，不得影响 KPI 双通道、
+         泄露扫描、全量 pytest 等任何其他检查（见 main() 传参处）。
     """
+    # 合并上下文（pre-merge-commit 钩子经 --merge-context 传入）：staged 改动即
+    # 合并产物，非在飞改动 → 跳过收尾门禁。详见 docstring 2026-10-11 条目。
+    if merge_context:
+        print("ℹ️ 合并上下文（pre-merge-commit）：跳过收尾门禁（staged 改动即合并产物）")
+        return True
     # 合并进行中：工作树含合并结果（staged M/D 即合并产物），非在飞改动 → 跳过
+    # （保留：服务于 pre-commit 第⑧道——该路径运行时 MERGE_HEAD 已落盘）
     git_dir = sh(["git", "rev-parse", "--git-dir"]).stdout.strip()
     if git_dir and os.path.exists(os.path.join(git_dir, "MERGE_HEAD")):
         print("ℹ️ 合并进行中：跳过收尾门禁（工作树含合并结果，非在飞改动）")
@@ -583,6 +606,11 @@ def main() -> int:
     ap.add_argument("--kpi-only", action="store_true", help="只做 KPI 断言（快速）")
     ap.add_argument("--full-baseline", action="store_true",
                     help="全量真题真值跑并落盘基线（每日定时，不阻塞合并）")
+    ap.add_argument("--merge-context", action="store_true",
+                    help="由 pre-merge-commit 钩子调用：合并上下文下 staged 改动即合并产物，"
+                         "故跳过收尾门禁（dirty_check）；KPI 双通道与全量测试照跑，不放松。"
+                         "（git 2.55.0 在 pre-merge-commit 时 MERGE_HEAD 尚未落盘，"
+                         "仅靠 MERGE_HEAD 检测会把每个 --no-ff 合并误杀）")
     args = ap.parse_args()
 
     # ── ⓪ 仓库健康门禁 L0（2026-09-19 防复发，纯文件系统，零 git 依赖）──
@@ -604,7 +632,9 @@ def main() -> int:
 
     # 收尾门禁（2026-08-24 调控落地）：合并回 main 前工作树必须干净——
     # 在飞改动（未收尾的 M/D/??）禁止经车道合并进 main（纲领 §4 炸弹）。
-    if not dirty_check():
+    # args.merge_context 由 pre-merge-commit 钩子传入，只影响本步；后续
+    # kpi_check() / full_tests() 不读该开关，KPI 双通道与全量测试一律照跑。
+    if not dirty_check(merge_context=args.merge_context):
         return 1
     ok = kpi_check()
     if not ok:
