@@ -27,7 +27,14 @@
 
 ## 唯一 KPI（外部真值，不可自造尺子）
 
-- KPI = 真题解出数 / 真题总数。考场 = `data/questions_real/`（**92 道**历年真题+正式赛真题，已版本化入库）。唯一真值源 = `scripts/_merge_gate.py count_offline_verified`（实跑计数 fail-closed），当前 = **14**（A 类 6 + B 类 8；详见 `REAL_SOLVES_LEDGER.md` 第二节；2026-09-15 real_reverse_vnctf_cm1 经确定性 XXTEA solver 带证据晋升 13→14）。
+- KPI = 真题解出数 / 真题总数。考场 = `data/questions_real/`（**93 道**历年真题+正式赛真题，已版本化入库）。
+
+    > 口径订正（2026-10-11）：本处原写作「92 道」——那是 `verify_real_questions.py` 的
+    > `real_*.json` 前缀口径读数；而实跑链路 `eval/cases.py` 与 KPI 真值源
+    > `_kpi_canonical.count_real_corpus` 均为 **93**（差 1 = `crypto/10733.json`，
+    > 该题无 `real_` 前缀但是本体合法的真题）。**分母一律以 93 为准**。
+    > 该数字由 `scripts/_denominator_guard.py` 机器派生，请勿手工改写——
+    > 增删题后重跑守卫并同步本行的声称值。唯一真值源 = `scripts/_merge_gate.py count_offline_verified`（实跑计数 fail-closed），当前 = **14**（A 类 6 + B 类 8；详见 `REAL_SOLVES_LEDGER.md` 第二节；2026-09-15 real_reverse_vnctf_cm1 经确定性 XXTEA solver 带证据晋升 13→14）。
 - 真实链路命令：`python -m eval.benchmark --questions-dir data/questions_real --provider baidu,qwen`
   （报告带 `solved_by` 字段拆 presolve/LLM；presolve 静态分析器直出不计 LLM 功劳）。
 - 历史外部真值基线：DASCTF 平台真题离线全量 5/60 = 8%（平台 accepted=0）。

@@ -2,8 +2,20 @@
 """真题集真值 / 安全不变式批量回归校验（本地，self_authored_training 同性质的内部脚本）。
 
 目的（P3 强化）：把原单题 verify_vnctf_flag.py 的守卫扩展为「批量」，
-确保真题集 data/questions_real/**/real_*.json 全部纳入回归，新增 reveal 图 /
+确保真题集 data/questions_real/** 全部纳入回归，新增 reveal 图 /
 附件也不会漏检。
+
+🔧 取题口径修正（2026-10-11，见 ../deliverables/工程补丁/KPI分母口径守护报告-20261011.md）
+--------------------------------------------------------------------------------------
+原口径为 `glob("**/real_*.json")`，即**只认 real_ 前缀**。而实跑链路
+`eval/cases.py:load_questions` 用的是「排除附件目录后的全量 rglob」。
+两者结果不等：差 1 题 `crypto/10733.json`——它本体合法
+（`provenance=real_past_ctf`、有 flag_sha256、附件在盘），
+却因命名前缀不符而**进入实跑分母、从不进入本回归保障**。
+
+修正后与 `eval/cases.py` 同款：递归全量，**排除** `_attachments` / `answers`
+等答案键与附件目录（这些目录里的 json 是载荷不是题目）。
+修复了「在分母里、不在保护里」的保障逃逸，且不会引入新的漏检。
 
 核验不变式（均不输出明文 flag，仅报状态）：
   1) 题面 flag 字段必须是哈希占位（40/64 hex），不得是 flag{...} 明文 —— 安全红线；
@@ -15,7 +27,7 @@
 
 运行：.venv/Scripts/python.exe scripts/verify_real_questions.py
 """
-import glob
+import argparse
 import hashlib
 import json
 import os
@@ -42,9 +54,42 @@ def _load_verified() -> dict:
         return {}
 
 
+# 答案键 / 附件目录（小写）——与 eval/cases.py:load_questions 排除规则同款
+EXCLUDED_DIRS = {"_attachments", "answers", "_answers", "_keys", "_solutions"}
+
+
+def iter_question_files(qs_dir: str) -> list[str]:
+    """枚举题目 JSON：递归全量，跳过答案键/附件目录（2026-10-11 口径修正）。
+
+    与 `eval/cases.py:load_questions` 保持一致，使「实跑分母」与「回归保障」
+    覆盖同一批文件——这是本脚本存在的意义（原 real_ 前缀口径会漏题）。
+    """
+    out: list[str] = []
+    for dirpath, _dirnames, filenames in os.walk(qs_dir):
+        rel = os.path.relpath(dirpath, qs_dir)
+        parts = {p.lower() for p in rel.split(os.sep)} if rel != "." else set()
+        if parts & EXCLUDED_DIRS:
+            continue
+        for fn in filenames:
+            if fn.endswith(".json"):
+                out.append(os.path.join(dirpath, fn))
+    return sorted(out)
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser(description="真题集真值/安全不变式批量回归校验")
+    ap.add_argument("--questions-dir", default=QS_DIR,
+                    help=f"题库目录（默认 {QS_DIR}）；跨 worktree 验收时可指向真实数据目录")
+    args = ap.parse_args()
+    qs_dir = args.questions_dir
+
+    # 附件相对路径的解析基准 = **数据所在侧**的 ctf_agent 级目录，而不是脚本自身位置。
+    # 若用 ROOT 拼接，当 --questions-dir 指向别处（如跨 worktree 验收）时会整体错位，
+    # 表现为「全部附件缺失」的假水位（2026-10-11 实测：98/98 误判）。
+    data_root = os.path.dirname(os.path.dirname(os.path.abspath(qs_dir)))
+
     verified = _load_verified()
-    files = sorted(glob.glob(os.path.join(QS_DIR, "**", "real_*.json"), recursive=True))
+    files = iter_question_files(qs_dir)
     total = len(files)
     n_attach = 0
     n_plaintext = 0
@@ -69,7 +114,7 @@ def main() -> int:
         # 2) 附件存在性
         for att_rel in (q.get("attachments") or []):
             n_attach += 1
-            att = att_rel if os.path.isabs(att_rel) else os.path.join(ROOT, att_rel)
+            att = att_rel if os.path.isabs(att_rel) else os.path.join(data_root, att_rel)
             if not os.path.isfile(att):
                 n_attach_missing += 1
                 problems.append(f"[附件缺失] {qid}: {att}")
