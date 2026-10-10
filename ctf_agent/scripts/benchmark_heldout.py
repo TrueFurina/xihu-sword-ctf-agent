@@ -72,6 +72,16 @@ BLACKBOARD = RESULTS / "blackboard.json"
 LEAK_MARKERS = ("flag.txt",)
 SELF_AUTHORED_MARKERS = ("self_authored_training", "self-authored", "training")
 
+# 答案来源审计清单（机器生成：scripts/_leak_provenance.py --presolve-json <presolve_audit>）。
+# 2026-10-01 v3：对 real92 全池用 presolve oracle 二段判定。其 desc_leak 档唯一题 =
+# real_crypto_dnui_keyboard（题面明文写「解出 CLCKOUTHK」，读描述即得答案，非自主推理）。
+# select_candidates 只取 desc_leak 档用于剔除能力分母；**不取 att_leak**——后者含
+# reverse/crypto/pwn 题「挑战文件内嵌 flag」的误判（如 real_reverse_js 的 flag 在 coso.js，
+# 那正是题目本身，剔除会腰斩合法题），att_leak(答案密钥类) 已由 _is_leaked_attachment 覆盖。
+# ⚠️ 此清单为 2026-10-01 快照；real 语料变更后须重跑 _leak_provenance.py 刷新，否则
+# bare-token 类 desc_leak 可能漏检（见 _is_desc_leak 的回退路径）。
+LEAK_PROVENANCE_MANIFEST = ROOT / "heldout_evidence" / "leak_provenance_real92_v3_20261001.json"
+
 
 def _is_leaked_attachment(q: dict) -> bool:
     """题的所有附件都是答案密钥（内容级判定）→ 即 KNOWN_LEAK，不可作能力分母。
@@ -92,6 +102,64 @@ def _is_leaked_attachment(q: dict) -> bool:
         return False
     from core.answer_key_filter import is_answer_key_only
     return is_answer_key_only(q)
+
+
+_DESC_LEAK_CACHE = None  # None=未加载；set=已加载(可空)；"UNAVAILABLE"=清单不可用
+
+
+def _load_desc_leak_cache() -> None:
+    """加载机器生成的泄漏清单中的 desc_leak 题集（缓存，进程内仅一次）。"""
+    global _DESC_LEAK_CACHE
+    if _DESC_LEAK_CACHE is not None:
+        return
+    try:
+        data = json.loads(LEAK_PROVENANCE_MANIFEST.read_text(encoding="utf-8"))
+        ids = {r["id"] for r in data.get("rows", []) if r.get("provenance") == "desc_leak"}
+        _DESC_LEAK_CACHE = ids
+    except Exception as exc:  # noqa: BLE001
+        sys.stderr.write(
+            f"[benchmark_heldout] 泄漏来源清单 {LEAK_PROVENANCE_MANIFEST} 不可用"
+            f"（{exc}）；desc_leak 回退到无 oracle 判定（bare-token 类会漏检），"
+            f"请重跑 scripts/_leak_provenance.py 刷新。\n")
+        _DESC_LEAK_CACHE = "UNAVAILABLE"
+
+
+def _is_desc_leak(q: dict, qid: str) -> bool:
+    """题面描述是否自带答案（desc_leak）：命中≠自主推理，须剔除能力分母。
+
+    优先用机器生成的泄漏清单（含 presolve oracle 二段判定，能抓 dnui 的 bare-token
+    「CLCKOUTHK」类）。清单不可用时回退到 scripts._leak_provenance.classify 的无 oracle
+    形态（仅抓「描述含 flag{...} 形状明文」的 desc_leak），并打印告警——bare-token 类
+    在无 oracle 下无法判定，故清单缺失会漏检，必须刷新清单。
+    """
+    _load_desc_leak_cache()
+    if isinstance(_DESC_LEAK_CACHE, set):
+        return qid in _DESC_LEAK_CACHE
+    # 清单不可用：逐题无 oracle 兜底（bare-token 类漏检，仅抓 flag{...} 形状）
+    try:
+        from types import SimpleNamespace
+        from scripts._leak_provenance import classify as _lp_classify
+        ns = SimpleNamespace(
+            id=q.get("id") or qid,
+            attachments=q.get("attachments") or [],
+            flag_sha256=q.get("flag_sha256") or "",
+            description=q.get("description") or "",
+        )
+        return str(_lp_classify(ns, ROOT / "data" / "questions_real").get("provenance")) == "desc_leak"
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def desc_leak_ids() -> "frozenset[str]":
+    """机器生成的 desc_leak 题集（答案在题面描述里，命中≠自主推理），供能力分母剔除与外部核对。
+
+    数据源：LEAK_PROVENANCE_MANIFEST（scripts/_leak_provenance.py --presolve-json 产物）。
+    清单不可用回退空集（非空回退见 _is_desc_leak 的逐题 classify 路径）。
+    """
+    _load_desc_leak_cache()
+    if isinstance(_DESC_LEAK_CACHE, set):
+        return frozenset(_DESC_LEAK_CACHE)
+    return frozenset()
 
 
 def _has_plaintext_flag_in_question(q: dict) -> bool:
@@ -270,8 +338,13 @@ def select_candidates(require_sha256: bool = True,
     （trained/writeup/leaked/source-leaked/sha256），零新诚实逻辑。
 
     ⚠️ 2026-09-26 修正：原 docstring 写「默认 QUESTIONS_EXTERNAL」与签名 `None` 不符，
-    导致误以为默认就含外部题——实测 `select_candidates()` = 2 题、
-    `select_candidates(external_dir=QUESTIONS_EXTERNAL)` = 17 题，差 15 道。
+    导致误以为默认就含外部题——实测二者为不同口径（真实计数见下，禁止在此手抄数字，
+    一律由脚本运行派生：default 不并外部题 = 能力分母 heldout_candidates；
+    传 external_dir = 可选跑池 heldout_runnable_pool，含外部采源、难度更高）。
+    ⚠️ 2026-10-10 口径补强：剔除链新增 `known-leak(desc_leak)`——题面描述自带答案
+    （如 real_crypto_dnui_keyboard 题面写「解出 CLCKOUTHK」，读描述即得答案、非自主推理）
+    的题从能力分母剔除。该判定仅取泄漏清单的 desc_leak 档，不取 att_leak（后者含
+    reverse/crypto/pwn 题「挑战文件内嵌 flag」的误判，如 real_reverse_js 的 flag 在 coso.js）。
     该差异正是 _kpi_canonical 中 heldout_candidates(能力分母) 与
     heldout_runnable_pool(可选跑池) 的区分来源。
     """
@@ -307,6 +380,8 @@ def select_candidates(require_sha256: bool = True,
             source_leaked = _has_plaintext_flag_in_source(q, jf)
             # 脱敏模式下：明文 flag 可合成 sha256 校验锚 → 仍可校验
             validatable = bool(q.get("flag_sha256")) or (include_neutralized and has_plain)
+            # desc_leak 一次性算出，排除链与 rec 字段共用（清单命中为 O(1) 集合查询）
+            desc_leak = _is_desc_leak(q, qid)
             reason_excluded = None
             if qid in trained:
                 reason_excluded = "trained(KPI)"
@@ -318,6 +393,8 @@ def select_candidates(require_sha256: bool = True,
                 reason_excluded = "writeup-reconstructed(non-genuine)"
             elif not include_neutralized and _is_leaked_attachment(q):
                 reason_excluded = "known-leak(answer-key-only)"
+            elif not include_neutralized and desc_leak:
+                reason_excluded = "known-leak(desc_leak)"
             elif not include_neutralized and has_plain:
                 reason_excluded = "plaintext-flag-in-question"
             elif source_leaked:
@@ -337,6 +414,7 @@ def select_candidates(require_sha256: bool = True,
                 "source_leaked_flag": source_leaked,
                 "leaked_attachment": _is_leaked_attachment(q),
                 "known_leak": _is_leaked_attachment(q),
+                "desc_leak": desc_leak,
                 "excluded": reason_excluded,
             }
             all_recs.append(rec)
@@ -358,7 +436,8 @@ def write_manifest(cands: list[dict], all_recs: list[dict], require_sha256: bool
                     + ("；has flag_sha256 或可合成(validatable)" if require_sha256 else ""))
     else:
         criteria = ("unseen(NOT in AUTHORIZED_KPI_SOLVES) AND NOT known-leak(answer-key-only) "
-                    "AND NOT plaintext-flag-in-question AND NOT source-leaked-flag(sha256-in-attachment) "
+                    "AND NOT known-leak(desc_leak) AND NOT plaintext-flag-in-question "
+                    "AND NOT source-leaked-flag(sha256-in-attachment) "
                     "AND NOT answer_disclosed "
                     "AND NOT self_authored_training AND NOT writeup-reconstructed(non-genuine)"
                     + (" AND has flag_sha256(validatable)" if require_sha256 else ""))
