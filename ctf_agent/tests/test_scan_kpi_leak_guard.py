@@ -13,6 +13,12 @@
   1. 来源判定（att_leak / desc_leak）必须挡在扫描之外；
   2. 判定失败必须 fail-closed（宁可漏报，不可误报）；
   3. 二段 oracle 判定必须在场（裸 token 的题面泄漏，无 oracle 判不出来）。
+
+补充（ITEM4-A，2026-10-10）：A' 在更底层做了「源级隔离」——presolve 与 LLM 主链的
+  `_attachments` 一律剔除答案密钥附件（内容级 sha256 判定，防改名绕过），因此 presolve
+  **根本读不到**答案，从源头消除 att_leak 命中。本文件的
+  `test_presolve_cannot_read_answer_key_attachment_after_isolation` 即锁这一层：
+  若 A' 被回退，presolve 会在附件里直接命中真值，测试即红。
 """
 from __future__ import annotations
 
@@ -140,33 +146,61 @@ def test_real_desc_leak_needs_oracle_pass():
 
 @pytest.mark.skipif(not (_have_pool() and _ATT_ANXUN.is_dir()), reason="真实附件缺失（.gitignore 排除）")
 def test_guard_blocks_evidence_att_leak_sample():
-    """抽样核对：审计判为 att_leak 的题，抽样必须全部被闸门挡住（含裸 token 通道）。"""
+    """抽样核对：审计判为 att_leak 且**当前证据附件仍可解析**的题，必须全部被闸门挡住。
+
+    注意：快照 `leak_provenance_real92_v3_20261001.json` 中部分 att_leak 的附件来自已被
+    清理的 `_archive/recovered_external`（外部 writeup 归档，非规范题库），这些文件当前
+    不在磁盘上，`_classify_provenance` 无法再判定其为 att_leak —— 属证据缺失，非闸门
+    失效。故抽样仅取「泄漏当前可检测（附件含真值且文件在盘）」的子集，避免对环境变动误报。
+    """
     import json
+    from scripts._leak_provenance import _attachment_plaintext
 
     rows = json.loads(_LEAK_JSON.read_text(encoding="utf-8"))["rows"]
-    att_ids = [r["id"] for r in rows if r["provenance"] == "att_leak"][:6]
+    att_ids = [r["id"] for r in rows if r["provenance"] == "att_leak"]
     assert att_ids, "审计证据里应有 att_leak 样本"
     from eval.cases import load_questions
     pool = {q.id: q for q in load_questions(str(_POOL), include_disclosed=True)}
+
+    def _leak_resolvable(qid) -> bool:
+        q = pool.get(qid)
+        if not q:
+            return False
+        sha = getattr(q, "flag_sha256", None) or ""
+        if not sha:
+            return False
+        atts = list(getattr(q, "attachments", []) or [])
+        in_att, _ = _attachment_plaintext(atts, sha, Path("data/questions_real"))
+        return in_att
+
+    sample = [i for i in att_ids if i in pool and _leak_resolvable(i)][:6]
+    assert sample, "没有「证据当前可解析」的 att_leak 样本（环境变动导致全部缺失）"
     scannable, leaked, _ = split_by_leak(
-        [pool[i] for i in att_ids if i in pool], _classify_provenance)
+        [pool[i] for i in sample], _classify_provenance)
     assert scannable == [], f"以下证据判定的注水题漏进了扫描：{[x.id for x in scannable]}"
-    assert len(leaked) == len(att_ids)
+    assert len(leaked) == len(sample)
 
 
 @pytest.mark.skipif(
     not (_have_pool() and _ATT_ANXUN.is_dir()), reason="真实附件缺失（.gitignore 排除）")
-def test_presolve_hits_att_leak_from_attachment_causally():
-    """因果证据：该题确实被 presolve 在附件里命中 —— 所以只能按来源判定挡掉。"""
+def test_presolve_cannot_read_answer_key_attachment_after_isolation():
+    """A' 源级隔离的反向护栏：presolve 不得从答案密钥附件读出真值。
+
+    旧版（A' 之前）`real_crypto_anxun2020_aes` 唯一附件即泄漏的 flag.txt，presolve 的
+    附件扫描 0.2s 内「命中」并 MATCH —— 这正是 leak guard 闸门存在的原因。A' 把答案密钥
+    附件从 `_attachments` 剔除后，presolve 应**读不到**答案：返回 None 或非匹配值。
+    本测试锁这一层：若 A' 被回退，presolve 会重新在附件里命中真值，测试即红。
+    """
     import asyncio
 
     from core.presolve import presolve
+    from core.answer_key_filter import is_answer_key_attachment
     import scripts._scan_kpi_candidates as mod
 
     q = _load_real("real_crypto_anxun2020_aes")
-    missing = [a for a in q.attachments
-               if not (Path(str(a)) if Path(str(a)).is_absolute() else _ROOT / str(a)).exists()]
-    if missing:
-        pytest.skip(f"附件未落地: {missing[:2]}")
+    # 前置：本题确实带答案密钥附件（否则「读不到」无意义，可能是环境变动）
+    leaked = [a for a in q.attachments if is_answer_key_attachment(q, a)]
+    assert leaked, "aes 应含答案密钥附件（flag.txt），否则测试前提不成立"
     got = asyncio.run(presolve(q, registry=mod.build_registry(), force=True))
-    assert got and q.flag_matches(str(got)), "该题本就能被附件扫描命中；这正是闸门存在的原因"
+    assert not (got and q.flag_matches(str(got))), \
+        "A' 源级隔离失效：presolve 仍从答案密钥附件读出了真值"
