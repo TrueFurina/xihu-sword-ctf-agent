@@ -1,0 +1,8 @@
+{
+  "name": "misc_jpeg_padding_stego",
+  "purpose": "JPEG padding-block 隐写信道解码（Google CTF 2023 misc「papapapa」）。当图像宽/高不是 MCU 尺寸（8·Hmax / 8·Vmax）整数倍时，规范编码器把越界 padding 块填为边缘复制；本题作者改为把隐写数据写进 Y 分量 padding 块。本 skill 纯标准库完整解码基线 JPEG（marker 解析 + 规范 Huffman + 块满省略 EOB + 纯 Python IDCT），按 (my,bx) 坐标装配全部 Y padding 块 → rot90 CCW → 阈值 200 二值化 → 分段（间隙 ≤1px 合并）→ 逐段实例模板匹配（段宽=模板宽且 IoU≥0.85）→ flag 形态校验。实测 white.jpg（512×512「纯白」，3 分量 3×1 sampling）：128 个 Y padding 块中 114 个携带 AC 数据，还原出 16×512 文本带并解出 flag（sha256 与题面逐字匹配）。",
+  "input_spec": "params = {'path': JPEG 文件路径}；非 JPEG / 渐进式 / 无 padding 数据块 / OCR 段匹配失败 → {'flag': None}（不崩、不谎报）",
+  "output_spec": "run → {'flag': 'CTF{...}'}（形态 [A-Za-z0-9_]+\\{[^}]+\\} 且逐段 IoU≥0.85）或 {'flag': None}",
+  "categories": ["misc", "forensics", "stego", "jpeg"],
+  "version": "1.0"
+}

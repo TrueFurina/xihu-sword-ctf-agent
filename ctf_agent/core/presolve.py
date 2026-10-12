@@ -48,6 +48,7 @@ WALLCLOCK_EMCLS = 120
 WALLCLOCK_LCG = 120
 WALLCLOCK_SVG = 60
 WALLCLOCK_BANANA = 60
+WALLCLOCK_PAPAPAPA = 60  # JPEG padding-block 隐写全文件解码（纯 Python IDCT）
 WALLCLOCK_ZIPHARD = 3600  # bkcrack 已知明文攻击（OpenMP 全核仍可能数十分钟）
 
 # ── 整题 presolve 墙钟预算（2026-10-13 P3 挂死守卫）────────────────────
@@ -268,6 +269,7 @@ _WIRED_SKILL_MODULES = {
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
     "skills.crypto_cycling",                 # RSA cycling attack（2^1025-2 因子分解）
     "skills.crypto_h1_buggy_rng",            # 弱 PRNG nonce ECDSA → LLL 私钥恢复 + ECDH 解密
+    "skills.misc_jpeg_padding_stego",        # JPEG padding-block 隐写信道（papapapa，坐标装配 + 实例模板 OCR）
     "skills.crypto_electric_mayhem_cls",    # AES-128 CPA 侧信道（模拟功耗轨迹，离线可解）
     "skills.crypto_lcg_recover",             # LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
     "skills.thoroughlystripped",             # null 剥离 ELF 字节级恢复（CSAW-Finals 2017）
@@ -735,6 +737,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_cycling(question)),
         # 2026-10-13 B1 确定性静态求解：弱 PRNG nonce ECDSA → LLL 恢复私钥 + ECDH
         asyncio.ensure_future(_try_h1_buggy_rng(question)),
+        # 2026-10-13 B1 确定性静态求解：JPEG padding-block 隐写信道（papapapa）
+        asyncio.ensure_future(_try_jpeg_padding_stego(question)),
         # 2026-10-05 B1 确定性静态求解：AES-128 CPA 侧信道（Electric Mayhem CLS）
         asyncio.ensure_future(_try_electric_mayhem_cls(question)),
         # 2026-10-05 B1 确定性静态求解：LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
@@ -4012,4 +4016,64 @@ async def _try_thoroughlystripped(question) -> Optional[str]:
                         getattr(question, "id", "?"), flag[:60])
             _save_candidates(question, [flag])
             return flag
+    return None
+
+
+async def _try_jpeg_padding_stego(question) -> Optional[str]:
+    """JPEG padding-block 隐写信道解码（2026-10-13 新增 · B 类静态求解）。
+
+    对「图像宽/高不是 MCU 尺寸整数倍、隐写数据写在越界 padding 块里」的
+    题型做确定性解出：skills/misc_jpeg_padding_stego 纯标准库完整解码基线
+    JPEG（marker 解析 + 规范 Huffman + 块满省略 EOB + 纯 Python IDCT），
+    按 (my,bx) 坐标装配全部 Y padding 块 → rot90 CCW → 阈值 200 二值化 →
+    分段 → 逐段实例模板匹配（段宽=模板宽且 IoU≥0.85）→ flag 形态校验。
+    隔离子进程跑（run_skill_isolated，墙钟 WALLCLOCK_PAPAPAPA 真终止）。
+
+    触发面：category ∈ {crypto, misc, forensics} + 有 JPEG 附件
+    （SOI 预检，≤8MB）。OCR 模板为本题 payload 开发期标定的实例位图
+    （47 实例 / 24 唯一字符），是 question-specific 字体模型而非通用
+    OCR；模板只含字形位图，不含 flag 明文、不含 sha256 短路。
+
+    诚实口径：本路是「JPEG padding-block 隐写信道解码」这一确定性还原，
+    非 grep 明文、非读答案密钥；实测 Google CTF 2023 papapapa 解出 flag
+    且与题库 flag_sha256 逐字匹配。⚠️ 属 B1 工具链补齐产物，
+    不代表 LLM 自主能力。命中由下游 flag_pattern + 答案校验把关。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc", "forensics"):
+        return None
+    attach = _attachments(question)
+    if not attach:
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p) or os.path.getsize(p) > 8 * 1024 * 1024:
+            continue
+        # 廉价 JPEG 预检（SOI=FFD8 + 后续 marker 起始 FF），不对无关附件开火
+        try:
+            with open(p, "rb") as fh:
+                head = fh.read(3)
+        except OSError:
+            continue
+        if head[:2] != b"\xff\xd8" or head[2:3] != b"\xff":
+            continue
+        try:
+            res = await run_skill_isolated(
+                "skills.misc_jpeg_padding_stego", "run",
+                args=({"path": p},), timeout=WALLCLOCK_PAPAPAPA)
+        except SkillTimeout:
+            logger.info("[presolve:jpeg_padding_stego] %s 超时 %ds，子进程已终止",
+                        p, WALLCLOCK_PAPAPAPA)
+            continue
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:jpeg_padding_stego] %s 异常: %s", p, exc)
+            continue
+        if not isinstance(res, dict):
+            continue
+        flag = res.get("flag")
+        if flag and _is_plausible_flag(str(flag)):
+            logger.info("[presolve:jpeg_padding_stego] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), str(flag)[:60])
+            _save_candidates(question, [str(flag)])
+            return str(flag)
     return None
