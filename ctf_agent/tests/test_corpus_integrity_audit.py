@@ -97,6 +97,28 @@ class TestCorpusIntegrityAudit(unittest.TestCase):
             rep = aci.audit(root, getattr(self, "_att_root", None))
             self.assertNotIn("no_truth", rep["rows"][0]["issues"])
 
+    def test_repo_root_prefixed_attachment_resolved(self):
+        """附件路径带 ctf_agent/ 前缀（仓根相对）时也必须识别。
+
+        2026-10-12 实例：real_reverse_vnctf_cm1 的附件写作
+        ctf_agent/scripts/_solve_vnctf_cm1.py，调用方（check_corpus_health 等）
+        以 att_root=ctf_agent 目录调用 → 四候选（base/rel、Path(rel)、root/rel、
+        root.parent/rel）全部落空 → 假 payload_missing，把 ok 题误判 broken
+        （health 基线 +6 回归的组成项之一）。
+        """
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "data" / "questions_real"
+            root.mkdir(parents=True)
+            (Path(td) / "ctf_agent" / "scripts").mkdir(parents=True)
+            (Path(td) / "ctf_agent" / "scripts" / "solve.py").write_bytes(b"x = 1\n")
+            (root / "q.json").write_text(json.dumps({
+                "id": "q", "flag_sha256": _truth(FLAG),
+                "attachments": ["ctf_agent/scripts/solve.py"]}), encoding="utf-8")
+            # att_root = <td>/ctf_agent，模拟真实调用方的 ROOT 传参形态
+            rep = aci.audit(root, Path(td) / "ctf_agent")
+            self.assertEqual(rep["rows"][0]["level"], "ok")
+            self.assertEqual(rep["rows"][0]["payload_on_disk"], 1)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
