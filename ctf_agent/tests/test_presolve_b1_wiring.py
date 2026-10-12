@@ -50,6 +50,7 @@ H1_QID = "ext_gctf2021_h1"
 CLS_QID = "ext_gctf2022_electric-mayhem-cls"
 LCG_QID = "ext_gctf2023_least-common-genominator"
 ZIP_QID = "ext_gctf2023_zip"
+PAPAPAPA_QID = "ext_gctf2023_papapapa"
 
 
 def _big(rng, bits=136):
@@ -77,7 +78,8 @@ def test_b1_skills_are_wired():
                     ("skills.crypto_h1_buggy_rng", "_try_h1_buggy_rng"),
                     ("skills.crypto_electric_mayhem_cls", "_try_electric_mayhem_cls"),
                     ("skills.crypto_lcg_recover", "_try_lcg_recover"),
-                    ("skills.crypto_zip_bkcrack", "_try_zip_bkcrack")):
+                    ("skills.crypto_zip_bkcrack", "_try_zip_bkcrack"),
+                    ("skills.misc_jpeg_padding_stego", "_try_jpeg_padding_stego")):
         assert mod in wired, f"{mod} 未接线（只是库，不算能力）"
         assert callable(getattr(P, fn, None)), f"{fn} 未定义"
 
@@ -342,4 +344,23 @@ def test_presolve_h1_solves_real_problem_via_main_entry():
     truth = str(getattr(q, "flag_sha256", "") or "")
     flag = asyncio.run(P.presolve(q, answers=preset_answers([q]), force=True))
     assert flag, "presolve 主入口未解出 h1（内部命中但被主入口闸丢弃？）"
+    assert hashlib.sha256(flag.encode()).hexdigest() == truth
+
+@pytest.mark.slow
+def test_presolve_papapapa_solves_real_problem_via_main_entry():
+    """papapapa（JPEG padding-block 隐写）端到端走 **presolve 主入口**。
+
+    同 h1 教训：只测 `_try_jpeg_padding_stego` 内部会绕过主入口两道闸；
+    且本路 OCR 是 question-specific 实例模板，必须验证整条生产链
+    （隔离子进程 skill + flag_pattern 闸 + answer_check 闸 + sha256 仲裁）。
+    """
+    import asyncio
+
+    from eval.cases import preset_answers
+
+    q = _load(PAPAPAPA_QID)
+    assert q is not None, f"题库里找不到 {PAPAPAPA_QID}"
+    truth = str(getattr(q, "flag_sha256", "") or "")
+    flag = asyncio.run(P.presolve(q, answers=preset_answers([q]), force=True))
+    assert flag, "presolve 主入口未解出 papapapa（内部命中但被主入口闸丢弃？）"
     assert hashlib.sha256(flag.encode()).hexdigest() == truth
