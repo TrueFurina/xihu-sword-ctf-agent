@@ -70,7 +70,10 @@ def audit_question(q: dict, fp: Path, root: Path, att_root: Path | None = None) 
         # 题库里的附件路径是相对**仓库根**（如 data/questions_real/_attachments/...），
         # 初版按题库目录拼接 → 93 题全报 payload_missing（假阳性）。改为多候选探测：
         # 先按 CWD（仓库根）解析，再退回题库根，任一命中即算存在。
-        cands = [base / rel, Path(rel), root / rel, root.parent / rel]
+        # 2026-10-12：个别题目（real_reverse_vnctf_cm1）的附件路径带 ctf_agent/ 前缀
+        # （仓根相对），而调用方 att_root 传的正是 ctf_agent 目录 → 前四候选全部落空
+        # → 假 payload_missing。补 base.parent（仓库根）候选覆盖该形态。
+        cands = [base / rel, Path(rel), root / rel, root.parent / rel, base.parent / rel]
         p = next((c for c in cands if c.is_file()), None)
         if p is None:
             continue
