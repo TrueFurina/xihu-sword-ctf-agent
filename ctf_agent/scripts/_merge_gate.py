@@ -208,6 +208,62 @@ REGRESSION_CHECKS = [
 KNOWN_GAP: list = []
 
 
+# ── 永久丢失载荷注册表（2026-10-12 本地未跟踪数据丢失事件）──
+# 5 道已解出题的真题附件在 2026-10-12 02:2x 随本地未跟踪数据丢失事件被删：全盘 find
+# 零副本、无远端副本、_archive/ 已不存在、g_sessions 空 → 不可恢复。其回归命令
+# （presolve 读附件）当前无法复现。
+# 纪律（与测试侧「加优雅跳过」同款，不掩回归、不删不查）：
+#   - 显式登记（本表 + 基线 incident_notes + 台账）
+#   - 载荷缺失时 loud 警告但**不阻断**合并（回归命令本就不可能跑，非代码回归）
+#   - 载荷一旦恢复在盘 → 自动回到严格校验路径（守卫 = 附件是否在盘，数据自检，非写死数字）
+#   - 台账 offline_verified 保留 14（历史解出为真），另以 currently_reproducible 维度
+#     如实并列「当前可复现」数（= 台账计数 − 永久丢失且仍缺失的计数项）
+LOST_PAYLOAD: dict = {
+    "real_crypto_anwang_crypto1": "附件 flag.txt 永久丢失（2026-10-12 数据丢失事件）",
+    "real_crypto_ezmult": "附件 s1.txt 永久丢失（2026-10-12 数据丢失事件）",
+    "real_crypto_qiangwang_classic": "附件 classicCrypto.txt 永久丢失（2026-10-12 数据丢失事件）",
+    "real_misc_xuanhun_signin": "附件 xz1.jpg 永久丢失（2026-10-12 数据丢失事件）",
+    "real_misc_vnctf_flag": "附件 flag.png 永久丢失（2026-10-12 数据丢失事件）",
+}
+
+
+def _question_payload_missing(qid: str) -> bool:
+    """数据自检：按题面 JSON 的 attachments[0] 判附件是否缺失（禁写死路径/数字）。
+
+    找不到题面 JSON、或缺 attachments，亦视为「不可复现」。附件恢复在盘即返回 False，
+    于是 LOST_PAYLOAD 项自动回到严格校验路径（复活）。
+    """
+    import glob as _glob
+    for p in _glob.glob(os.path.join(ROOT, "data", "questions_real", "**",
+                                     f"{qid}.json"), recursive=True):
+        try:
+            with open(p, encoding="utf-8") as fh:
+                d = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            continue
+        atts = d.get("attachments") or []
+        if not atts:
+            return True
+        a = str(atts[0])
+        path = a if os.path.isabs(a) else os.path.join(ROOT, a.replace("/", os.sep))
+        return not os.path.isfile(path)
+    return True
+
+
+def currently_reproducible() -> int:
+    """当前可复现的严格真题数 = 台账 offline_verified − 永久丢失且仍缺失的计数项。
+
+    与 count_offline_verified()（历史解出）并列的双数口径。LOST_PAYLOAD 各项均为台账
+    计入的 A/B 类已解出题，故逐项相减即得。载荷恢复在盘后本值自动回升。台账缺失
+    （计数 < 0）时返回 -1。
+    """
+    n = count_offline_verified()
+    if n < 0:
+        return -1
+    lost = sum(1 for qid in LOST_PAYLOAD if _question_payload_missing(qid))
+    return max(n - lost, 0)
+
+
 def dirty_check(merge_context: bool = False) -> bool:
     """收尾门禁（2026-08-24 调控落地；2026-08-26 修正误杀合法合并的 bug）：合并回 main 前工作树必须干净。
 
@@ -327,6 +383,13 @@ def regression_check() -> bool:
     print(f"── KPI 真值回归（{len(REGRESSION_CHECKS)} 道已解出题）──")
     ok = True
     for item in REGRESSION_CHECKS:
+        qid = item["id"]
+        # 永久丢失载荷（2026-10-12 数据丢失事件）：显式登记 + loud 警告但不阻断合并——
+        # 回归命令因附件缺失本就不可能跑通（非代码回归）。载荷恢复在盘即回到严格校验。
+        if qid in LOST_PAYLOAD and _question_payload_missing(qid):
+            print(f"⚠️ 载荷永久丢失，跳过严格校验：{qid}（{LOST_PAYLOAD[qid]}）"
+                  f"——载荷恢复在盘后自动恢复严格校验")
+            continue
         try:
             r = sh(item["cmd"])
         except subprocess.TimeoutExpired:
@@ -393,6 +456,16 @@ def save_baseline(verified: int, test_stats: dict | None = None,
                     bl["chain_worst_step"] = f"{_worst}({_steps[_worst].get('pct', 0)}%)"
         except Exception:  # noqa: BLE001 - 基线加维度失败不阻塞
             pass
+    # currently_reproducible（2026-10-12）：与 offline_verified 并列的双数口径——
+    # 「当前可复现」数（= 台账计数 − 永久丢失且仍缺失的计数项）。机器派生，每次落盘
+    # 均重算，载荷恢复在盘后自动回升。
+    _cr = currently_reproducible()
+    if _cr >= 0:
+        bl["currently_reproducible"] = _cr
+    # 保留既有 incident_notes（历史事件登记不因基线刷新而丢失）
+    _old = load_baseline()
+    if "incident_notes" in _old and "incident_notes" not in bl:
+        bl["incident_notes"] = _old["incident_notes"]
     with open(BASELINE, "w", encoding="utf-8") as f:
         json.dump(bl, f, ensure_ascii=False, indent=2)
 
@@ -515,6 +588,15 @@ def kpi_check() -> bool:
                   f"（注水或回退均不允许）")
             return False
         print(f"✅ KPI 计数断言通过（严格）：offline_verified {n} == 基线 {base}")
+        # 双数并列（2026-10-12）：台账 offline_verified 是「历史解出」，本值是其
+        # 「当前可复现」对偶。两者并列公示，不抹历史也不掩盖缺口。
+        _cr = currently_reproducible()
+        if _cr >= 0:
+            if n - _cr > 0:
+                print(f"ℹ️ 当前可复现 = {_cr}（台账 {n} − 永久丢失且仍缺失 {n - _cr} 题；"
+                      f"清单见 LOST_PAYLOAD，载荷恢复在盘后自动回升）")
+            else:
+                print(f"✅ 当前可复现 = {_cr} == 台账 {n}（无永久丢失缺席项）")
     # 真值回归：台账计数只是文本，回归集才是"能复现"的证据
     if not regression_check():
         return False
