@@ -26,6 +26,7 @@ import asyncio
 import logging
 import os
 import re
+import time
 from typing import Optional
 
 from core.skill_pool import SkillTimeout, run_skill_isolated
@@ -48,6 +49,72 @@ WALLCLOCK_LCG = 120
 WALLCLOCK_SVG = 60
 WALLCLOCK_BANANA = 60
 WALLCLOCK_ZIPHARD = 3600  # bkcrack 已知明文攻击（OpenMP 全核仍可能数十分钟）
+
+# ── 整题 presolve 墙钟预算（2026-10-13 P3 挂死守卫）────────────────────
+# 并发嗅探的「安全阀」：历史上 asyncio.as_completed 必须等全部 task 完成才退出，
+# 单路挂死（无限 await，如未受子进程预算约束的进程内 CPU 密集循环 / 无超时网络调用）
+# 会拖垮整题（"2 题非终止"根因；且合并闸门 scripts/_regress_one.py 无超时会被永久阻塞）。
+# 现以墙钟预算兜底：预算耗尽即「loud 告警 + 取消未完 task + 回退已有候选」并停止产出，
+# presolve 的 finally 取消未完 task。默认派生自 config.per_question_wallclock（单题墙钟
+# 硬止损 300s，禁写死数字）；可用 CTF_AGENT_PRESOLVE_WALLCLOCK 环境变量覆盖（CI / 单题调试）。
+
+
+def _presolve_wallclock_budget() -> float:
+    """返回整题 presolve 墙钟预算（秒）。
+
+    优先读 CTF_AGENT_PRESOLVE_WALLCLOCK 环境变量；缺省/非法时派生自
+    config.per_question_wallclock（单题墙钟硬止损，默认 300s），禁写死数字。
+    """
+    _raw = os.environ.get("CTF_AGENT_PRESOLVE_WALLCLOCK")
+    if _raw:
+        try:
+            _v = float(_raw)
+        except (TypeError, ValueError):
+            _v = 0.0
+        if _v > 0:
+            return _v
+        logger.warning(
+            "[presolve] CTF_AGENT_PRESOLVE_WALLCLOCK=%r 非法(须>0)，回退默认 per_question_wallclock",
+            _raw)
+    # 默认派生自 config.per_question_wallclock（单题墙钟硬止损），禁写死数字
+    try:
+        from config import AppConfig
+        return float(AppConfig.from_env().per_question_wallclock)
+    except Exception as _e:  # noqa: BLE001 - config 不可用时兜底 300s
+        logger.warning("[presolve] 读取 config.per_question_wallclock 失败(%s)，兜底 300s", _e)
+        return 300.0
+
+
+async def _iter_presolve_results(tasks, question):
+    """按完成顺序产出各并发嗅探 task 的结果，墙钟预算耗尽即停止产出。
+
+    替代 asyncio.as_completed：后者须等全部 task 完成才退出，单路挂死会拖垮整题。
+    本生成器以墙钟 deadline 兜底——超时即 return（停止产出），presolve 的 finally
+    负责取消仍未完的 task。异常 task 等价于无结果，记 debug 日志后跳过（不阻塞）。
+    """
+    _budget = _presolve_wallclock_budget()
+    _deadline = time.monotonic() + _budget
+    _pending = list(tasks)
+    while _pending:
+        _timeout = _deadline - time.monotonic()
+        if _timeout <= 0:
+            logger.warning(
+                "[presolve] %s 确定性预扫墙钟耗尽（预算 %.0fs，仍有 %d 路未完成）："
+                "停止产出，finally 将取消剩余 task（防单路挂死拖垮整题，绝不静默冒充成功）",
+                getattr(question, "id", "?"), _budget, len(_pending))
+            return
+        _done, _pending = await asyncio.wait(
+            _pending, timeout=_timeout, return_when=asyncio.FIRST_COMPLETED)
+        if not _done:
+            # 极端：_timeout 边界恰好无 task 完成 → 下一轮 _timeout<=0 即 return
+            continue
+        for _fut in _done:
+            try:
+                yield _fut.result()
+            except Exception as _e:  # noqa: BLE001 - 单 task 异常不阻塞其余
+                logger.debug("[presolve] 并发嗅探异常: %s", _e)
+                continue
+
 
 _PRESOLVE_ATTEMPTED = "_presolve_attempted"
 _PRESOLVE_CANDIDATES = "_presolve_candidates"  # 2026-08-22 锐评：多候选提取透传（提交迭代用）
@@ -692,12 +759,9 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         #     （无真值声明的题行为完全不变，仍先到先得，零行为回退）。
         _fallback = None
         _sha_truth_declared = bool(getattr(question, "expected_sha256", None))
-        for _fut in asyncio.as_completed(_tasks):
-            try:
-                _r = await _fut
-            except Exception as _e:
-                logger.debug("[presolve] 并发嗅探异常: %s", _e)
-                continue
+        # 2026-10-13 P3 挂死守卫：以墙钟预算兜底的生成器替代 asyncio.as_completed，
+        # 单路挂死不再拖垮整题（预算耗尽即停止产出，finally 取消未完 task）。
+        async for _r in _iter_presolve_results(_tasks, question):
             if _r and _is_plausible_flag(_r):
                 # 2026-08-31 修复：本题若声明 flag_pattern，候选 flag 必须匹配该格式，
                 # 否则视为附件/脚本/题面中的诱饵（如 ctf{XORed} / CTF{TimeFl...} 等
