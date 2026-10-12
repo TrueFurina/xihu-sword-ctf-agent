@@ -135,10 +135,18 @@ def _is_permanent_429_failure(body: str) -> bool:
 
 
 def _circuit_record_failure(provider: str, model: str, status_code: int,
-                            body: str = "") -> None:
+                            body: str = "", *, unconditional: bool = False) -> None:
     """记录一次永久性失败（401/402/403，或伪装成 429 的余额耗尽/账号停用）；
-    达阈值打开该 (provider, model) 的熔断。"""
-    permanent = status_code in (401, 402, 403) or (
+    达阈值打开该 (provider, model) 的熔断。
+
+    unconditional=True：**本地/配置层**导致的「请求根本发不出」（httpx 缺失、
+    端点不在白名单）。属确定性不可用，与永久故障同等对待——都须熔断，使
+    `provider_circuit_open` 为真、经 run.py 根因回填让报告如实标 interpretable=False。
+    否则退化桶(wrong_direction/unresolved)原样进报告 → 假绿（实证
+    `G_rerun_noabandon_20261013_001117`：httpx 缺失时 token 停在兜底值却标可引用）。
+    status_code 在 unconditional 分支仅占位，不参与判定。
+    """
+    permanent = unconditional or status_code in (401, 402, 403) or (
         status_code == 429 and _is_permanent_429_failure(body)
     )
     if not permanent:
@@ -149,11 +157,19 @@ def _circuit_record_failure(provider: str, model: str, status_code: int,
         st["fails"] += 1
         if st["fails"] >= _PROVIDER_CIRCUIT_FAIL_LIMIT and not st["open"]:
             st["open"] = True
-            logger.warning(
-                "🔴 provider=%s model=%s 连续 %d 次永久故障(status=%s)，已熔断——"
-                "后续请求将直接跳过该模型（同 provider 其他模型与剩余存活源照常接管）",
-                provider, model or "(默认)", st["fails"], status_code,
-            )
+            if unconditional:
+                logger.warning(
+                    "🔴 provider=%s model=%s 连续 %d 次「本地不可用」（%s），已熔断——"
+                    "请求根本发不出（非 Agent 能力失败）；后续请求直接跳过该模型",
+                    provider, model or "(默认)", st["fails"],
+                    body or "本地/配置层不可用",
+                )
+            else:
+                logger.warning(
+                    "🔴 provider=%s model=%s 连续 %d 次永久故障(status=%s)，已熔断——"
+                    "后续请求将直接跳过该模型（同 provider 其他模型与剩余存活源照常接管）",
+                    provider, model or "(默认)", st["fails"], status_code,
+                )
 
 
 def _circuit_record_success(provider: str, model: str = "") -> None:
@@ -865,12 +881,22 @@ def _post_chat(
         (文本内容, usage dict)；任何失败返回 (None, 全 0 usage)。
     """
     _ZERO = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    _provider = settings.get("provider", "")
+    _model = settings.get("model", "")
     if httpx is None:
         logger.warning("httpx 未安装，无法发起 LLM 请求")
+        # 本地不可用（确定性，非 Agent 能力失败）→ 必须记熔断，否则报告会把
+        # 「LLM 全链路不可用」假绿成 interpretable=True（实证 001117）。
+        # 见 tests/test_llm_local_unavailable_circuit.py
+        _circuit_record_failure(_provider, _model, 0,
+                                "httpx 未安装，无法发起 LLM 请求", unconditional=True)
         return None, dict(_ZERO)
 
     # 白名单合规校验：违规端点直接拒绝（防误配置取消比赛资格）
     if not _check_whitelist(settings.get("base_url", "")):
+        # 配置层不可用（请求同样根本发不出）→ 同上记熔断防假绿。
+        _circuit_record_failure(_provider, _model, 0,
+                                "端点不在白名单（fail-closed 拦截）", unconditional=True)
         return None, dict(_ZERO)
 
     payload = {
