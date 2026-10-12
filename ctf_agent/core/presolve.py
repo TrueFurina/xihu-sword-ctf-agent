@@ -267,6 +267,7 @@ _WIRED_SKILL_MODULES = {
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
     "skills.crypto_cycling",                 # RSA cycling attack（2^1025-2 因子分解）
+    "skills.crypto_h1_buggy_rng",            # 弱 PRNG nonce ECDSA → LLL 私钥恢复 + ECDH 解密
     "skills.crypto_electric_mayhem_cls",    # AES-128 CPA 侧信道（模拟功耗轨迹，离线可解）
     "skills.crypto_lcg_recover",             # LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
     "skills.thoroughlystripped",             # null 剥离 ELF 字节级恢复（CSAW-Finals 2017）
@@ -732,6 +733,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_knapsack_mhk(question)),
         # 2026-10-04 B1 确定性静态求解：RSA cycling attack
         asyncio.ensure_future(_try_cycling(question)),
+        # 2026-10-13 B1 确定性静态求解：弱 PRNG nonce ECDSA → LLL 恢复私钥 + ECDH
+        asyncio.ensure_future(_try_h1_buggy_rng(question)),
         # 2026-10-05 B1 确定性静态求解：AES-128 CPA 侧信道（Electric Mayhem CLS）
         asyncio.ensure_future(_try_electric_mayhem_cls(question)),
         # 2026-10-05 B1 确定性静态求解：LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
@@ -2822,6 +2825,148 @@ async def _try_crypto_primes(question) -> Optional[str]:
         _save_candidates(question, [flag])
         return flag
     return None
+
+
+# h1（弱 PRNG nonce）：门槛常量 + 签名行/参数识别
+_H1_RNG_RE = re.compile(r"16843009|0x1010101\b")
+
+
+async def _try_h1_buggy_rng(question) -> Optional[str]:
+    """h1（弱 PRNG nonce ECDSA → 格攻击，2026-10-13 新增 · B 类静态求解）。
+
+    对「签名 nonce 由 RNG(nbits, 16843009, 2**32) 生成」的题型做确定性求解：
+    nonce 实际只由前 nbits/32 个字节决定（熵仅 8·nbits/32 bit）→ 两条同签名者
+    的已知明文签名构造模线性方程 → Kannan 嵌入 + LLL 恢复私钥；再由对方的
+    已知明文签名反推其公钥 → ECDH 共享密钥 → AES-ECB 解密出 flag。
+
+    触发面（严）：文本同时含 16843009 常量 + 可解析的曲线参数（mod/a/b/n/G）
+    + ≥3 条 "X -> Y: (r, s, ct)" 签名行 + ≥3 条已知明文字面量。
+    命中由下游 flag_pattern + 题面 flag_sha256 把关。
+
+    诚实口径：本路是「弱 nonce ECDSA 格攻击」这一真实密码学攻击的确定性
+    实现（非 grep 明文、非读答案密钥）；实测 Google CTF 2021 h1 解出 flag
+    且与题库 flag_sha256 逐字匹配。⚠️ 属 B1 工具链补齐产物，
+    不代表 LLM 自主能力。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc"):
+        return None
+    parts = [str(getattr(question, "description", "") or "")]
+    for a in _attachments(question):
+        p = str(a)
+        if not os.path.isfile(p):
+            continue
+        try:
+            if os.path.getsize(p) > 512 * 1024:
+                continue
+            with open(p, "r", encoding="utf-8", errors="replace") as fh:
+                parts.append(fh.read())
+        except OSError:
+            continue
+    blob = "\n".join(parts)
+    if not blob or not _H1_RNG_RE.search(blob):
+        return None
+
+    # ── 曲线参数 ──
+    def _param(name: str):
+        m = re.search(r"^%s\s*=\s*(\d+)\s*$" % name, blob, re.M)
+        return int(m.group(1)) if m else None
+
+    mod, ac, bc, n = _param("mod"), _param("a"), _param("b"), _param("n")
+    mg = re.search(r"^G\s*=\s*\(([^()]*)\)", blob, re.M | re.S)
+    g = None
+    if mg:
+        try:
+            g = tuple(int(x.strip()) for x in mg.group(1).split(","))
+        except ValueError:
+            g = None
+    if not all([mod, ac, bc, n, g]) or len(g or ()) != 3:
+        return None
+
+    # ── 签名行（output.txt 形态）──
+    sigs = []
+    for line in blob.splitlines():
+        m = re.match(r"\s*(\w+)\s*->\s*\w+\s*:\s*\(([^)]*)\)", line)
+        if not m:
+            continue
+        try:
+            nums = [int(x.strip()) for x in m.group(2).split(",")]
+        except ValueError:
+            continue
+        if len(nums) == 3:
+            sigs.append((m.group(1), nums[0], nums[1], nums[2]))
+    if len(sigs) < 3:
+        return None
+
+    # ── 已知明文字面量（按 chall.py 中 msga/msgb 赋值顺序对齐输出行）──
+    known: dict = {}
+    unknown_idx: list = []
+    for i, rhs in enumerate(re.findall(r"(?:msga|msgb)\s*=\s*(.+)", blob)):
+        m = re.match(r"\s*b(['\"])(.*?)\1", rhs)
+        if m:
+            known[i] = m.group(2).encode("utf-8")
+        else:
+            unknown_idx.append(i)
+    if not unknown_idx or len(known) < 3:
+        return None
+
+    def _z(msg: bytes) -> int:
+        import hashlib  # 本模块未顶层导入 hashlib（与 _passes_answer_check 同例）
+
+        h = hashlib.sha512(msg)
+        v = int.from_bytes(h.digest(), "big")
+        shift = h.digest_size * 8 - n.bit_length()
+        return v >> shift if shift > 0 else v
+
+    # 同一签名者需有 ≥2 条已知明文签名（用于恢复私钥）
+    by_who: dict = {}
+    for i, (who, r, s, _ct) in enumerate(sigs):
+        if i in known:
+            by_who.setdefault(who, []).append(i)
+    victim = next((w for w, idxs in by_who.items() if len(idxs) >= 2), None)
+    if victim is None:
+        return None
+    v_idx = by_who[victim][:2]
+    bob = [(sigs[i][1], sigs[i][2], _z(known[i])) for i in v_idx]
+
+    # 对方的已知明文签名（用于反推其公钥）+ 未知明文那条即密文
+    other = next((w for w in {s[0] for s in sigs} if w != victim), None)
+    o_known = [i for i in by_who.get(other, [])]
+    ct_i = next((i for i in unknown_idx if i < len(sigs) and sigs[i][0] == other), None)
+    if other is None or not o_known or ct_i is None:
+        return None
+    ok_i = o_known[0]
+    alice = (sigs[ok_i][1], sigs[ok_i][2], _z(known[ok_i]))
+
+    try:
+        from skills.crypto_h1_buggy_rng import run as h1_run
+    except Exception as exc:  # noqa: BLE001
+        _warn_import_once("skills.crypto_h1_buggy_rng", exc)
+        return None
+    try:
+        res = await asyncio.wait_for(
+            asyncio.to_thread(h1_run, {
+                "kind": "h1_buggy_rng",
+                "curve": {"mod": mod, "a": ac, "b": bc, "n": n, "G": list(g),
+                          "nb": n.bit_length() // 32},
+                "bob": bob, "alice": alice, "ct": sigs[ct_i][3],
+            }),
+            timeout=600)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[presolve:h1] %s 攻击异常: %s",
+                     getattr(question, "id", "?"), exc)
+        return None
+    flag = ""
+    if isinstance(res, dict):
+        flag = str(res.get("flag") or "")
+    if not flag:
+        return None
+    if not _is_plausible_flag(flag):
+        return None
+    logger.info("[presolve:h1] %s 命中 flag=%s",
+                getattr(question, "id", "?"), flag[:60])
+    _save_candidates(question, [flag])
+    return flag
 
 
 async def _try_cycling(question) -> Optional[str]:

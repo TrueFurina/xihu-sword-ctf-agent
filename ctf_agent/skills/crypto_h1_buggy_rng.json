@@ -1,0 +1,8 @@
+{
+  "name": "crypto_h1_buggy_rng",
+  "purpose": "弱 PRNG nonce 的 ECDSA 私钥恢复 + ECDH 解密（Google CTF 2021「h1」）。当签名 nonce 由 RNG(nbits, a=16843009, b=2**32) 生成时，其实际只由前 nbits/32 个字节决定（熵仅 8·nbits/32 bit），可用两条同签名者的已知明文签名构造模线性方程、Kannan 嵌入 + LLL 恢复私钥 d；再由对方已知明文签名反推其公钥 Q，ECDH 得共享密钥后 AES-ECB 解密出 flag",
+  "input_spec": "params = {'kind': 'h1_buggy_rng', 'curve': {'mod':…, 'a':…, 'b':…, 'n':…, 'G': [x,y,z], 'nb': 16}, 'bob': [(r,s,z), (r,s,z)], 'alice': (r,s,z), 'ct': <int>}",
+  "output_spec": "run → {'flag': <明文 CTF{...}>} 或 {'flag': None, 'reason': …}",
+  "categories": ["crypto", "ecdsa", "lattice", "weak-rng", "ecdh"],
+  "version": "1.0"
+}
