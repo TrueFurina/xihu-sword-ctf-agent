@@ -54,16 +54,32 @@ class Blackboard:
     # 缓存版本化（2026-09-11）：条目绑定 presolve 源码指纹——presolve.py
     # 变更后旧缓存自动失效，防止"旧逻辑解出的 flag"被新逻辑直接复用（脏命中）。
     _PRESOLVE_SRC = os.path.join(os.path.dirname(__file__), "presolve.py")
+    # 2026-10-13 加：答案表装配层。原式只指纹 presolve.py，导致 eval/cases.py
+    # （preset_answers）变更后旧缓存仍命中——修复前写入的诱饵条目可绕过新 sha256 闸。
+    _ANSWER_ASSEMBLY_SRC = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "eval", "cases.py",
+    )
 
     @classmethod
     def _presolve_fingerprint(cls) -> str:
-        """presolve.py 源码 sha256 前 16 位（源码变更即换指纹）。"""
+        """presolve.py + eval/cases.py 联合源码 sha256 前 16 位（判分/装配层变更即换指纹）。
+
+        2026-10-13 修复：原只指纹 presolve.py。而真值判定横跨两层——
+        core/presolve.py（判分）+ eval/cases.py（preset_answers 答案表装配）。
+        只指纹前者时，装配层修复（补齐 flag_sha256 形态）后旧缓存仍命中，
+        **修复前在无闸状态下写入的诱饵条目会绕过新 sha256 闸**。
+        """
         import hashlib
-        try:
-            with open(cls._PRESOLVE_SRC, "rb") as f:
-                return hashlib.sha256(f.read()).hexdigest()[:16]
-        except OSError:
-            return "unknown"
+
+        h = hashlib.sha256()
+        for p in (cls._PRESOLVE_SRC, cls._ANSWER_ASSEMBLY_SRC):
+            try:
+                with open(p, "rb") as f:
+                    h.update(f.read())
+            except OSError:
+                return "unknown"
+        return h.hexdigest()[:16]
 
     def get_presolve(self, task_id: str):
         """查 presolve 缓存：返回 (flag, source, ts) 或 None。
