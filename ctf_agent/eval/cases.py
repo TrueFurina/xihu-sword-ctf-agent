@@ -232,6 +232,15 @@ def preset_answers(questions: list[Question]) -> dict[str, str]:
     for q in questions:
         # 2026-09-30 防御：mock/轻量 Question 可能无 flag 属性，getattr 兜底
         # （run.py:477 等调用点现在对任意 question 对象传 preset_answers([q])）。
-        if getattr(q, "flag", None):
-            out[q.id] = q.flag
+        _v = getattr(q, "flag", None)
+        if not _v:
+            # 2026-10-13 修复（P0）：flag 存在三种形态（见 §⑯）——明文 / sha256 占位 /
+            # **flag=None + flag_sha256（外部题全部如此）**。此前只认明文形态，
+            # 导致外部题答案表装配为 `{}` → core.presolve._passes_answer_check 首行
+            # `if not answers: return True` 直接放行，sha256 校验从未生效
+            # （实测：primes 的 chal.sage 诱饵明文 CTF{YkDOLISt…} 冒充解出）。
+            # 补齐形态三后，诱饵由 sha256 闸拦截，真命中照常放行。
+            _v = getattr(q, "flag_sha256", None)
+        if _v:
+            out[q.id] = str(_v).strip()
     return out
