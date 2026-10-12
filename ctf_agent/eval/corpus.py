@@ -20,7 +20,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Optional, Sequence
 
-from eval.cases import load_questions
+from eval.cases import load_questions, _SHA256_RE
 
 __all__ = [
     "AttachmentHealth",
@@ -99,12 +99,20 @@ def has_input(q: Any) -> bool:
 def has_truth(q: Any) -> bool:
     """是否有可校验真值。
 
-    真值形态二选一：
-      - flag_sha256（真 flag 红线后的推荐形态）
-      - flag 明文（本地旧题仍在用，比对时 flag 入 git 属例外但确实是真值）
+    真值形态二选一，且必须与 ``cases.Question.expected_sha256`` 同一口径：
+
+      - flag_sha256：必须是合法 64 位十六进制 sha256，否则只是占位/格式串，
+        不可校验。非 hex 占位若计入分母，``expected_sha256=None`` →
+        ``flag_matches`` 恒 False，既膨胀分母又制造"永久不可解"假象。
+      - flag 明文（本地旧题仍在用，比对时 flag 入 git 属例外但确实是真值）。
+
     只有 flag_pattern 而无任一真值 → **不可校验**（格式对 ≠ 内容对）。
     """
-    return bool(getattr(q, "flag_sha256", None) or getattr(q, "flag", None))
+    _sha = getattr(q, "flag_sha256", None)
+    if isinstance(_sha, str) and _SHA256_RE.match(_sha):
+        return True
+    _flag = getattr(q, "flag", None)
+    return bool(isinstance(_flag, str) and _flag)
 
 
 def measurable(q: Any) -> bool:

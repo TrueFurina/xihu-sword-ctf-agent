@@ -83,7 +83,8 @@ class RaceController:
         """启发式边际收益 = 解出概率 × 分值 / 预计成本（不调用 LLM）。"""
         diff = str(getattr(q, "difficulty", "") or "").upper()
         _prob = {"EASY": 0.7, "MEDIUM": 0.5, "HARD": 0.3}.get(diff, 0.5)
-        _score = float(getattr(q, "score", 100) or 100)
+        _score_raw = getattr(q, "score", None)
+        _score = float(100 if _score_raw is None else _score_raw)
         _cost = 1.0 if str(qs.category).lower() in ("crypto", "pwn", "reverse") else 0.6
         return round(_prob * _score / _cost, 4)
 
