@@ -107,6 +107,19 @@ class TestInputTruthJudgement(unittest.TestCase):
         q = _Q()
         self.assertFalse(has_truth(q))
 
+    def test_non_hex_flag_sha256_is_not_truth(self):
+        """非 64-hex 的 flag_sha256 占位不得计入真值。
+
+        避免 KPI 分母膨胀 + expected_sha256=None 致 flag_matches 恒 False
+        （既虚增分母又制造"永久不可解"假象）。合法 64-hex 仍算真值（对照防改坏）。
+        """
+        self.assertFalse(has_truth(_Q(flag_sha256="not-a-real-sha256")),
+                         "非 hex 占位 sha256 不是可校验真值")
+        self.assertFalse(has_truth(_Q(flag_sha256="abc")),
+                         "过短非 hex 也不得计入")
+        self.assertTrue(has_truth(_Q(flag_sha256="a" * 64)),
+                       "合法 64-hex sha256 仍应算真值")
+
     def test_measurable_is_conjunction(self):
         good = _Q(attachments=[self.existing_file], flag_sha256="a" * 64)
         no_truth_only = _Q(attachments=[self.existing_file])
@@ -144,7 +157,7 @@ class TestCorpusDedup(unittest.TestCase):
         """坏副本在前也要能纠正——不依赖 roots 顺序的正确性。"""
         import tempfile
         with tempfile.TemporaryDirectory() as td:
-            bad = _mk_bank(td, "bad", [("q1", [False], True)])
+            _mk_bank(td, "bad", [("q1", [False], True)])
             _mk_bank(td, "good", [("q1", [True], True)])
             entries = load_corpus([os.path.join(td, "bad"),
                                    os.path.join(td, "good")])

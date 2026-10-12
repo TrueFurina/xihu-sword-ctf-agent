@@ -49,3 +49,24 @@ def test_reflect_continue_on_early_attempt_with_timeout():
     out = {"error": {"category": "wallclock_timeout", "detail": "超 150s"}}
     decision = ctrl.reflect_on_attempt("q1", out, attempt_index=0, max_attempts=3)
     assert decision == "CONTINUE"
+
+
+def test_compute_marginal_value_zero_score_not_inflated():
+    """回归：score=0.0 必须保持 0.0，不能因 `(0.0 or 100)` 被当成满分。
+
+    项目已在 scripts/_provider_capability_archive.py 修过同类 falsy 陷阱并加回归测试，
+    race_orchestrator 此前漏改，会令"零失败率"被误算成"100% 价值"。
+    """
+    class _QS:
+        category = "crypto"
+
+    class _RQ:
+        def __init__(self, difficulty="EASY", score=100.0):
+            self.difficulty = difficulty
+            self.score = score
+
+    qs = _QS()
+    mv_zero = RaceController._compute_marginal_value(qs, _RQ("EASY", 0.0))
+    assert mv_zero == 0.0, "score=0.0 不应被 falsy 陷阱放成满分，得 %r" % (mv_zero,)
+    mv_full = RaceController._compute_marginal_value(qs, _RQ("EASY", 100.0))
+    assert mv_full > 0.0, "score=100 应为正常正值"
