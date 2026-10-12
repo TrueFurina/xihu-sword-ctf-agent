@@ -68,9 +68,14 @@ class TestEvalGuard(unittest.TestCase):
     """B. 评测护栏。"""
 
     def test_answer_disclosed_excluded_by_default(self):
-        if not QUESTIONS_DIR.exists():
+        # 守卫须判「池内是否真有题」，而非「目录是否存在」——2026-10-12 实测：data/questions
+        # 目录仍在但 50 题池已随本地未跟踪数据丢失事件被删空，仅判 exists() 会漏过 →
+        # load_questions 返回空 → assertTrue(disclosed) 假红。判据 = 池内是否有题（数据自检），
+        # 池恢复在盘即自动恢复严格校验。
+        if not any(QUESTIONS_DIR.rglob("*.json")):
             self.skipTest(
-                f"题库目录缺失（公开仓不含内部 data/questions）：{QUESTIONS_DIR}"
+                f"题库为空或缺失（公开仓不含内部 data/questions；2026-10-12 该 50 题池"
+                f"随本地未跟踪数据丢失事件永久丢失，全盘零副本、不可恢复）：{QUESTIONS_DIR}"
             )
         default = {q.id for q in load_questions(str(QUESTIONS_DIR))}
         allq = {q.id for q in load_questions(str(QUESTIONS_DIR), include_disclosed=True)}

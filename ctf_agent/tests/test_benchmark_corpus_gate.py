@@ -30,6 +30,23 @@ from eval.corpus import (  # noqa: E402
 
 _EXISTING = __file__  # 必定存在的真实文件
 
+_POOL_DIR = os.path.join(_CTF, "data", "questions")
+
+
+def _pool_available() -> bool:
+    """数据自检：data/questions 是否真有题（非仅目录存在）。"""
+    return os.path.isdir(_POOL_DIR) and any(
+        fn.endswith(".json") for _, _, fs in os.walk(_POOL_DIR) for fn in fs)
+
+
+# 2026-10-12：data/questions 50 题池随本地未跟踪数据丢失事件被删空（全盘 find 零副本、
+# 无远端副本、不可恢复）。依赖该池的 CLI 端到端用例补 skipif 优雅降级：池在 → 严格跑；
+# 池空 → skip（不再假红）。判据 = 池内是否有题（数据自检，非写死数字），
+# 池一旦恢复在盘即自动恢复严格校验。
+_need_pool = pytest.mark.skipif(
+    not _pool_available(),
+    reason=f"data/questions 50 题池永久丢失（2026-10-12 数据丢失事件）: {_POOL_DIR}")
+
 
 class _Q:
     def __init__(self, attachments=None, flag_sha256=None, flag=None, qid="q"):
@@ -121,6 +138,7 @@ class TestBenchmarkCLI(unittest.TestCase):
         return proc.stdout + proc.stderr
 
     @pytest.mark.local
+    @_need_pool
     def test_default_gate_drops_input_less(self):
         """默认必须打印剔除统计（data/questions 里 27 题 input-less）。"""
         out = self._run()
@@ -128,6 +146,7 @@ class TestBenchmarkCLI(unittest.TestCase):
         self.assertIn("有效分母", out)
 
     @pytest.mark.local
+    @_need_pool
     def test_include_unmeasurable_restores(self):
         out = self._run("--include-unmeasurable")
         self.assertIn("恢复全部", out,

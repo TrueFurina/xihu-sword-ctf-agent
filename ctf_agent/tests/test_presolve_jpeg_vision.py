@@ -27,7 +27,16 @@ IMG = os.path.join(_REPO, "data/questions_real/_attachments/misc/real_misc_xuanh
 
 # 本文件全部用例都依赖 data/questions_real/_attachments/ 下的真实附件（.gitignore 排除）。
 # 附件缺失时 isfile 守卫判 false，*_returns_none 会恰好返回 None 而假绿 —— 一并移出默认门禁。
-pytestmark = pytest.mark.local
+# 2026-10-12：该附件（xz1.jpg）随本地未跟踪数据丢失事件被删（全盘 find 零副本、无远端副本、
+# 不可恢复）。故补 skipif 优雅降级：附件在盘 → 严格跑；缺失 → 明确 skip（不再假绿/假红）。
+# 守卫判据 = 附件是否在盘（数据自检，非写死数字），附件一旦恢复在盘即自动恢复严格校验。
+pytestmark = [
+    pytest.mark.local,
+    pytest.mark.skipif(
+        not os.path.isfile(JPG),
+        reason=f"真题附件永久丢失（2026-10-12 数据丢失事件），不可复现: {JPG}",
+    ),
+]
 
 def _q(flag_sha256=""):
     return SimpleNamespace(id="real_misc_xuanhun_signin", category="misc",

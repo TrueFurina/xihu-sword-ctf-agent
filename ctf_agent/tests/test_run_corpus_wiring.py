@@ -47,6 +47,26 @@ def _cli(env_extra=None, timeout=300):
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
+_POOL_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "questions")
+
+
+def _pool_available() -> bool:
+    """数据自检：data/questions 是否真有题（非仅目录存在）。"""
+    return os.path.isdir(_POOL_DIR) and any(
+        fn.endswith(".json") for _, _, fs in os.walk(_POOL_DIR) for fn in fs)
+
+
+# 2026-10-12：data/questions 50 题池随本地未跟踪数据丢失事件被删空（全盘 find 零副本、
+# 无远端副本、不可恢复）。依赖该池的 CLI 端到端用例补 skipif 优雅降级：池在 → 严格跑；
+# 池空 → skip（不再假红）。判据 = 池内是否有题（数据自检，非写死数字），
+# 池一旦恢复在盘即自动恢复严格校验。
+_need_pool = pytest.mark.skipif(
+    not _pool_available(),
+    reason=f"data/questions 50 题池永久丢失（2026-10-12 数据丢失事件）: {_POOL_DIR}")
+
+
 class TestAnswerBookUnion(unittest.TestCase):
     """A. 答案表：并集语义 + 不丢旧答案。"""
 
@@ -142,6 +162,7 @@ class TestRunCliCorpusGate(unittest.TestCase):
     """C. run_cli 闸门端到端（subprocess 真跑，防哑开关）。"""
 
     @pytest.mark.local
+    @_need_pool
     def test_default_skips_unmeasurable(self):
         rc, out = _cli()
         self.assertEqual(rc, 0, out[-500:])
@@ -150,6 +171,7 @@ class TestRunCliCorpusGate(unittest.TestCase):
         self.assertNotIn("对照模式", out)
 
     @pytest.mark.local
+    @_need_pool
     def test_env_switch_restores_legacy(self):
         rc, out = _cli({"CTF_AGENT_INCLUDE_UNMEASURABLE": "1"})
         self.assertEqual(rc, 0, out[-500:])
