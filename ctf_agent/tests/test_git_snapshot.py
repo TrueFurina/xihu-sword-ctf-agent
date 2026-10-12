@@ -340,3 +340,47 @@ def test_make_bundle_default_dir_is_shared_main_tree(tmp_path):
     assert s == "ok" and p
     # git_dir 指向主仓 → 解析落点应是主仓 ctf_agent/logs/git_bundles
     assert os.path.dirname(p) == os.path.join(repo, "ctf_agent", "logs", "git_bundles")
+
+
+def test_incremental_small_with_orphan_refs(tmp_path):
+    """孤立分支 ref 存在时，增量仍须远小于全量（2026-10-12 实例回归）。
+
+    真实仓库有 26 个 refs（archive/*、backup/* 等孤立历史）。旧增量命令
+    `--all ^prev_tip` 只排除 master 线的祖先 → 其他 refs 的大对象每次被
+    全量重打（实测：全量 2680MB，五份"增量"各 2676MB，目录反涨到 16G）。
+    修复：增量必须排除上一份 bundle 的**全部 ref tips**。
+    """
+    repo = _init_repo_big(tmp_path, "repo", blob_bytes=400_000)
+    main_branch = subprocess.run(["git", "branch", "--show-current"], cwd=repo,
+                                 env=clean_git_env(), capture_output=True,
+                                 text=True, check=True).stdout.strip()
+    # 孤立分支：另一个大 blob，完全不在 master 历史里
+    _git(repo, "checkout", "-q", "--orphan", "archive/old")
+    _git(repo, "clean", "-fdq")  # orphan 后索引已空；清掉继承自 master 的工作区文件
+    with open(os.path.join(repo, "old.bin"), "wb") as fh:
+        fh.write(os.urandom(400_000))
+    _git(repo, "add", "old.bin")
+    _git(repo, "commit", "-q", "-m", "orphan")
+    _git(repo, "checkout", "-q", main_branch)
+
+    outdir = str(tmp_path / "bundles")
+    gitdir = os.path.join(repo, ".git")
+
+    s1, p1 = snap.make_bundle(out_dir=outdir, daily=False, mode="full",
+                              keep=10, git_dir=gitdir)
+    assert s1 == "ok" and p1
+
+    # master 上一个**小**提交
+    _commit(repo, "tiny", "c2")
+    s2, p2 = snap.make_bundle(out_dir=outdir, daily=False, mode="incremental",
+                              keep=10, git_dir=gitdir)
+    assert s2 == "ok" and p2
+    assert os.path.getsize(p2) < os.path.getsize(p1) // 5, (
+        f"增量 {os.path.getsize(p2)}B 未远小于全量 {os.path.getsize(p1)}B"
+        "——孤立 ref 的对象被重复打包")
+    # prerequisite 链仍须自洽：增量 verify 会因缺 prerequisite 失败（符合预期），
+    # 故只验证 bundle 结构可读且不含孤立分支的大 blob 对象
+    v = subprocess.run(["git", "bundle", "list-heads", p2], cwd=repo,
+                       env=clean_git_env(), capture_output=True, text=True)
+    assert v.returncode == 0, v.stderr
+    assert main_branch in v.stdout
