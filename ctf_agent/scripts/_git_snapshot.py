@@ -235,6 +235,31 @@ def bundle_tip(bundle_path: str, git_dir: str | None = None) -> str | None:
     return None
 
 
+def bundle_tips(bundle_path: str, git_dir: str | None = None) -> list[str]:
+    """该 bundle 覆盖的**全部 ref tips**（list-heads 全量解析）。
+
+    增量 bundle 的排除集必须用全部 ref tips 而非单个 HEAD：仓库常有孤立历史
+    ref（archive/*、backup/* 等），`--all ^<master_tip>` 只排除 master 祖先，
+    其他 refs 的大对象会被每次全量重打（2026-10-12 实测：全量 2680MB，
+    五份"增量"各 2676MB，目录反涨到 16G）。
+    """
+    cmd = ["git"] + (["--git-dir", git_dir] if git_dir else []) + \
+        ["bundle", "list-heads", bundle_path]
+    try:
+        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=120)
+    except Exception:  # noqa: BLE001
+        return []
+    if r.returncode != 0:
+        return []
+    tips = []
+    for ln in (r.stdout or "").splitlines():
+        parts = ln.split()
+        if parts and parts[0] not in tips:
+            tips.append(parts[0])
+    return tips
+
+
 def commits_between(old_sha: str | None, new_sha: str | None,
                     git_dir: str | None = None) -> int | None:
     """`git rev-list --count old..new`；无法判定返回 None。"""
@@ -320,15 +345,18 @@ def make_bundle(out_dir: str | None = None, keep: int = DEFAULT_KEEP, daily: boo
         want_full = False
     else:  # auto
         want_full = _incrementals_since_full(out_dir) >= max(1, int(full_every))
+    # 增量基点必须是上一份 bundle 的**全部 ref tips**（孤立历史 ref 的对象
+    # 不在 master 祖先里，只排除 HEAD 会把它们每次全量重打）。
+    prev_tips = bundle_tips(prev, git_dir) if (prev and not want_full) else []
 
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    if want_full:
+    if want_full or not prev_tips:
         out = _unique_path(out_dir, stamp, FULL_PREFIX)
         rev_args = ["--all"]
         kind = "全量"
     else:
         out = _unique_path(out_dir, stamp, INC_PREFIX)
-        rev_args = ["--all", f"^{prev_tip}"]  # 增量：排除已在上份 bundle 中的对象
+        rev_args = ["--all"] + [f"^{t}" for t in prev_tips]  # 增量：排除上份全部对象
         kind = "增量"
 
     cmd = ["git"]
