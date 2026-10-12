@@ -85,10 +85,46 @@ def compare(cur: dict, base: dict) -> dict:
     return {"regressions": regressions, "improvements": improvements}
 
 
+def detect_corpus_loss(cur: dict, base: dict) -> tuple[list[str], set[str]]:
+    """检测**题目池缩水**（真数据丢失）——返回 (回归消息, 涉及的池集合)。
+
+    背景（2026-10-12 实测）：原门禁只比对 `broken` 计数，而题目定义 JSON 被整体删除时，
+    该题不再进入 `_audit_corpus_integrity.audit()`（只 `rglob("*.json")`）⇒ `total` 下降、
+    `broken` 不升反降 ⇒ 门禁把**数据丢失误读为「改善」**。实测：
+      - `questions_ext`   37 → 17 题（剩 17 全是好题）⇒ 被报「改善 -3，建议 --update」；
+      - `questions_ext_cybench` 13 → 0、`questions_ext_trial5` 5 → 0、
+        `questions_real_kpi9` 8 → 0 ⇒ broken 恒 0 ⇒ 门禁**完全无感**。
+    与基线 `incident_notes` 记录的 02-25 删除事件吻合（≈93 题仅剩 `_attachments/`）。
+
+    判据：某池 `total` 或 `ok` 低于基线 ⇒ 数据丢失。**独立于 `compare()`、不改其契约**
+    ——`compare()` 的 `broken` 语义与既有测试保持不变。本函数结果由 `main()` 默认以
+    「⚠️ 警告」呈现（**不改变既有阻断语义**，避免引入新的红而自锁提交）；加 `--strict-loss`
+    才计入阻塞回归。
+    """
+    msgs: list[str] = []
+    pools: set[str] = set()
+    for pool, b in base.items():
+        c = cur.get(pool)
+        if c is None:
+            continue  # 整池消失由 compare() 既有判据覆盖，此处不重复
+        b_total, c_total = b.get("total", 0), c.get("total", 0)
+        b_ok, c_ok = b.get("ok", 0), c.get("ok", 0)
+        if c_total < b_total:
+            msgs.append(f"{pool}: 题目池缩水 {b_total} → {c_total} 题"
+                        f"（丢失 {b_total - c_total}；可用 {b_ok} → {c_ok}）")
+            pools.add(pool)
+        elif c_ok < b_ok:
+            msgs.append(f"{pool}: 可用题减少 {b_ok} → {c_ok}（-{b_ok - c_ok}）")
+            pools.add(pool)
+    return msgs, pools
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="题库健康度基线门禁")
     ap.add_argument("--update", action="store_true", help="刷新基线")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--strict-loss", action="store_true",
+                    help="把「题目池缩水」判为回归（默认仅警告，不阻断）")
     args = ap.parse_args()
     cur = snapshot()
     bench_ok, bench_msg = benchmark_ok()
@@ -116,8 +152,20 @@ def main() -> int:
 
     base = json.loads(BASELINE.read_text(encoding="utf-8"))["pools"] if BASELINE.is_file() else {}
     diff = compare(cur, base)
+    loss_msgs, loss_pools = detect_corpus_loss(cur, base)
+    if loss_pools:
+        # 池缩水时的「坏题下降」不是改善，而是被丢失掩盖 ⇒ 抑制误报的 improvement 提示
+        diff["improvements"] = [
+            i for i in diff["improvements"]
+            if not any(i.startswith(p + ":") for p in loss_pools)
+        ]
+    # 默认只警告、不阻断（保持既有阻断语义不变，避免引入新的红而自锁提交）；
+    # 需要把「数据丢失」作为阻断项时显式加 --strict-loss。
+    if args.strict_loss:
+        diff["regressions"] = diff["regressions"] + loss_msgs
     ok = not diff["regressions"] and bench_ok
     rep = {"ok": ok, "current": cur, "baseline": base, **diff,
+           "corpus_loss": loss_msgs, "strict_loss": args.strict_loss,
            "benchmark_check": {"ok": bench_ok, "detail": bench_msg}}
     if args.json:
         print(json.dumps(rep, ensure_ascii=False, indent=1))
@@ -125,6 +173,9 @@ def main() -> int:
         print(f"[health] 正式基准校验: {'通过' if bench_ok else '失败'}（{bench_msg}）")
         for r in diff["regressions"]:
             print("  ❌ 回归:", r)
+        if loss_msgs and not args.strict_loss:
+            for w in loss_msgs:
+                print("  ⚠️  数据丢失（默认不阻断；--strict-loss 可阻断）:", w)
         for i in diff["improvements"]:
             print("  ⬆️  改善:", i)
         print(f"[health] 结论: {'无回归' if ok else '**存在回归，需处理**'}")
