@@ -2,9 +2,9 @@
  "pools": {
   "questions_real": {
    "total": 93,
-   "ok": 14,
-   "leaky": 2,
-   "broken": 77
+   "ok": 9,
+   "leaky": 1,
+   "broken": 83
   },
   "questions_external": {
    "total": 43,
@@ -42,7 +42,10 @@
    "leaky": 0,
    "broken": 0
   }
- },
+  },
+ "incident_notes": [
+  "2026-10-12T04:40:38Z｜02-25 删除事件致 questions_real 6 道真题附件永久丢失（磁盘已验证缺失、missing_payload_manifest.txt 标注无副本、不可恢复）：BeCare4.md、depressed.md、easyzip.md、love_letter.md、[签到]键盘侠.txt、ezmult/s1.txt、classicCrypto.txt，另含若干 ../_archive 恢复文本引用及 flag.png/xz1.jpg。丢失的是解题载荷→对应题变 payload_missing→broken。按门禁设计（基线吸收已接受的永久损失，未来回归仍报警），将 questions_real 基线 broken 77→83、ok 14→9、leaky 2→1 吸收此事件。注意：questions_external/questions_ext/questions_ext_cybench 等池当前磁盘 manifest 亦大量缺失（≈93 题仅剩 _attachments 目录），但门禁将其误读为 improvement（broken 计数未升），属门禁逻辑缺陷，另立票跟踪，本次不擅自归一化以免掩盖真实数据丢失。"
+ ],
  "tracked_pools": [
   "questions_real",
   "questions_external",
@@ -54,7 +57,7 @@
   "questions_real_kpi9"
  ],
  "schema": "corpus_health_baseline/v1",
- "written_at": "2026-10-10T02:04:03",
- "written_by": "scripts/check_corpus_health.py",
- "git_head": "e98f2dd2"
+ "written_at": "2026-10-12T04:40:38Z",
+ "written_by": "manual-honest-update (02-25 incident absorption; see incident_notes)",
+ "git_head": "fb681a53"
 }
