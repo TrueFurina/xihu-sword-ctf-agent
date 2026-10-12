@@ -46,6 +46,7 @@ pytestmark = pytest.mark.skipif(
 MHK2_QID = "ext_gctf2023_mhk2"
 PRIMES_QID = "ext_gctf2023_primes"
 CYCLING_QID = "ext_gctf2022_cycling"
+H1_QID = "ext_gctf2021_h1"
 CLS_QID = "ext_gctf2022_electric-mayhem-cls"
 LCG_QID = "ext_gctf2023_least-common-genominator"
 ZIP_QID = "ext_gctf2023_zip"
@@ -73,6 +74,7 @@ def test_b1_skills_are_wired():
     for mod, fn in (("skills.crypto_knapsack_mhk", "_try_knapsack_mhk"),
                     ("skills.crypto_primes_subset", "_try_crypto_primes"),
                     ("skills.crypto_cycling", "_try_cycling"),
+                    ("skills.crypto_h1_buggy_rng", "_try_h1_buggy_rng"),
                     ("skills.crypto_electric_mayhem_cls", "_try_electric_mayhem_cls"),
                     ("skills.crypto_lcg_recover", "_try_lcg_recover"),
                     ("skills.crypto_zip_bkcrack", "_try_zip_bkcrack")):
@@ -323,3 +325,21 @@ def test_presolve_main_entry_pattern_guard_intact_without_sha():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+@pytest.mark.slow
+def test_presolve_h1_solves_real_problem_via_main_entry():
+    """h1 端到端走 **presolve 主入口**（含 flag_pattern 闸 + answer_check 闸）。
+
+    2026-10-13 教训：只测内部 `_try_*` 会绕过主入口两道闸（实测 flag_pattern
+    与真 flag 格式不符时真命中被当诱饵丢弃），故本用例必须打主入口。
+    """
+    import asyncio
+
+    from eval.cases import preset_answers
+
+    q = _load(H1_QID)
+    assert q is not None, f"题库里找不到 {H1_QID}"
+    truth = str(getattr(q, "flag_sha256", "") or "")
+    flag = asyncio.run(P.presolve(q, answers=preset_answers([q]), force=True))
+    assert flag, "presolve 主入口未解出 h1（内部命中但被主入口闸丢弃？）"
+    assert hashlib.sha256(flag.encode()).hexdigest() == truth
