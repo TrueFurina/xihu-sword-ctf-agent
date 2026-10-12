@@ -183,6 +183,25 @@ echo "=== [5/5] 测试文件禁改守卫 ==="
 # 同时裸 `python` 与其余门禁的 "$PY"（.venv）不一致，一并统一为 "$PY"。
 "$PY" scripts/test_file_guard.py --staged || exit 1
 
+# ── ⑨ ruff_gate（2026-10-12：落地文档宣称但此前未接线的 ruff 门禁）──
+# 阻断 F401/F811/F821/F822/F841（未使用导入/重复定义/未定义名/未定义导出/未使用变量）
+# 进入暂存区。仅扫描本次暂存的 .py 文件，不误伤既有库；与仓库已有的 # noqa: F401 实践一致。
+# ruff 缺失时 fail-open（仅告警不阻断——与 ⑪ 结构守卫同原则），避免无 ruff 环境全员提交被卡。
+RUFF_BIN="$(command -v ruff 2>/dev/null || true)"
+if [ -n "$RUFF_BIN" ]; then
+  RUFF_FILES="$("$PY" -c "import subprocess; out=subprocess.run(['git','diff','--cached','--name-only','--diff-filter=ACM'],capture_output=True,text=True).stdout.splitlines(); print(chr(10).join(f for f in out if f.endswith('.py')))" || true)"
+  if [ -n "$RUFF_FILES" ]; then
+    # shellcheck disable=SC2086
+    "$RUFF_BIN" check --quiet --select F401,F811,F821,F822,F841 $RUFF_FILES || {
+      echo "❌ ruff_gate：暂存 Python 文件含未定义/未使用符号（F401/F811/F821/F822/F841）"
+      echo "   处置：删除未使用导入/变量，或在该行加 # noqa: <code>"
+      exit 1
+    }
+  fi
+else
+  echo "⚠️ ruff_gate：未找到 ruff（command -v ruff 为空），跳过本门禁"
+fi
+
 # ── ⑫ 数据真值/基准门禁聚合（2026-10-10 新增）──
 # 起因：三道**数据类**门禁（机器真值 schema 审计 / 正式基准清单 vs 磁盘 / 题库健康基线）
 # 此前**一道都没接进钩子**，只能靠人记得手动跑——每道门禁自己都能发现问题，

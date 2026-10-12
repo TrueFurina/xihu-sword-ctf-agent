@@ -44,3 +44,12 @@ packages = [
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
+
+# ruff_gate（2026-10-12）：落地文档宣称但此前未接线的 lint 门禁。
+# 仅拦截 F 类（pyflakes）中与"未定义/未使用符号"相关的 5 个 code，
+# 与仓库既有的 # noqa: F401 实践一致；不引入 E/W 风格规则，避免误伤。
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["F401", "F811", "F821", "F822", "F841"]
