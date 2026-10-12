@@ -2,26 +2,26 @@
  "pools": {
   "questions_real": {
    "total": 93,
-   "ok": 14,
+   "ok": 9,
    "leaky": 2,
-   "broken": 77
+   "broken": 82
   },
   "questions_external": {
-   "total": 43,
-   "ok": 40,
+   "total": 3,
+   "ok": 0,
    "leaky": 0,
    "broken": 3
   },
   "questions_ext": {
-   "total": 37,
-   "ok": 33,
-   "leaky": 1,
-   "broken": 3
+   "total": 0,
+   "ok": 0,
+   "leaky": 0,
+   "broken": 0
   },
   "questions_ext_cybench": {
-   "total": 13,
-   "ok": 11,
-   "leaky": 2,
+   "total": 0,
+   "ok": 0,
+   "leaky": 0,
    "broken": 0
   },
   "questions_ext_A_20261001": {
@@ -31,14 +31,14 @@
    "broken": 0
   },
   "questions_ext_trial5_20261001": {
-   "total": 5,
-   "ok": 5,
+   "total": 0,
+   "ok": 0,
    "leaky": 0,
    "broken": 0
   },
   "questions_real_kpi9": {
-   "total": 8,
-   "ok": 8,
+   "total": 0,
+   "ok": 0,
    "leaky": 0,
    "broken": 0
   }
@@ -54,7 +54,7 @@
   "questions_real_kpi9"
  ],
  "schema": "corpus_health_baseline/v1",
- "written_at": "2026-10-10T02:04:03",
+ "written_at": "2026-10-12T08:56:26",
  "written_by": "scripts/check_corpus_health.py",
- "git_head": "e98f2dd2"
+ "git_head": "fb681a53"
 }
