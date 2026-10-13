@@ -8,6 +8,7 @@
 """
 import importlib.util
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -55,6 +56,32 @@ class TestBenchmarkManifestRules(unittest.TestCase):
     def test_check_passes_on_current_disk(self):
         ok, problems = bench.check()
         self.assertTrue(ok, problems[:5])
+
+
+class TestLedgerExclusionSource(unittest.TestCase):
+    """选池规则 4 的「已解出 ledger」排除源必须是活路径（2026-10-13 死路径事故守卫）。
+
+    事故形态：`_seen_ids()` 曾写 `ROOT.parent / "REAL_SOLVES_LEDGER.md"`（仓库根），
+    而台账实际在 `ctf_agent/` 下、git 历史从未存在于根 → `is_file()` 恒 False →
+    ledger 排除源静默空转，规则 4 的三个来源里有一个从来没执行过，
+    且磁盘上的题池看起来完全正常（无任何报错）。
+    """
+
+    def test_ledger_path_points_inside_ctf_agent(self):
+        """路径常量必须锚在 ctf_agent/ 内——ROOT.parent 那类指错层级直接红。"""
+        self.assertEqual(bench.LEDGER, ROOT / "REAL_SOLVES_LEDGER.md")
+
+    def test_ledger_file_is_tracked_and_present(self):
+        """台账受 git 跟踪（HEAD 树内），任何 checkout 都应存在；缺失即环境异常。"""
+        self.assertTrue(bench.LEDGER.is_file(),
+                        f"台账不在预期路径: {bench.LEDGER}——排除源会静默失效")
+
+    def test_ledger_ids_flow_into_seen_set(self):
+        """活路径 + 真接线：台账提取的题 id 必须实际进入 _seen_ids() 排除集。"""
+        led_ids = bench._ledger_ids()
+        self.assertTrue(led_ids, "台账里提取不到任何题 id——正则或读取又坏了")
+        self.assertTrue(led_ids <= bench._seen_ids(),
+                        "台账题 id 没进排除集——_seen_ids() 的 ledger 源又是死的")
 
 
 class TestHealthBaselineGate(unittest.TestCase):
