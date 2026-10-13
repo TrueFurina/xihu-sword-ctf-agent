@@ -9,7 +9,7 @@
 
 覆盖
 ----
-1. 九个 B1 skill 必须同时出现在 `_WIRED_SKILL_MODULES` 且有对应 `_try_*` 协程（mhk2/primes/cycling/h1/electric-mayhem-cls/lcg-recover/ziphard/papapapa/data_siege）；
+1. 十个 B1 skill 必须同时出现在 `_WIRED_SKILL_MODULES` 且有对应 `_try_*` 协程（mhk2/primes/cycling/h1/electric-mayhem-cls/lcg-recover/ziphard/papapapa/data_siege/david-and-the-tree）；
 2. 参数提取（题面从不直接给全参数，必须自己抠）：
    - MHK2：`_mhk2_extract` 必须认出 a1/a2 + 密文二元组；垃圾文本、短公钥（n<48
      攻击不成立）必须**拒绝**而不是硬跑；
@@ -51,6 +51,7 @@ CLS_QID = "ext_gctf2022_electric-mayhem-cls"
 LCG_QID = "ext_gctf2023_least-common-genominator"
 ZIP_QID = "ext_gctf2023_zip"
 PAPAPAPA_QID = "ext_gctf2023_papapapa"
+DAVID_QID = "ext_gctf2021_david-and-the-tree"
 DATAIEGE_QID = ("ext_cybench_hackthebox_cyber_apocalypse_2024"
                 "_forensics_medium_data_siege")
 
@@ -82,7 +83,8 @@ def test_b1_skills_are_wired():
                     ("skills.crypto_lcg_recover", "_try_lcg_recover"),
                     ("skills.crypto_zip_bkcrack", "_try_zip_bkcrack"),
                     ("skills.misc_jpeg_padding_stego", "_try_jpeg_padding_stego"),
-                    ("skills.misc_pcap_ezrat_chat", "_try_pcap_ezrat_chat")):
+                    ("skills.misc_pcap_ezrat_chat", "_try_pcap_ezrat_chat"),
+                    ("skills.misc_deflate_huffman_flag", "_try_deflate_huffman_flag")):
         assert mod in wired, f"{mod} 未接线（只是库，不算能力）"
         assert callable(getattr(P, fn, None)), f"{fn} 未定义"
 
@@ -378,6 +380,29 @@ def test_presolve_papapapa_solves_real_problem_via_main_entry():
     truth = str(getattr(q, "flag_sha256", "") or "")
     flag = asyncio.run(P.presolve(q, answers=preset_answers([q]), force=True))
     assert flag, "presolve 主入口未解出 papapapa（内部命中但被主入口闸丢弃？）"
+    assert hashlib.sha256(flag.encode()).hexdigest() == truth
+
+
+@pytest.mark.slow
+def test_presolve_david_tree_solves_real_problem_via_main_entry():
+    r"""david-and-the-tree（DEFLATE Huffman 树隐码）端到端走 **presolve 主入口**。
+
+    必须验证整条生产链：隔离子进程 skill + flag_pattern 闸 +
+    answer_check 闸 + sha256 仲裁。⚠️ 本题元数据 flag_pattern 是
+    ``flag\{...\}``（外部池默认值），而 google-ctf 真 flag 实为
+    ``CTF\{...\}``——靠 2026-10-05 的 sha256 旁路机制过闸（候选哈希与
+    题面 flag_sha256 相符 → pattern 闸不得否决），本用例即该机制的
+    活守卫。
+    """
+    import asyncio
+
+    from eval.cases import preset_answers
+
+    q = _load(DAVID_QID)
+    assert q is not None, f"题库里找不到 {DAVID_QID}"
+    truth = str(getattr(q, "flag_sha256", "") or "")
+    flag = asyncio.run(P.presolve(q, answers=preset_answers([q]), force=True))
+    assert flag, "presolve 主入口未解出 david-and-the-tree（内部命中但被主入口闸丢弃？）"
     assert hashlib.sha256(flag.encode()).hexdigest() == truth
 
 
