@@ -23,11 +23,11 @@
 | `logs/` | 一切 agent 运行日志（**项目内**） | 跑批记录、自检输出 |
 | `research-wiki/`（已并入 `idea-stage/research-wiki/`） | — | — |
 | `_archive/` `_tools_ghidra/` `recovered_external`（已并入 `_archive/recovered_external/`） | 归档/工具/恢复材料 | 大型，勿动 |
-| 根目录仅允许 | `README.md` `README.zh.md` `CLAUDE.md` `LICENSE` `AGENTS.md` `REAL_SOLVES_LEDGER.md` `requirements.txt` `协同任务总账-TOP0.md`（根级白名单由 `ctf_agent/scripts/_structure_guard.py:ROOT_ALLOW` 机器校验，文档与代码一致）| 其余一律禁止 |
+| 根目录仅允许 | `README.md` `README.zh.md` `CLAUDE.md` `LICENSE` `AGENTS.md` `requirements.txt` `CONTRIBUTING.md` `协同任务总账-TOP0.md`（根级白名单由 `ctf_agent/scripts/_structure_guard.py:ROOT_ALLOW` 机器校验，文档与代码一致；解题台账 `REAL_SOLVES_LEDGER.md` 归位 `ctf_agent/`，根级不放置——2026-10-13 校正，历史白名单条目曾与事实不符）| 其余一律禁止 |
 
 ## 2. 硬规则（违反即被 pre-commit 拒绝）
 
-1. **禁止根级平铺**：仓库根只允许 `README.md` / `README.zh.md` / `CLAUDE.md` / `LICENSE` / `AGENTS.md` / `REAL_SOLVES_LEDGER.md` / `requirements.txt` / `协同任务总账-TOP0.md`（白名单以 `ctf_agent/scripts/_structure_guard.py:ROOT_ALLOW` 为唯一真值）。任何其他 `*.md/*.txt/*.html/*.json/...` 一律进对应子目录。
+1. **禁止根级平铺**：仓库根只允许 `README.md` / `README.zh.md` / `CLAUDE.md` / `LICENSE` / `AGENTS.md` / `requirements.txt` / `CONTRIBUTING.md` / `协同任务总账-TOP0.md`（白名单以 `ctf_agent/scripts/_structure_guard.py:ROOT_ALLOW` 为唯一真值；解题台账在 `ctf_agent/REAL_SOLVES_LEDGER.md`，勿在根级另建）。任何其他 `*.md/*.txt/*.html/*.json/...` 一律进对应子目录。
 2. **禁止 `deliverables/` 平铺**：交付物必须进 `deliverables/` 的 7 个子目录之一（唯一例外 `deliverables/overview.md`）。
 3. **禁止 `idea-stage/` 平铺**：科研产物进 `proposals/` `research/` `refine-logs/` `research-wiki/`；根层仅留 `IDEA_REPORT.md` 与已放置的评估文件。
 4. **日志不出项目**：所有运行日志写 `logs/`（或 `.workbuddy/memory/` 这种项目内目录），**禁止**写 `C:\Users\Lenovo\...`、`Desktop`、`Downloads`。
@@ -38,8 +38,8 @@
 - **提交时**：`pre-commit` 钩子（激活位 `ctf_agent/git_hooks/pre-commit`，源 `ctf_agent/scripts/hooks/pre-commit`）末尾第 ⑪ 节调用 `scripts/_structure_guard.py`，对**本次新增文件**（`--diff-filter=A`）做结构校验；命中散落即 `exit 1` 阻断提交（fail-closed）。脚本自带 try/except，自身异常时 fail-open（不误伤正常提交）。
 - **手动/CI 自检**：
   ```bash
-  python scripts/check_structure.py            # 仅本次新增（与 pre-commit 同口径）
-  python scripts/check_structure.py --all      # 全量扫磁盘（含被 .gitignore 忽略的堆积）
+  python scripts/_structure_guard.py            # 仅本次新增（与 pre-commit 同口径）
+  python scripts/_structure_guard.py --all      # 全量扫描（git 列举 + 受管目录磁盘直扫）
   ```
   返回 0 = 合规，1 = 发现散落（并打印归位建议）。
 

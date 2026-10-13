@@ -33,14 +33,19 @@ MANAGED_EXT = {
 }
 
 # 根级白名单：仅允许这些文件直接平铺在仓库根。
-# REAL_SOLVES_LEDGER.md = 反注水法令 fact-layer（被 _antifraud/_merge_gate/_board/_fix_ledger_kpi
-#   四处硬编码引用，且被 .gitignore 的 /data/* 排除——若移入 data/results/ 会从版本控制丢失，
-#   故保留在根并显式白名单）；requirements.txt = 构建清单（pip 约定根级，universal convention）。
+# 2026-10-13 校正：REAL_SOLVES_LEDGER.md 曾列在此处，但台账实际位于
+#   ctf_agent/REAL_SOLVES_LEDGER.md（git 跟踪；_antifraud/_merge_gate/_board/
+#   _fix_ledger_kpi 均以 ctf_agent/ 为 ROOT 解析），git 历史从未存在于根。
+#   保留条目会诱导「在根再建一份」→ 双真值源，故移除（_build_external_benchmark.py
+#   曾因 ROOT.parent 指根而静默丢失该排除源，见其 TestLedgerExclusionSource 守卫）。
+# requirements.txt = 构建清单（pip 约定根级，universal convention）；
+# CONTRIBUTING.md = 贡献指南（GitHub universal convention，2026-10-13 补录——
+#   f813f775 同步入库时漏登白名单，从仓库根跑 --all 一直假红）。
 # 协同任务总账-TOP0.md = 包工头总账活文件（post-commit 自动记账硬编码写 ../协同任务总账-TOP0.md，
 #   移动会破坏记账路径，故白名单保留在根）；_INDEX.md = 项目索引（归 docs/ 更规范，但历史散落
 #   已存在，先白名单合法化防 --all 误报，doc-归位留给后续）。
 ROOT_ALLOW = {"README.md", "README.zh.md", "CLAUDE.md", "LICENSE", "AGENTS.md",
-              "REAL_SOLVES_LEDGER.md", "requirements.txt",
+              "requirements.txt", "CONTRIBUTING.md",
               "协同任务总账-TOP0.md", "_INDEX.md"}
 DELIV_ROOT_ALLOW = {"deliverables/overview.md"}
 IDEA_ROOT_ALLOW = {
@@ -84,13 +89,18 @@ def staged_added_files():
 
 def all_tracked_and_untracked():
     files = set()
+    # --full-name 必须加：git ls-files 在子目录 cwd 下默认输出 cwd 相对路径，
+    # 会把 ctf_agent/REAL_SOLVES_LEDGER.md 显示成无斜杠的 REAL_SOLVES_LEDGER.md，
+    # 被规则 1 误判「根目录禁止平铺」（2026-10-13 假阳事故：白名单移除该项后
+    # 从 ctf_agent/ 跑 --all 立刻假红，还诱导把正确归位的文件挪走）。
+    # 回归守卫：tests/test_structure_guard.py。
     try:
-        tracked = _git("ls-files")
+        tracked = _git("ls-files", "--full-name")
         files.update(unquote_path(x) for x in tracked.splitlines() if x.strip())
     except Exception:
         pass
     try:
-        untracked = _git("ls-files", "--others", "--exclude-standard")
+        untracked = _git("ls-files", "--others", "--exclude-standard", "--full-name")
         files.update(unquote_path(x) for x in untracked.splitlines() if x.strip())
     except Exception:
         pass

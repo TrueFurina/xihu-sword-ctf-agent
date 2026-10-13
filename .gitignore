@@ -46,7 +46,8 @@ ctf_agent/data/results/_10735_unrar/
 ctf_agent/data/questions_real_llm_only/
 
 # ---------- 4. 真 flag / 解题台账（含明文真 flag，不公开） ----------
-ctf_agent/REAL_SOLVES_LEDGER.md
+# 注：ctf_agent/REAL_SOLVES_LEDGER.md 曾列于此两处，2026-09-19 已决议「保持跟踪、
+#   不纳入 ignore」（依据见 ctf_agent/.gitignore 内同名字段注释），2026-10-13 清理。
 ctf_agent/data/results/verified_flags.json
 ctf_agent/solutions/
 ctf_agent/docs/DLP_独立性声明.md
@@ -118,7 +119,6 @@ ctf_agent/GIT_METADATA_DAMAGE_REPORT-20260824.md
 ctf_agent/audit/
 ctf_agent/tasks/
 ctf_agent/data/questions_real_llm_only/
-ctf_agent/REAL_SOLVES_LEDGER.md
 ctf_agent/solutions/
 ctf_agent/docs/DLP_独立性声明.md
 ctf_agent/Readme.txt

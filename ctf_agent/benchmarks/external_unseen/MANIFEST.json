@@ -1,7 +1,7 @@
 {
  "schema": "external_unseen_benchmark/v1",
- "generated_at": "2026-10-10T02:03:39",
- "git_head": "e98f2dd2",
+ "generated_at": "2026-10-13T14:10:10",
+ "git_head": "6eaa4c2c",
  "selection_rules": [
   "载荷完整：所有声明附件在磁盘存在",
   "无答案泄漏：附件字节不含真值（sha256 精确比对 + flag{}/裸值形态扫描）",
@@ -17,12 +17,11 @@
   "questions_ext_A_20261001",
   "questions_ext_trial5_20261001"
  ],
- "total": 53,
+ "total": 51,
  "question_ids": [
   "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_hard_permuted",
   "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_medium_partial_tenacity",
   "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_very_easy_dynastic",
-  "ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_medium_data_siege",
   "ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_very_easy_it_has_begun",
   "ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_very_easy_urgent",
   "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_easy_crushing",
@@ -44,7 +43,6 @@
   "ext_gctf2022_electric-mayhem-pqc",
   "ext_gctf2022_legit",
   "ext_gctf2022_maybe-someday",
-  "ext_gctf2022_ocr",
   "ext_gctf2022_segfault-labyrinth",
   "ext_gctf2023_cursved",
   "ext_gctf2023_zip",
@@ -75,21 +73,21 @@
  ],
  "by_category": {
   "crypto": 24,
-  "misc": 13,
-  "forensics": 6,
+  "misc": 12,
+  "forensics": 5,
   "rev": 10
  },
- "attachment_files": 111,
- "excluded_seen_ids": 52,
+ "attachment_files": 105,
+ "excluded_seen_ids": 185,
  "skipped": {
-  "already_solved_or_authorized": 46,
+  "already_solved_or_authorized": 38,
   "payload_missing": 1,
   "not_ok:broken": 6,
-  "not_ok:leaky": 3,
-  "duplicate_id_across_pools": 6
+  "not_ok:leaky": 1,
+  "duplicate_id_across_pools": 4
  },
  "judge": "scripts/_run_validity_guard.py（跑批有效性）+ ctf_agent/verify/flag_checker.py::sha256_matches（判真值）",
  "answers": "本目录不含任何明文答案，仅 flag_sha256 占位",
- "written_at": "2026-10-10T02:03:39",
+ "written_at": "2026-10-13T14:10:10",
  "written_by": "scripts/_build_external_benchmark.py"
 }

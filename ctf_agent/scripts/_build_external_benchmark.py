@@ -38,10 +38,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "benchmarks" / "external_unseen"
+# 已解出台账（排除源之一）——唯一活路径在 ctf_agent/ 内（git 跟踪、HEAD 树内）。
+# 2026-10-13 事故：此处曾写 ROOT.parent（仓库根），台账从未存在于根 →
+# is_file() 恒 False → ledger 排除源静默空转，选池规则 4 有三个来源却只跑两个。
+# 路径指错层级不报错、题池看起来完全正常，故由
+# tests/test_external_benchmark_and_health.py::TestLedgerExclusionSource 钉死。
+LEDGER = ROOT / "REAL_SOLVES_LEDGER.md"
 SRC_POOLS = ("questions_external", "questions_ext", "questions_ext_cybench",
              "questions_ext_A5_20261001", "questions_ext_A_20261001",
              "questions_ext_trial5_20261001")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
+_LEDGER_ID_RE = re.compile(
+    r"\b([a-z]{2,5}[a-z0-9_]*_[a-z0-9_]+|[a-z0-9_]*\d{3,}[a-z0-9_]*)\b")
 
 
 def _load_auditor():
@@ -50,6 +58,15 @@ def _load_auditor():
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
+
+
+def _ledger_ids() -> set[str]:
+    """已解出台账文本里的题 id（排除源之一）。台账缺失时返回空集——调用方
+    （测试）负责断言路径是活路径；此处不静默改路径，避免再犯指错层级的错。"""
+    if not LEDGER.is_file():
+        return set()
+    return {m.group(1) for m in _LEDGER_ID_RE.finditer(
+        LEDGER.read_text(encoding="utf-8", errors="ignore"))}
 
 
 def _seen_ids() -> set[str]:
@@ -61,11 +78,7 @@ def _seen_ids() -> set[str]:
         seen |= {str(x) for x in AUTHORIZED_KPI_SOLVES}
     except Exception:  # noqa: BLE001
         pass
-    ledger = ROOT.parent / "REAL_SOLVES_LEDGER.md"
-    if ledger.is_file():
-        seen |= {m.group(1) for m in re.finditer(
-            r"\b([a-z]{2,5}[a-z0-9_]*_[a-z0-9_]+|[a-z0-9_]*\d{3,}[a-z0-9_]*)\b",
-            ledger.read_text(encoding="utf-8", errors="ignore"))}
+    seen |= _ledger_ids()
     for rep in (ROOT / "data" / "results").glob("**/benchmark_report*.json"):
         try:
             for r in json.loads(rep.read_text(encoding="utf-8")).get("results", []):
