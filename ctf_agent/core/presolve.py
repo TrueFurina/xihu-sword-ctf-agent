@@ -50,6 +50,7 @@ WALLCLOCK_SVG = 60
 WALLCLOCK_BANANA = 60
 WALLCLOCK_PAPAPAPA = 60  # JPEG padding-block 隐写全文件解码（纯 Python IDCT）
 WALLCLOCK_EZRAT = 120  # EZRAT C2 会话解密（口令候选 × 纯 Python AES-CBC 评分）
+WALLCLOCK_DEFLATE = 60  # DEFLATE Huffman 树隐码提取（位级解析，纯标准库）
 WALLCLOCK_ZIPHARD = 3600  # bkcrack 已知明文攻击（OpenMP 全核仍可能数十分钟）
 
 # ── 整题 presolve 墙钟预算（2026-10-13 P3 挂死守卫）────────────────────
@@ -272,6 +273,7 @@ _WIRED_SKILL_MODULES = {
     "skills.crypto_h1_buggy_rng",            # 弱 PRNG nonce ECDSA → LLL 私钥恢复 + ECDH 解密
     "skills.misc_jpeg_padding_stego",        # JPEG padding-block 隐写信道（papapapa，坐标装配 + 实例模板 OCR）
     "skills.misc_pcap_ezrat_chat",           # EZRAT 木马 C2 加密会话解密（data_siege，PBKDF2+纯 Python AES-CBC）
+    "skills.misc_deflate_huffman_flag",      # DEFLATE 动态 Huffman 树隐码（david-and-the-tree，RFC1951 位级解析）
     "skills.crypto_electric_mayhem_cls",    # AES-128 CPA 侧信道（模拟功耗轨迹，离线可解）
     "skills.crypto_lcg_recover",             # LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
     "skills.thoroughlystripped",             # null 剥离 ELF 字节级恢复（CSAW-Finals 2017）
@@ -743,6 +745,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_jpeg_padding_stego(question)),
         # 2026-10-13 B1 确定性静态求解：EZRAT 木马 C2 加密会话解密（data_siege）
         asyncio.ensure_future(_try_pcap_ezrat_chat(question)),
+        # 2026-10-13 B1 确定性静态求解：DEFLATE 动态 Huffman 树隐码（david-and-the-tree）
+        asyncio.ensure_future(_try_deflate_huffman_flag(question)),
         # 2026-10-05 B1 确定性静态求解：AES-128 CPA 侧信道（Electric Mayhem CLS）
         asyncio.ensure_future(_try_electric_mayhem_cls(question)),
         # 2026-10-05 B1 确定性静态求解：LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
@@ -4148,6 +4152,66 @@ async def _try_pcap_ezrat_chat(question) -> Optional[str]:
         flag = res.get("flag")
         if flag and _is_plausible_flag(str(flag)):
             logger.info("[presolve:pcap_ezrat_chat] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), str(flag)[:60])
+            _save_candidates(question, [str(flag)])
+            return str(flag)
+    return None
+
+
+async def _try_deflate_huffman_flag(question) -> Optional[str]:
+    """David and the Tree（DEFLATE 动态 Huffman 树隐码，2026-10-13 B1）。
+
+    触发面：ZIP 附件（magic ``PK\x03\x04``）。交给
+    :func:`skills.misc_deflate_huffman_flag.run` 按 RFC 1951 位级语法
+    解析：ZIP EOCD → 中央目录（权威 csz/本地头偏移）→ 逐条目 deflate
+    流 → 动态 Huffman 块头 → 规范码表 → 取符号 69（'E'）的码，
+    ``& 0xFF`` 后 8 位逆序得 ASCII，按条目序拼 flag。
+
+    题型本质：ZIP 内是 lipogram 小说（全文无字母 E），缺失的 E 被
+    人工写进每条目的 Huffman 树——正常编码器绝不会给未出现的符号
+    分配码，该码即隐写信道。skill 内置 lipogram（解压文本 E 占比
+    ≤1e-3）与 E 码长（≤9 位）双守卫 + fail-closed 拼装语义。
+
+    诚实口径：本路是「RFC 1951 位级语法 + 规范 Huffman 构造」的
+    确定性实现，非 grep 明文、非读答案文件；实测 Google CTF 2021
+    David and the Tree 解出 flag 且与题库 flag_sha256 逐字匹配。
+    ⚠️ 属 B1 工具链补齐产物，不代表 LLM 自主能力。命中由下游
+    flag_pattern + 答案校验把关。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("misc", "forensics"):
+        return None
+    attach = _attachments(question)
+    if not attach:
+        return None
+    for a in attach:
+        p = str(a)
+        if not os.path.isfile(p) or os.path.getsize(p) > 8 * 1024 * 1024:
+            continue
+        # 廉价 ZIP 预检（本地文件头魔数），不对无关附件开火
+        try:
+            with open(p, "rb") as fh:
+                head = fh.read(4)
+        except OSError:
+            continue
+        if head != b"PK\x03\x04":
+            continue
+        try:
+            res = await run_skill_isolated(
+                "skills.misc_deflate_huffman_flag", "run",
+                args=({"path": p},), timeout=WALLCLOCK_DEFLATE)
+        except SkillTimeout:
+            logger.info("[presolve:deflate_huffman] %s 超时 %ds，子进程已终止",
+                        p, WALLCLOCK_DEFLATE)
+            continue
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:deflate_huffman] %s 异常: %s", p, exc)
+            continue
+        if not isinstance(res, dict):
+            continue
+        flag = res.get("flag")
+        if flag and _is_plausible_flag(str(flag)):
+            logger.info("[presolve:deflate_huffman] %s 命中 flag=%s",
                         getattr(question, "id", "?"), str(flag)[:60])
             _save_candidates(question, [str(flag)])
             return str(flag)

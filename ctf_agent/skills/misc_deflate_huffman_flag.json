@@ -1,0 +1,8 @@
+{
+  "name": "misc_deflate_huffman_flag",
+  "purpose": "DEFLATE 动态 Huffman 树隐码提取（Google CTF 2021 misc「David and the Tree」）。题面 ZIP 内装 lipogram 小说 Gadsby（全文不用字母 E）的 26 章；缺失的 E 被藏进每个 deflate 流的动态 Huffman（David A. Huffman）树——正常编码器绝不会给未出现的符号分配码。本 skill 纯标准库按 RFC 1951 位级语法解析：ZIP EOCD→中央目录→逐条目 deflate 流→动态块头（HLIT/HDIST/HCLEN→码长码树→规范码）→取符号 69('E') 的规范码，&0xFF 后 8 位逆序得 ASCII，按条目序拼 flag。防误报双守卫：解压文本 E 占比 ≤1e-3（lipogram 判定，真题 ~1.6e-5 / 正常英文 ~1e-1）+ E 码长 ≤9 位（人工短码指纹）；全条目须承载字符（fail-closed 拼装语义）。实测 challenge.zip 单附件解出且与题库 flag_sha256 逐字匹配。",
+  "input_spec": "params = {'path': ZIP 文件路径}；非 ZIP / 条目 <4 / 普通含 E 文本 / E-less 但无隐码 / 含 stored 条目 / 超 32MB → {'flag': None}（不崩、不谎报）",
+  "output_spec": "run → {'flag': '<按 ZIP 条目序拼装的 ASCII 串>'}（逐字符可打印 0x20-0x7E、E 占比与码长双守卫通过）或 {'flag': None}",
+  "categories": ["misc", "forensics", "stego", "compression", "zip"],
+  "version": "1.0"
+}
