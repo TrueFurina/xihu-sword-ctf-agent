@@ -9,7 +9,7 @@
 
 覆盖
 ----
-1. 五个 skill 必须同时出现在 `_WIRED_SKILL_MODULES` 且有对应 `_try_*` 协程（mhk2/primes/cycling/electric-mayhem-cls/lcg-recover）；
+1. 九个 B1 skill 必须同时出现在 `_WIRED_SKILL_MODULES` 且有对应 `_try_*` 协程（mhk2/primes/cycling/h1/electric-mayhem-cls/lcg-recover/ziphard/papapapa/data_siege）；
 2. 参数提取（题面从不直接给全参数，必须自己抠）：
    - MHK2：`_mhk2_extract` 必须认出 a1/a2 + 密文二元组；垃圾文本、短公钥（n<48
      攻击不成立）必须**拒绝**而不是硬跑；
@@ -51,6 +51,8 @@ CLS_QID = "ext_gctf2022_electric-mayhem-cls"
 LCG_QID = "ext_gctf2023_least-common-genominator"
 ZIP_QID = "ext_gctf2023_zip"
 PAPAPAPA_QID = "ext_gctf2023_papapapa"
+DATAIEGE_QID = ("ext_cybench_hackthebox_cyber_apocalypse_2024"
+                "_forensics_medium_data_siege")
 
 
 def _big(rng, bits=136):
@@ -79,7 +81,8 @@ def test_b1_skills_are_wired():
                     ("skills.crypto_electric_mayhem_cls", "_try_electric_mayhem_cls"),
                     ("skills.crypto_lcg_recover", "_try_lcg_recover"),
                     ("skills.crypto_zip_bkcrack", "_try_zip_bkcrack"),
-                    ("skills.misc_jpeg_padding_stego", "_try_jpeg_padding_stego")):
+                    ("skills.misc_jpeg_padding_stego", "_try_jpeg_padding_stego"),
+                    ("skills.misc_pcap_ezrat_chat", "_try_pcap_ezrat_chat")):
         assert mod in wired, f"{mod} 未接线（只是库，不算能力）"
         assert callable(getattr(P, fn, None)), f"{fn} 未定义"
 
@@ -123,6 +126,18 @@ def _load(qid: str):
     from eval.cases import load_questions
 
     qs = load_questions("data/questions_external")
+    return next((q for q in qs if getattr(q, "id", "") == qid), None)
+
+
+def _load_cybench(qid: str):
+    """cybench 池（data_siege 所在池）的题目加载。
+
+    注意：loader 会把 JSON 里的 category=forensics 规范为 misc，
+    presolve 的 category 门必须同时放行两者（由接线函数自身保证）。
+    """
+    from eval.cases import load_questions
+
+    qs = load_questions("data/questions_ext_cybench")
     return next((q for q in qs if getattr(q, "id", "") == qid), None)
 
 
@@ -363,4 +378,26 @@ def test_presolve_papapapa_solves_real_problem_via_main_entry():
     truth = str(getattr(q, "flag_sha256", "") or "")
     flag = asyncio.run(P.presolve(q, answers=preset_answers([q]), force=True))
     assert flag, "presolve 主入口未解出 papapapa（内部命中但被主入口闸丢弃？）"
+    assert hashlib.sha256(flag.encode()).hexdigest() == truth
+
+
+@pytest.mark.slow
+def test_presolve_data_siege_solves_real_problem_via_main_entry():
+    """data_siege（EZRAT C2 聊天三段拼 flag）端到端走 **presolve 主入口**。
+
+    本题flag 是 sha256 占位形态（`flag=None` + `flag_sha256`），必须验证
+    整条生产链：隔离子进程 skill + flag_pattern 闸 + answer_check 闸 +
+    sha256 仲裁。单附件（pcap）即可解出——exe 由 pcap 内 8000 流传输，
+    口令从重组 exe 的 .NET UTF-16LE 元数据提取。
+    """
+    import asyncio
+
+    from eval.cases import preset_answers
+
+    q = _load_cybench(DATAIEGE_QID)
+    assert q is not None, f"cybench 题库里找不到 {DATAIEGE_QID}"
+    truth = str(getattr(q, "flag_sha256", "") or "")
+    assert truth, "题目缺 flag_sha256（真值源损坏？）"
+    flag = asyncio.run(P.presolve(q, answers=preset_answers([q]), force=True))
+    assert flag, "presolve 主入口未解出 data_siege（内部命中但被主入口闸丢弃？）"
     assert hashlib.sha256(flag.encode()).hexdigest() == truth
