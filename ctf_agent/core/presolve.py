@@ -52,6 +52,7 @@ WALLCLOCK_PAPAPAPA = 60  # JPEG padding-block 隐写全文件解码（纯 Python
 WALLCLOCK_EZRAT = 120  # EZRAT C2 会话解密（口令候选 × 纯 Python AES-CBC 评分）
 WALLCLOCK_DEFLATE = 60  # DEFLATE Huffman 树隐码提取（位级解析，纯标准库）
 WALLCLOCK_ZIPHARD = 3600  # bkcrack 已知明文攻击（OpenMP 全核仍可能数十分钟）
+WALLCLOCK_ENIGMA = 900  # Enigma crib 分层海选（numpy 向量化 3.7M 配置，实测 145-290s）
 
 # ── 整题 presolve 墙钟预算（2026-10-13 P3 挂死守卫）────────────────────
 # 并发嗅探的「安全阀」：历史上 asyncio.as_completed 必须等全部 task 完成才退出，
@@ -274,6 +275,7 @@ _WIRED_SKILL_MODULES = {
     "skills.misc_jpeg_padding_stego",        # JPEG padding-block 隐写信道（papapapa，坐标装配 + 实例模板 OCR）
     "skills.misc_pcap_ezrat_chat",           # EZRAT 木马 C2 加密会话解密（data_siege，PBKDF2+纯 Python AES-CBC）
     "skills.misc_deflate_huffman_flag",      # DEFLATE 动态 Huffman 树隐码（david-and-the-tree，RFC1951 位级解析）
+    "skills.crypto_enigma_crib",             # Enigma M3 已知明文 crib 攻击（enigma，海选+环扫+插板爬山+fernet）
     "skills.crypto_electric_mayhem_cls",    # AES-128 CPA 侧信道（模拟功耗轨迹，离线可解）
     "skills.crypto_lcg_recover",             # LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
     "skills.thoroughlystripped",             # null 剥离 ELF 字节级恢复（CSAW-Finals 2017）
@@ -747,6 +749,8 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_pcap_ezrat_chat(question)),
         # 2026-10-13 B1 确定性静态求解：DEFLATE 动态 Huffman 树隐码（david-and-the-tree）
         asyncio.ensure_future(_try_deflate_huffman_flag(question)),
+        # 2026-10-14 B1 确定性静态求解：Enigma M3 crib 分层海选（enigma）
+        asyncio.ensure_future(_try_enigma_crib(question)),
         # 2026-10-05 B1 确定性静态求解：AES-128 CPA 侧信道（Electric Mayhem CLS）
         asyncio.ensure_future(_try_electric_mayhem_cls(question)),
         # 2026-10-05 B1 确定性静态求解：LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
@@ -4212,6 +4216,76 @@ async def _try_deflate_huffman_flag(question) -> Optional[str]:
         flag = res.get("flag")
         if flag and _is_plausible_flag(str(flag)):
             logger.info("[presolve:deflate_huffman] %s 命中 flag=%s",
+                        getattr(question, "id", "?"), str(flag)[:60])
+            _save_candidates(question, [str(flag)])
+            return str(flag)
+    return None
+
+
+async def _try_enigma_crib(question) -> Optional[str]:
+    """Enigma M3 已知明文 crib 分层海选（2026-10-14 B1 第八道）。
+
+    触发面：category ∈ {crypto, misc} + 附件为长字母文本（≥500 大写字母，
+    ≤8MB）。交给 :func:`skills.crypto_enigma_crib.run`：crib 匹配数分层
+    海选（numpy 向量化 210 海军约束序 × 26³ 位置，环 AAA 空插板）→
+    环量扫描 → 插板爬山（crib 匹配评分）→ 2641/2641 逐字母校验 →
+    归一化设置串派生 Fernet 密钥（PBKDF2-SHA256 390000 轮）解密同目录
+    flag.fernet.txt → 德语指令文本解析 flag。隔离子进程跑
+    （run_skill_isolated，墙钟 WALLCLOCK_ENIGMA 真终止）。
+
+    题型本质：M3 Enigma（转子 I-VIII / 反射器 B / 10 插板对）flag 消息。
+    插板使「无插板解密」不是明文置换（IoC 信号 0.0405 vs 0.0385 被稀释，
+    10-09 实证），故用公开 crib + 匹配数评分；crib 为本题开发期标定的
+    已知明文（挑战公开仓库数据），密钥由求解器搜索恢复，未内嵌设置/flag。
+
+    诚实口径：本路是「crib 匹配数分层海选 + 插板爬山」的确定性实现，
+    非读答案文件；实测 Google CTF 2022 enigma 恢复官方设置串逐字一致、
+    解出 flag 且与题库 flag_sha256 逐字匹配。⚠️ 属 B1 工具链补齐产物，
+    不代表 LLM 自主能力。命中由下游 flag_pattern + 答案校验把关。
+    """
+    cat = str(getattr(question, "category", "")).lower()
+    if cat not in ("crypto", "misc"):
+        return None
+    attach = _attachments(question)
+    if not attach:
+        return None
+    # 展平：附件可能是目录（如 enigma 题的 messages/），浅walk 取文件
+    candidates = []
+    for a in attach:
+        p = str(a)
+        if os.path.isdir(p):
+            for root, _dirs, files in os.walk(p):
+                for fn in files:
+                    candidates.append(os.path.join(root, fn))
+        else:
+            candidates.append(p)
+    for p in candidates:
+        if not os.path.isfile(p) or os.path.getsize(p) > 8 * 1024 * 1024:
+            continue
+        # 廉价预检：长字母文本（密文为 A-Z 流；skill 内再做 crib 长度比对）
+        try:
+            with open(p, "rb") as fh:
+                blob = fh.read()
+        except OSError:
+            continue
+        if sum(1 for c in blob if 65 <= c <= 90) < 500:
+            continue
+        try:
+            res = await run_skill_isolated(
+                "skills.crypto_enigma_crib", "run",
+                args=({"path": p},), timeout=WALLCLOCK_ENIGMA)
+        except SkillTimeout:
+            logger.info("[presolve:enigma_crib] %s 超时 %ds，子进程已终止",
+                        p, WALLCLOCK_ENIGMA)
+            continue
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("[presolve:enigma_crib] %s 异常: %s", p, exc)
+            continue
+        if not isinstance(res, dict):
+            continue
+        flag = res.get("flag")
+        if flag and _is_plausible_flag(str(flag)):
+            logger.info("[presolve:enigma_crib] %s 命中 flag=%s",
                         getattr(question, "id", "?"), str(flag)[:60])
             _save_candidates(question, [str(flag)])
             return str(flag)

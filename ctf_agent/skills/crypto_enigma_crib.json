@@ -1,0 +1,8 @@
+{
+  "name": "crypto_enigma_crib",
+  "purpose": "Enigma M3 已知明文 crib 分层海选（Google CTF 2022「enigma」）。M3（转子 I-VIII、反射器 B、10 插板对）flag 消息：crib 匹配数分层海选（numpy 向量化 210 海军约束序 × 26³ 位置，环 AAA 空插板）→ 环量扫描 → 插板爬山（crib 匹配评分）→ 2641/2641 逐字母校验 → 归一化设置串（encrypt_modern.py 语义：左环强制 A、插板对排序）派生 Fernet 密钥（PBKDF2-SHA256 390000 轮）解密同目录 flag.fernet.txt → 德语指令文本解析 flag。10 插板下无插板解密不是明文置换（IoC 信号 0.0405 vs 0.0385 被稀释），故用公开 crib + 匹配数评分（实测 shift 匹配真配置 207 vs 随机 106±8，12σ）",
+  "input_spec": "params = {'path': flag.ciphertext.txt 路径, 'fernet'?: flag.fernet.txt 路径（缺省取同目录）}",
+  "output_spec": "run → {'flag': <明文 CTF{...}>} 或 {'flag': None}",
+  "categories": ["crypto", "enigma", "known-plaintext", "hill-climb", "fernet"],
+  "version": "1.0"
+}
