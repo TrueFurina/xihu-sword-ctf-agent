@@ -7,6 +7,7 @@
   人会忘、文档会漏，但"开工必须先跑本命令"是 100% 可控的注入点。
 
 检查清单（fail-closed，任一项不过 → 打印处置并 exit 1）：
+  ⓪ 仓库健康：.git 元数据 L0 四查 + core.bare 未置 true（2026-10-12 补，事故特征）
   ① 车道分支：当前分支必须是 w/<任务名>（main 直提由 pre-commit 拦截）
   ② 身份登记：CT_AGENT_SESSION 已设置（或 git config atomcode.session 兜底）
   ③ 工作树干净：git status --porcelain 为空（脏树 → 先收口，不许带脏开工）
@@ -88,6 +89,17 @@ def main(argv=None) -> int:
         print("        无快照时按上方「恢复目标值来源」从 ORIG_HEAD/FETCH_HEAD/info/refs 恢复")
         return 1
     print(f"✅ 仓库健康（L0）：{gd}")
+
+    # ── ⓪c core.bare 判据（2026-10-12 防复发）──
+    # L0 四查全是「文件在不在」，看不出「config 被写成 core.bare=true」这类**语义损坏**
+    # （2026-10-11 时间窗内已复现两次：⑥ 的 tmp_path 用例继承 GIT_DIR 后改写主仓 config）。
+    # 该状态会让 git status/merge 全线失效 ⇒ 必须在 boot 阶段 fail-closed。
+    _bare = _git_guard.check_core_bare(gd)
+    if not _bare["ok"]:
+        print(f"❌ L0[{_bare['id']}] {_bare['detail']}")
+        print("❌ 仓库健康门禁 ⓪ 未过：core.bare 被置真（主工作树被误判为 bare），已短路后续检查。")
+        print("   处置：git config --local core.bare false   # 再复核 git status 是否恢复")
+        return 1
 
     # ── ⓪b 僵尸租约「只报告不修改」（2026-09-19 防复发 A1 修订，缺口 G4）──
     # 决策（team-lead A1）：**boot 路径一个字节都不写 coordination.json**。
