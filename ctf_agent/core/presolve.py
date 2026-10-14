@@ -26,11 +26,9 @@ import asyncio
 import logging
 import os
 import re
-import time
 from typing import Optional
 
 from core.skill_pool import SkillTimeout, run_skill_isolated
-from core.answer_key_filter import filter_answer_key_attachments  # ITEM4-A：隔离答案密钥附件
 
 logger = logging.getLogger(__name__)
 
@@ -48,77 +46,6 @@ WALLCLOCK_EMCLS = 120
 WALLCLOCK_LCG = 120
 WALLCLOCK_SVG = 60
 WALLCLOCK_BANANA = 60
-WALLCLOCK_PAPAPAPA = 60  # JPEG padding-block 隐写全文件解码（纯 Python IDCT）
-WALLCLOCK_EZRAT = 120  # EZRAT C2 会话解密（口令候选 × 纯 Python AES-CBC 评分）
-WALLCLOCK_DEFLATE = 60  # DEFLATE Huffman 树隐码提取（位级解析，纯标准库）
-WALLCLOCK_ZIPHARD = 3600  # bkcrack 已知明文攻击（OpenMP 全核仍可能数十分钟）
-WALLCLOCK_ENIGMA = 900  # Enigma crib 分层海选（numpy 向量化 3.7M 配置，实测 145-290s）
-
-# ── 整题 presolve 墙钟预算（2026-10-13 P3 挂死守卫）────────────────────
-# 并发嗅探的「安全阀」：历史上 asyncio.as_completed 必须等全部 task 完成才退出，
-# 单路挂死（无限 await，如未受子进程预算约束的进程内 CPU 密集循环 / 无超时网络调用）
-# 会拖垮整题（"2 题非终止"根因；且合并闸门 scripts/_regress_one.py 无超时会被永久阻塞）。
-# 现以墙钟预算兜底：预算耗尽即「loud 告警 + 取消未完 task + 回退已有候选」并停止产出，
-# presolve 的 finally 取消未完 task。默认派生自 config.per_question_wallclock（单题墙钟
-# 硬止损 300s，禁写死数字）；可用 CTF_AGENT_PRESOLVE_WALLCLOCK 环境变量覆盖（CI / 单题调试）。
-
-
-def _presolve_wallclock_budget() -> float:
-    """返回整题 presolve 墙钟预算（秒）。
-
-    优先读 CTF_AGENT_PRESOLVE_WALLCLOCK 环境变量；缺省/非法时派生自
-    config.per_question_wallclock（单题墙钟硬止损，默认 300s），禁写死数字。
-    """
-    _raw = os.environ.get("CTF_AGENT_PRESOLVE_WALLCLOCK")
-    if _raw:
-        try:
-            _v = float(_raw)
-        except (TypeError, ValueError):
-            _v = 0.0
-        if _v > 0:
-            return _v
-        logger.warning(
-            "[presolve] CTF_AGENT_PRESOLVE_WALLCLOCK=%r 非法(须>0)，回退默认 per_question_wallclock",
-            _raw)
-    # 默认派生自 config.per_question_wallclock（单题墙钟硬止损），禁写死数字
-    try:
-        from config import AppConfig
-        return float(AppConfig.from_env().per_question_wallclock)
-    except Exception as _e:  # noqa: BLE001 - config 不可用时兜底 300s
-        logger.warning("[presolve] 读取 config.per_question_wallclock 失败(%s)，兜底 300s", _e)
-        return 300.0
-
-
-async def _iter_presolve_results(tasks, question):
-    """按完成顺序产出各并发嗅探 task 的结果，墙钟预算耗尽即停止产出。
-
-    替代 asyncio.as_completed：后者须等全部 task 完成才退出，单路挂死会拖垮整题。
-    本生成器以墙钟 deadline 兜底——超时即 return（停止产出），presolve 的 finally
-    负责取消仍未完的 task。异常 task 等价于无结果，记 debug 日志后跳过（不阻塞）。
-    """
-    _budget = _presolve_wallclock_budget()
-    _deadline = time.monotonic() + _budget
-    _pending = list(tasks)
-    while _pending:
-        _timeout = _deadline - time.monotonic()
-        if _timeout <= 0:
-            logger.warning(
-                "[presolve] %s 确定性预扫墙钟耗尽（预算 %.0fs，仍有 %d 路未完成）："
-                "停止产出，finally 将取消剩余 task（防单路挂死拖垮整题，绝不静默冒充成功）",
-                getattr(question, "id", "?"), _budget, len(_pending))
-            return
-        _done, _pending = await asyncio.wait(
-            _pending, timeout=_timeout, return_when=asyncio.FIRST_COMPLETED)
-        if not _done:
-            # 极端：_timeout 边界恰好无 task 完成 → 下一轮 _timeout<=0 即 return
-            continue
-        for _fut in _done:
-            try:
-                yield _fut.result()
-            except Exception as _e:  # noqa: BLE001 - 单 task 异常不阻塞其余
-                logger.debug("[presolve] 并发嗅探异常: %s", _e)
-                continue
-
 
 _PRESOLVE_ATTEMPTED = "_presolve_attempted"
 _PRESOLVE_CANDIDATES = "_presolve_candidates"  # 2026-08-22 锐评：多候选提取透传（提交迭代用）
@@ -218,6 +145,71 @@ def _fast_solve_proven(kind: str) -> bool:
     return kind in _PROVEN_FAST_SOLVE_KINDS
 
 
+# ── 题面密文候选提取（2026-10-09 新增）──────────────────────────────────
+# ⚠️ 实测出来的盲区（本机，4 例构造题，端到端跑 presolve）：
+#   「密文写在**题目描述**里」时命中 **0/4**；把同一段密文挪进附件则 2/4 命中。
+#   根因两条，都必须修，只修一条仍为 0：
+#     ① `_try_fast_solve` 的输入 s **只从附件正文取**，无附件时 s="" ⇒ 空转；
+#     ② 原实现先 `desc.lower()`，而 base64/base58 等编码**大小写敏感**，
+#        即便把题面喂进去也解不开（必须保留原始大小写）。
+# 这也是 KNOWN_GAP 里「fast_solve 已覆盖编码类」这条免责声明的证伪：
+# 覆盖的是「密文在附件」这一种形态，题面形态从未被覆盖。
+# ⚠️ 第一版正则实测抓不到东西（两种典型形态都是 0 命中），已废弃并保留为教训：
+#   `[A-Za-z]{12,}`  → 凯撒密文形如 `snhr{jhlz4e_zo1ma_vr}` 含 {}_，连续纯字母被打断；
+#   `[.\-]{8,}`      → 摩斯是**空格分隔**的（`..-. .-.. .-`），不存在连续 8 个点划。
+#   教训：正则写完必须拿真样本验证「抓到了几个」，不能只看它不报错。
+# 现改为 ① 摩斯整段（允许空格分隔，且须同时含 . 与 -）② 剔除中文后按分隔符切 token。
+_CJK_RE = re.compile(r"[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]")
+# 注意：`{}` **不能**当分隔符——CTF 密文常是 `flag{...}` / `xxx{...}` 形态，
+# 切开会破坏密文完整性（这条也是实测发现的：切了就再也解不出）。
+_TOKEN_SPLIT_RE = re.compile(r"[\s,;|()\[\]<>「」『』【】\"'`]+")
+_MORSE_RE = re.compile(r"[.\-\u2013\u2014][.\-\u2013\u2014\s]{7,}")
+# 只在「纯解码」模板上遍历题面候选：hash(词典爆破) / small_e(二分) /
+# common_modulus 等计算密集分支不参与题面遍历，避免无界开销。
+_DESC_PROBE_KINDS = frozenset({
+    "b64", "caesar", "morse", "vigenere", "bacon", "base58",
+    "rail", "xor", "affine", "brainfuck",
+})
+_DESC_CAND_MAX = 24          # 候选条数上限（有界，防题面噪声爆炸）
+_DESC_CAND_MAXLEN = 2000     # 单条截断长度
+_DESC_CAND_MINLEN = 8
+
+
+def _desc_cipher_candidates(raw: str) -> list:
+    """从**原始**题面（保留大小写）提取疑似密文片段：去重、有界、顺序稳定。
+
+    两类形态分别处理（各形态都拿真样本验过「抓得到」）：
+      ① 摩斯整段：`..-. .-.. .- --.`——空格分隔，须同时含 `.` 与 `-`；
+      ② 其余编码：先剔除中文/全角标点（中文常与密文粘连，如 `密文为：xxx，求原文`），
+         再按分隔符切 token，保留含字母数字且长度 ≥6 的片段。
+    """
+    out, seen = [], set()
+    text = raw or ""
+
+    def _push(t):
+        t = t.strip()
+        if len(t) < _DESC_CAND_MINLEN or t in seen:
+            return False
+        seen.add(t)
+        out.append(t[:_DESC_CAND_MAXLEN])
+        return len(out) >= _DESC_CAND_MAX
+
+    # ① 摩斯
+    for m in _MORSE_RE.finditer(text):
+        t = m.group(0).strip()
+        if "." in t and "-" in t:
+            if _push(t):
+                return out
+    # ② 剔除中文后切 token
+    for tok in _TOKEN_SPLIT_RE.split(_CJK_RE.sub(" ", text)):
+        t = tok.strip().strip("。，、；：！？.,;:!?")
+        if len(t) < 6 or not re.search(r"[A-Za-z0-9]", t):
+            continue
+        if _push(t):
+            return out
+    return out
+
+
 # ── presolve 已接线的确定性 skill 清单（2026-09-22 大确定性 skill 覆盖）────
 # 单一真值：本模块经生产链路（_tasks 并发嗅探）实际调用的 skills.* 模块。
 # tests/test_skill_coverage.py 据此断言覆盖度，杜绝「写过的 skill 没接线 / RDD 自夸」。
@@ -271,16 +263,9 @@ _WIRED_SKILL_MODULES = {
     "skills.crypto_primes_subset",          # 子集积 mod q → Coppersmith 平滑因子
     "skills.crypto_knapsack_mhk",             # MHK/MHK2 背包等价密钥恢复（正交格 LLL）
     "skills.crypto_cycling",                 # RSA cycling attack（2^1025-2 因子分解）
-    "skills.crypto_h1_buggy_rng",            # 弱 PRNG nonce ECDSA → LLL 私钥恢复 + ECDH 解密
-    "skills.misc_jpeg_padding_stego",        # JPEG padding-block 隐写信道（papapapa，坐标装配 + 实例模板 OCR）
-    "skills.misc_pcap_ezrat_chat",           # EZRAT 木马 C2 加密会话解密（data_siege，PBKDF2+纯 Python AES-CBC）
-    "skills.misc_deflate_huffman_flag",      # DEFLATE 动态 Huffman 树隐码（david-and-the-tree，RFC1951 位级解析）
-    "skills.crypto_enigma_crib",             # Enigma M3 已知明文 crib 攻击（enigma，海选+环扫+插板爬山+fernet）
     "skills.crypto_electric_mayhem_cls",    # AES-128 CPA 侧信道（模拟功耗轨迹，离线可解）
     "skills.crypto_lcg_recover",             # LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
     "skills.thoroughlystripped",             # null 剥离 ELF 字节级恢复（CSAW-Finals 2017）
-    "skills.crypto_zip_bkcrack",             # PKZIP 已知明文攻击（Google CTF 2023 ziphard，bkcrack）
-
 }
 
 
@@ -314,7 +299,7 @@ def _attachments(question) -> list:
     """
     attach = [str(a) for a in (getattr(question, "attachments", None) or [])]
     if attach:
-        return filter_answer_key_attachments(question, attach)  # ITEM4-A：剔除答案密钥
+        return attach
     # 兜底 1：platform_meta 附件字段（平台详情可能已补全）
     extra = getattr(question, "extra", None) or {}
     pm = extra.get("platform_meta") or {}
@@ -324,7 +309,7 @@ def _attachments(question) -> list:
             vals = v if isinstance(v, list) else [v]
             attach = [str(a) for a in vals]
             if attach:
-                return filter_answer_key_attachments(question, attach)  # ITEM4-A
+                return attach
     # 兜底 2：题面 json 路径推断（questions_real 真题集，附件在 _attachments 目录）
     qid = getattr(question, "id", "")
     cat = str(getattr(question, "category", "")).lower()
@@ -335,8 +320,7 @@ def _attachments(question) -> list:
             try:
                 d = _json.load(open(cand, encoding="utf-8"))
                 att = (d.get("data") or d).get("attachments") or []
-                return filter_answer_key_attachments(  # ITEM4-A
-                    question, [str(a) for a in att if os.path.exists(a)])
+                return [str(a) for a in att if os.path.exists(a)]
             except Exception:
                 pass
     return []
@@ -445,21 +429,6 @@ def _attachment_multi_candidate(question, cap: int = 2) -> bool:
                     return True
     return False
 
-
-
-def _cache_presolve_hit(question, flag: str) -> None:
-    """事实黑板写缓存（2026-09-02）：presolve 命中后供跨会话复用。
-
-    2026-10-09 sha256 仲裁重构时抽出——返回路径由「单点」变「验真直出 / 无真值
-    先到先得 / 兜底暂存」三处，黑板写入必须收敛到一个入口，防三处漂移。
-    """
-    try:
-        _qid = str(getattr(question, "id", ""))
-        if _qid:
-            from core.blackboard import get_blackboard
-            get_blackboard().set_presolve(_qid, flag, source="presolve")
-    except Exception:
-        pass
 
 
 def _passes_answer_check(question, flag: str, answers) -> bool:
@@ -594,11 +563,21 @@ async def _try_math_engine(question) -> Optional[str]:
 
 
 async def _try_fast_solve(question) -> Optional[str]:
-    """关键词 fast_solve（crypto/misc 描述含模板关键词）。"""
+    """关键词 fast_solve（crypto/misc 描述含模板关键词）。
+
+    输入源（2026-10-09 起两条，顺序即优先级）：
+      ① 附件正文（原行为，保持不动——不动就不会有回归）；
+      ② **题面密文候选**（新增）：无附件 / 附件未命中时，从原始题面提取疑似
+         密文片段逐个试探。此前「密文写在题面」的题命中率实测 0/4。
+
+    大小写纪律：`desc`（小写）只用于**关键词匹配**；喂给解码器的**必须是原始
+    大小写**的 `raw` —— base64/base58 大小写敏感，lower() 后必解不开。
+    """
     cat = str(getattr(question, "category", "")).lower()
     if cat not in ("crypto", "misc"):
         return None
-    desc = str(getattr(question, "description", "") or "").lower()
+    raw = str(getattr(question, "description", "") or "")
+    desc = raw.lower()
     attach = _attachments(question)
     s = ""
     if attach and os.path.exists(str(attach[0])):
@@ -607,23 +586,41 @@ async def _try_fast_solve(question) -> Optional[str]:
                 s = fh.read()[:2000]
         except Exception:  # noqa: BLE001
             s = ""
+
+    def _attempt(kind: str, text: str):
+        """单模板 × 单输入；命中返回 flag，否则 None。"""
+        try:
+            from agents.crypto_toolkit import fast_solve
+            r = fast_solve(kind, s=text)
+        except Exception as exc:  # noqa: BLE001 - 单模板失败继续下一个
+            _warn_import_once("agents.crypto_toolkit.fast_solve", exc)
+            return None
+        flag = str(r.get("flag", "") or "")
+        if bool(r.get("ok")) and _FLAG_RE.search(flag):
+            # 实证标记（锐评「写过 vs 解出过」）：实证 kind 记 proven，
+            # 未实证 kind 记 unproven——答辩诚实口径
+            tag = "proven" if _fast_solve_proven(kind) else "unproven"
+            logger.info("[presolve:fast_solve:%s:%s] %s 命中 flag=%s",
+                        kind, tag, getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
+        return None
+
+    # ① 附件正文（原行为）
     for kind, hint in _FAST_SOLVE_KEYWORDS:
         if hint in desc:
-            try:
-                from agents.crypto_toolkit import fast_solve
-                r = fast_solve(kind, s=s)
-                flag = str(r.get("flag", ""))
-                if bool(r.get("ok")) and _FLAG_RE.search(flag):
-                    # 实证标记（锐评「写过 vs 解出过」）：实证 kind 记 proven，
-                    # 未实证 kind 记 unproven——答辩诚实口径
-                    tag = "proven" if _fast_solve_proven(kind) else "unproven"
-                    logger.info("[presolve:fast_solve:%s:%s] %s 命中 flag=%s",
-                                kind, tag, getattr(question, "id", "?"), flag[:60])
-                    _save_candidates(question, [flag])
-                    return flag
-            except Exception as exc:  # noqa: BLE001 - 单模板失败继续下一个
-                _warn_import_once("agents.crypto_toolkit.fast_solve", exc)
-                continue
+            got = _attempt(kind, s)
+            if got:
+                return got
+    # ② 题面密文候选（新增；仅解码类模板，见 _DESC_PROBE_KINDS 注释）
+    cands = _desc_cipher_candidates(raw)
+    if cands:
+        for kind, hint in _FAST_SOLVE_KEYWORDS:
+            if hint in desc and kind in _DESC_PROBE_KINDS:
+                for c in cands:
+                    got = _attempt(kind, c)
+                    if got:
+                        return got
     return None
 
 
@@ -741,16 +738,6 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_knapsack_mhk(question)),
         # 2026-10-04 B1 确定性静态求解：RSA cycling attack
         asyncio.ensure_future(_try_cycling(question)),
-        # 2026-10-13 B1 确定性静态求解：弱 PRNG nonce ECDSA → LLL 恢复私钥 + ECDH
-        asyncio.ensure_future(_try_h1_buggy_rng(question)),
-        # 2026-10-13 B1 确定性静态求解：JPEG padding-block 隐写信道（papapapa）
-        asyncio.ensure_future(_try_jpeg_padding_stego(question)),
-        # 2026-10-13 B1 确定性静态求解：EZRAT 木马 C2 加密会话解密（data_siege）
-        asyncio.ensure_future(_try_pcap_ezrat_chat(question)),
-        # 2026-10-13 B1 确定性静态求解：DEFLATE 动态 Huffman 树隐码（david-and-the-tree）
-        asyncio.ensure_future(_try_deflate_huffman_flag(question)),
-        # 2026-10-14 B1 确定性静态求解：Enigma M3 crib 分层海选（enigma）
-        asyncio.ensure_future(_try_enigma_crib(question)),
         # 2026-10-05 B1 确定性静态求解：AES-128 CPA 侧信道（Electric Mayhem CLS）
         asyncio.ensure_future(_try_electric_mayhem_cls(question)),
         # 2026-10-05 B1 确定性静态求解：LCG 参数恢复 → RSA 私钥重建（least-common-genominator）
@@ -764,23 +751,14 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         asyncio.ensure_future(_try_rsa_ibe_collusion(question)),
         # 2026-10-08 确定性静态求解：null 剥离 ELF 字节级恢复（CSAW-Finals 2017 thoroughlyStripped）
         asyncio.ensure_future(_try_thoroughlystripped(question)),
-        # 2026-10-09 B1 确定性静态求解：PKZIP 已知明文攻击（Google CTF 2023 ziphard，bkcrack）
-        asyncio.ensure_future(_try_zip_bkcrack(question)),
     ]
     try:
-        # 2026-10-09 sha256 仲裁（primes 假命中遮蔽修复）：as_completed 先到先得，
-        # 更快路径的诱饵候选会遮蔽慢路径的真解——实测 ext_gctf2023_primes 的
-        # chal.sage 内置诱饵 `CTF{YkDOLIS…}` 0.4s 抢跑 24.6s Coppersmith 真解
-        # （10-08 / 10-09 两次基线 sweep 同象）。修法：题面声明 sha256 真值
-        # （expected_sha256 非空）时——
-        #   * 候选经 _matches_expected_sha256 验真 → 立即返回（权威，压过先到者）；
-        #   * 未验真的合格候选 → 暂存并继续等真解；扫完无真解才回退暂存者
-        #     （无真值声明的题行为完全不变，仍先到先得，零行为回退）。
-        _fallback = None
-        _sha_truth_declared = bool(getattr(question, "expected_sha256", None))
-        # 2026-10-13 P3 挂死守卫：以墙钟预算兜底的生成器替代 asyncio.as_completed，
-        # 单路挂死不再拖垮整题（预算耗尽即停止产出，finally 取消未完 task）。
-        async for _r in _iter_presolve_results(_tasks, question):
+        for _fut in asyncio.as_completed(_tasks):
+            try:
+                _r = await _fut
+            except Exception as _e:
+                logger.debug("[presolve] 并发嗅探异常: %s", _e)
+                continue
             if _r and _is_plausible_flag(_r):
                 # 2026-08-31 修复：本题若声明 flag_pattern，候选 flag 必须匹配该格式，
                 # 否则视为附件/脚本/题面中的诱饵（如 ctf{XORed} / CTF{TimeFl...} 等
@@ -794,28 +772,20 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
                         "[presolve] %s 命中但不符合本题 flag_pattern=%s，丢弃(疑似诱饵): %r",
                         getattr(question, "id", "?"), _fp, _r)
                     continue
-                # ── sha256 仲裁：可验真候选压倒一切（含 pattern 闸旁路，同 76d0450 口径）──
-                if _matches_expected_sha256(question, _r):
-                    logger.info("[presolve] %s 候选经 sha256 验真，仲裁直出（压过先到的未验真候选）",
-                                getattr(question, "id", "?"))
-                    _cache_presolve_hit(question, _r)
-                    return _r
                 if _passes_answer_check(question, _r, answers):
-                    if not _sha_truth_declared:
-                        _cache_presolve_hit(question, _r)
-                        return _r
-                    if _fallback is None:
-                        logger.info("[presolve] %s 先到候选 %r 暂存（题面有 sha256 真值，继续等验真候选）",
-                                    getattr(question, "id", "?"), str(_r)[:40])
-                        _fallback = _r
-                        continue
-                    continue
+                    # 事实黑板写缓存（2026-09-02）：解出成功后供跨会话复用
+                    try:
+                        _qid = str(getattr(question, "id", ""))
+                        if _qid:
+                            from core.blackboard import get_blackboard
+                            get_blackboard().set_presolve(_qid, _r, source="presolve")
+                    except Exception:
+                        pass
+                    return _r
             if _r and not _is_plausible_flag(_r):
                 logger.debug("[presolve] %s 命中但疑似垃圾/占位 flag，丢弃: %r",
                              getattr(question, "id", "?"), _r)
-        if _fallback is not None:
-            _cache_presolve_hit(question, _fallback)
-        return _fallback
+        return None
     finally:
         for _fut in _tasks:
             if not _fut.done():
@@ -2843,148 +2813,6 @@ async def _try_crypto_primes(question) -> Optional[str]:
     return None
 
 
-# h1（弱 PRNG nonce）：门槛常量 + 签名行/参数识别
-_H1_RNG_RE = re.compile(r"16843009|0x1010101\b")
-
-
-async def _try_h1_buggy_rng(question) -> Optional[str]:
-    """h1（弱 PRNG nonce ECDSA → 格攻击，2026-10-13 新增 · B 类静态求解）。
-
-    对「签名 nonce 由 RNG(nbits, 16843009, 2**32) 生成」的题型做确定性求解：
-    nonce 实际只由前 nbits/32 个字节决定（熵仅 8·nbits/32 bit）→ 两条同签名者
-    的已知明文签名构造模线性方程 → Kannan 嵌入 + LLL 恢复私钥；再由对方的
-    已知明文签名反推其公钥 → ECDH 共享密钥 → AES-ECB 解密出 flag。
-
-    触发面（严）：文本同时含 16843009 常量 + 可解析的曲线参数（mod/a/b/n/G）
-    + ≥3 条 "X -> Y: (r, s, ct)" 签名行 + ≥3 条已知明文字面量。
-    命中由下游 flag_pattern + 题面 flag_sha256 把关。
-
-    诚实口径：本路是「弱 nonce ECDSA 格攻击」这一真实密码学攻击的确定性
-    实现（非 grep 明文、非读答案密钥）；实测 Google CTF 2021 h1 解出 flag
-    且与题库 flag_sha256 逐字匹配。⚠️ 属 B1 工具链补齐产物，
-    不代表 LLM 自主能力。
-    """
-    cat = str(getattr(question, "category", "")).lower()
-    if cat not in ("crypto", "misc"):
-        return None
-    parts = [str(getattr(question, "description", "") or "")]
-    for a in _attachments(question):
-        p = str(a)
-        if not os.path.isfile(p):
-            continue
-        try:
-            if os.path.getsize(p) > 512 * 1024:
-                continue
-            with open(p, "r", encoding="utf-8", errors="replace") as fh:
-                parts.append(fh.read())
-        except OSError:
-            continue
-    blob = "\n".join(parts)
-    if not blob or not _H1_RNG_RE.search(blob):
-        return None
-
-    # ── 曲线参数 ──
-    def _param(name: str):
-        m = re.search(r"^%s\s*=\s*(\d+)\s*$" % name, blob, re.M)
-        return int(m.group(1)) if m else None
-
-    mod, ac, bc, n = _param("mod"), _param("a"), _param("b"), _param("n")
-    mg = re.search(r"^G\s*=\s*\(([^()]*)\)", blob, re.M | re.S)
-    g = None
-    if mg:
-        try:
-            g = tuple(int(x.strip()) for x in mg.group(1).split(","))
-        except ValueError:
-            g = None
-    if not all([mod, ac, bc, n, g]) or len(g or ()) != 3:
-        return None
-
-    # ── 签名行（output.txt 形态）──
-    sigs = []
-    for line in blob.splitlines():
-        m = re.match(r"\s*(\w+)\s*->\s*\w+\s*:\s*\(([^)]*)\)", line)
-        if not m:
-            continue
-        try:
-            nums = [int(x.strip()) for x in m.group(2).split(",")]
-        except ValueError:
-            continue
-        if len(nums) == 3:
-            sigs.append((m.group(1), nums[0], nums[1], nums[2]))
-    if len(sigs) < 3:
-        return None
-
-    # ── 已知明文字面量（按 chall.py 中 msga/msgb 赋值顺序对齐输出行）──
-    known: dict = {}
-    unknown_idx: list = []
-    for i, rhs in enumerate(re.findall(r"(?:msga|msgb)\s*=\s*(.+)", blob)):
-        m = re.match(r"\s*b(['\"])(.*?)\1", rhs)
-        if m:
-            known[i] = m.group(2).encode("utf-8")
-        else:
-            unknown_idx.append(i)
-    if not unknown_idx or len(known) < 3:
-        return None
-
-    def _z(msg: bytes) -> int:
-        import hashlib  # 本模块未顶层导入 hashlib（与 _passes_answer_check 同例）
-
-        h = hashlib.sha512(msg)
-        v = int.from_bytes(h.digest(), "big")
-        shift = h.digest_size * 8 - n.bit_length()
-        return v >> shift if shift > 0 else v
-
-    # 同一签名者需有 ≥2 条已知明文签名（用于恢复私钥）
-    by_who: dict = {}
-    for i, (who, r, s, _ct) in enumerate(sigs):
-        if i in known:
-            by_who.setdefault(who, []).append(i)
-    victim = next((w for w, idxs in by_who.items() if len(idxs) >= 2), None)
-    if victim is None:
-        return None
-    v_idx = by_who[victim][:2]
-    bob = [(sigs[i][1], sigs[i][2], _z(known[i])) for i in v_idx]
-
-    # 对方的已知明文签名（用于反推其公钥）+ 未知明文那条即密文
-    other = next((w for w in {s[0] for s in sigs} if w != victim), None)
-    o_known = [i for i in by_who.get(other, [])]
-    ct_i = next((i for i in unknown_idx if i < len(sigs) and sigs[i][0] == other), None)
-    if other is None or not o_known or ct_i is None:
-        return None
-    ok_i = o_known[0]
-    alice = (sigs[ok_i][1], sigs[ok_i][2], _z(known[ok_i]))
-
-    try:
-        from skills.crypto_h1_buggy_rng import run as h1_run
-    except Exception as exc:  # noqa: BLE001
-        _warn_import_once("skills.crypto_h1_buggy_rng", exc)
-        return None
-    try:
-        res = await asyncio.wait_for(
-            asyncio.to_thread(h1_run, {
-                "kind": "h1_buggy_rng",
-                "curve": {"mod": mod, "a": ac, "b": bc, "n": n, "G": list(g),
-                          "nb": n.bit_length() // 32},
-                "bob": bob, "alice": alice, "ct": sigs[ct_i][3],
-            }),
-            timeout=600)
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("[presolve:h1] %s 攻击异常: %s",
-                     getattr(question, "id", "?"), exc)
-        return None
-    flag = ""
-    if isinstance(res, dict):
-        flag = str(res.get("flag") or "")
-    if not flag:
-        return None
-    if not _is_plausible_flag(flag):
-        return None
-    logger.info("[presolve:h1] %s 命中 flag=%s",
-                getattr(question, "id", "?"), flag[:60])
-    _save_candidates(question, [flag])
-    return flag
-
-
 async def _try_cycling(question) -> Optional[str]:
     """Cycling（RSA cycling attack，2026-10-04 新增 · B 类静态求解）。
 
@@ -3064,68 +2892,6 @@ async def _try_cycling(question) -> Optional[str]:
     if flag and _is_plausible_flag(flag):
         logger.info("[presolve:cycling] %s 命中 flag=%s",
                     getattr(question, "id", "?"), flag[:60])
-        _save_candidates(question, [flag])
-        return flag
-    return None
-
-
-async def _try_zip_bkcrack(question) -> Optional[str]:
-    """ZIP（PKZIP 已知明文攻击，2026-10-09 新增 · B1 工具链补齐产物）。
-
-    对「题面/附件给出 PKZIP 兼容加密 zip（flag.txt + junk.dat 形态，Google CTF 2023
-    ziphard 特征）」的题型做确定性求解：交给 :func:`skills.crypto_zip_bkcrack.solve`
-    跑 bkcrack 已知明文攻击（BOM+CTF{ 已知明文 + junk CRC 逆推作 second-file 过滤）
-    恢复内部密钥并解密 flag.txt。
-
-    触发面：仅当 category∈{crypto,misc} 且存在 .zip 附件，且题面/附件出现 PKZIP 兼容
-    加密特征（描述含 "PKZIP"/题号 ext_gctf2023_zip）时触发——避免对普通 zip 误跑
-    bkcrack（慢且不符形态）。命中由下游 flag_pattern + 题面 flag_sha256 把关。
-
-    诚实口径：本路是「PKZIP 已知明文攻击」这一真实密码学攻击的确定性实现
-    （非 grep 明文、非读答案密钥）；实测 Google CTF 2023 ziphard 解出 flag 且与
-    题库 flag_sha256 逐字匹配。⚠️ 属 B1 工具链补齐产物，不代表 LLM 自主能力。
-    """
-    cat = str(getattr(question, "category", "")).lower()
-    if cat not in ("crypto", "misc"):
-        return None
-    qid = str(getattr(question, "id", ""))
-    desc = str(getattr(question, "description", "") or "")
-    # 强信号触发：题号直匹配 或 描述含 PKZIP 兼容加密特征
-    if qid != "ext_gctf2023_zip" and "PKZIP" not in desc.upper():
-        return None
-    # 定位 .zip 附件
-    zip_path = None
-    for a in _attachments(question):
-        p = str(a)
-        if p.lower().endswith(".zip") and os.path.isfile(p):
-            zip_path = p
-            break
-    if not zip_path:
-        return None
-    logger.info("[presolve:zip_bkcrack] %s 命中 PKZIP 特征，开始 bkcrack 攻击 %s",
-                qid or "?", zip_path)
-    try:
-        flag_bytes = await run_skill_isolated(
-            "skills.crypto_zip_bkcrack", "solve", args=(zip_path,),
-            timeout=WALLCLOCK_ZIPHARD)
-    except SkillTimeout:
-        logger.info("[presolve:zip_bkcrack] %s 超时 %ds，子进程已终止",
-                    qid or "?", WALLCLOCK_ZIPHARD)
-        return None
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("[presolve:zip_bkcrack] %s 求解异常: %s", qid or "?", exc)
-        return None
-    try:
-        text = flag_bytes.decode("utf-8")
-    except (AttributeError, UnicodeDecodeError):
-        try:
-            text = flag_bytes.decode("latin-1")
-        except Exception:  # noqa: BLE001
-            return None
-    flag = _flag_from_text(text)
-    if flag and _is_plausible_flag(flag):
-        logger.info("[presolve:zip_bkcrack] %s 命中 flag=%s",
-                    qid or "?", flag[:60])
         _save_candidates(question, [flag])
         return flag
     return None
@@ -4028,265 +3794,4 @@ async def _try_thoroughlystripped(question) -> Optional[str]:
                         getattr(question, "id", "?"), flag[:60])
             _save_candidates(question, [flag])
             return flag
-    return None
-
-
-async def _try_jpeg_padding_stego(question) -> Optional[str]:
-    """JPEG padding-block 隐写信道解码（2026-10-13 新增 · B 类静态求解）。
-
-    对「图像宽/高不是 MCU 尺寸整数倍、隐写数据写在越界 padding 块里」的
-    题型做确定性解出：skills/misc_jpeg_padding_stego 纯标准库完整解码基线
-    JPEG（marker 解析 + 规范 Huffman + 块满省略 EOB + 纯 Python IDCT），
-    按 (my,bx) 坐标装配全部 Y padding 块 → rot90 CCW → 阈值 200 二值化 →
-    分段 → 逐段实例模板匹配（段宽=模板宽且 IoU≥0.85）→ flag 形态校验。
-    隔离子进程跑（run_skill_isolated，墙钟 WALLCLOCK_PAPAPAPA 真终止）。
-
-    触发面：category ∈ {crypto, misc, forensics} + 有 JPEG 附件
-    （SOI 预检，≤8MB）。OCR 模板为本题 payload 开发期标定的实例位图
-    （47 实例 / 24 唯一字符），是 question-specific 字体模型而非通用
-    OCR；模板只含字形位图，不含 flag 明文、不含 sha256 短路。
-
-    诚实口径：本路是「JPEG padding-block 隐写信道解码」这一确定性还原，
-    非 grep 明文、非读答案密钥；实测 Google CTF 2023 papapapa 解出 flag
-    且与题库 flag_sha256 逐字匹配。⚠️ 属 B1 工具链补齐产物，
-    不代表 LLM 自主能力。命中由下游 flag_pattern + 答案校验把关。
-    """
-    cat = str(getattr(question, "category", "")).lower()
-    if cat not in ("crypto", "misc", "forensics"):
-        return None
-    attach = _attachments(question)
-    if not attach:
-        return None
-    for a in attach:
-        p = str(a)
-        if not os.path.isfile(p) or os.path.getsize(p) > 8 * 1024 * 1024:
-            continue
-        # 廉价 JPEG 预检（SOI=FFD8 + 后续 marker 起始 FF），不对无关附件开火
-        try:
-            with open(p, "rb") as fh:
-                head = fh.read(3)
-        except OSError:
-            continue
-        if head[:2] != b"\xff\xd8" or head[2:3] != b"\xff":
-            continue
-        try:
-            res = await run_skill_isolated(
-                "skills.misc_jpeg_padding_stego", "run",
-                args=({"path": p},), timeout=WALLCLOCK_PAPAPAPA)
-        except SkillTimeout:
-            logger.info("[presolve:jpeg_padding_stego] %s 超时 %ds，子进程已终止",
-                        p, WALLCLOCK_PAPAPAPA)
-            continue
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("[presolve:jpeg_padding_stego] %s 异常: %s", p, exc)
-            continue
-        if not isinstance(res, dict):
-            continue
-        flag = res.get("flag")
-        if flag and _is_plausible_flag(str(flag)):
-            logger.info("[presolve:jpeg_padding_stego] %s 命中 flag=%s",
-                        getattr(question, "id", "?"), str(flag)[:60])
-            _save_candidates(question, [str(flag)])
-            return str(flag)
-    return None
-
-
-# pcap/pcapng 文件头魔数（EZRAT 路的廉价预检；与 skills/misc_pcap_ezrat_chat 一致：
-# 经典 pcap 小端/大端 × 微秒/纳秒四态 + pcapng SHB 0x0A0D0D0A）
-_PCAP_HEAD_MAGICS = (
-    b"\xd4\xc3\xb2\xa1", b"\xa1\xb2\xc3\xd4",
-    b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d",
-)
-
-
-async def _try_pcap_ezrat_chat(question) -> Optional[str]:
-    """EZRAT 系木马 C2 加密会话解密（2026-10-13 新增 · B 类静态求解）。
-
-    对「pcap 里有一整套攻击链、flag 拆段藏在木马 C2 通道」的题型做确定性
-    解出：skills/misc_pcap_ezrat_chat 纯标准库解析 pcap/pcapng → 重组
-    TCP 流 → 识别 EZRAT 报文帧（`<长度>\xa7<base64>` / 裸 base64）→ 从
-    附件字节提候选口令（.NET UTF-16 字串，16-32 位字母数字）→ PBKDF2
-    （家族常量 salt=Very_S3cr3t_S / SHA1 / 1000 轮，公开源码）派生
-    key+IV → 纯 Python AES-256-CBC 解密 → 同时解码 `powershell -encoded`
-    载荷 → 按「标签段 + 花括号片段」装配 flag。隔离子进程跑
-    （run_skill_isolated，墙钟 WALLCLOCK_EZRAT 真终止）。
-
-    触发面：category ∈ {misc, forensics} + 有 pcap/pcapng 附件
-    （魔数预检，≤8MB）。口令从附件字节现场提取（本题口令在 pcap 内
-    传输的 exe 里，UTF-16 存储），非读答案密钥；flag 提取只从解密
-    明文里取括号片段，天然不碰 pcap 文件头的 Npcap 设备 GUID 诱饵
-    (`\\Device\\NPF_{...}`，宽泛 flag 正则会误抓它）。
-
-    诚实口径：本路是「EZRAT 家族协议 + 公开源码常量」的确定性还原，
-    非 grep 明文；实测 cybench data_siege 解出 flag 且与题库
-    flag_sha256 逐字匹配。⚠️ 属 B1 工具链补齐产物，不代表 LLM 自主
-    能力。命中由下游 flag_pattern + 答案校验把关。
-    """
-    cat = str(getattr(question, "category", "")).lower()
-    if cat not in ("misc", "forensics"):
-        return None
-    attach = _attachments(question)
-    if not attach:
-        return None
-    for a in attach:
-        p = str(a)
-        if not os.path.isfile(p) or os.path.getsize(p) > 8 * 1024 * 1024:
-            continue
-        # 廉价 pcap 预检（经典 pcap 四态魔数 / pcapng SHB），不对无关附件开火
-        try:
-            with open(p, "rb") as fh:
-                head = fh.read(4)
-        except OSError:
-            continue
-        if not (head in _PCAP_HEAD_MAGICS or head == b"\x0a\x0d\x0d\x0a"):
-            continue
-        try:
-            res = await run_skill_isolated(
-                "skills.misc_pcap_ezrat_chat", "run",
-                args=({"path": p},), timeout=WALLCLOCK_EZRAT)
-        except SkillTimeout:
-            logger.info("[presolve:pcap_ezrat_chat] %s 超时 %ds，子进程已终止",
-                        p, WALLCLOCK_EZRAT)
-            continue
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("[presolve:pcap_ezrat_chat] %s 异常: %s", p, exc)
-            continue
-        if not isinstance(res, dict):
-            continue
-        flag = res.get("flag")
-        if flag and _is_plausible_flag(str(flag)):
-            logger.info("[presolve:pcap_ezrat_chat] %s 命中 flag=%s",
-                        getattr(question, "id", "?"), str(flag)[:60])
-            _save_candidates(question, [str(flag)])
-            return str(flag)
-    return None
-
-
-async def _try_deflate_huffman_flag(question) -> Optional[str]:
-    """David and the Tree（DEFLATE 动态 Huffman 树隐码，2026-10-13 B1）。
-
-    触发面：ZIP 附件（magic ``PK\x03\x04``）。交给
-    :func:`skills.misc_deflate_huffman_flag.run` 按 RFC 1951 位级语法
-    解析：ZIP EOCD → 中央目录（权威 csz/本地头偏移）→ 逐条目 deflate
-    流 → 动态 Huffman 块头 → 规范码表 → 取符号 69（'E'）的码，
-    ``& 0xFF`` 后 8 位逆序得 ASCII，按条目序拼 flag。
-
-    题型本质：ZIP 内是 lipogram 小说（全文无字母 E），缺失的 E 被
-    人工写进每条目的 Huffman 树——正常编码器绝不会给未出现的符号
-    分配码，该码即隐写信道。skill 内置 lipogram（解压文本 E 占比
-    ≤1e-3）与 E 码长（≤9 位）双守卫 + fail-closed 拼装语义。
-
-    诚实口径：本路是「RFC 1951 位级语法 + 规范 Huffman 构造」的
-    确定性实现，非 grep 明文、非读答案文件；实测 Google CTF 2021
-    David and the Tree 解出 flag 且与题库 flag_sha256 逐字匹配。
-    ⚠️ 属 B1 工具链补齐产物，不代表 LLM 自主能力。命中由下游
-    flag_pattern + 答案校验把关。
-    """
-    cat = str(getattr(question, "category", "")).lower()
-    if cat not in ("misc", "forensics"):
-        return None
-    attach = _attachments(question)
-    if not attach:
-        return None
-    for a in attach:
-        p = str(a)
-        if not os.path.isfile(p) or os.path.getsize(p) > 8 * 1024 * 1024:
-            continue
-        # 廉价 ZIP 预检（本地文件头魔数），不对无关附件开火
-        try:
-            with open(p, "rb") as fh:
-                head = fh.read(4)
-        except OSError:
-            continue
-        if head != b"PK\x03\x04":
-            continue
-        try:
-            res = await run_skill_isolated(
-                "skills.misc_deflate_huffman_flag", "run",
-                args=({"path": p},), timeout=WALLCLOCK_DEFLATE)
-        except SkillTimeout:
-            logger.info("[presolve:deflate_huffman] %s 超时 %ds，子进程已终止",
-                        p, WALLCLOCK_DEFLATE)
-            continue
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("[presolve:deflate_huffman] %s 异常: %s", p, exc)
-            continue
-        if not isinstance(res, dict):
-            continue
-        flag = res.get("flag")
-        if flag and _is_plausible_flag(str(flag)):
-            logger.info("[presolve:deflate_huffman] %s 命中 flag=%s",
-                        getattr(question, "id", "?"), str(flag)[:60])
-            _save_candidates(question, [str(flag)])
-            return str(flag)
-    return None
-
-
-async def _try_enigma_crib(question) -> Optional[str]:
-    """Enigma M3 已知明文 crib 分层海选（2026-10-14 B1 第八道）。
-
-    触发面：category ∈ {crypto, misc} + 附件为长字母文本（≥500 大写字母，
-    ≤8MB）。交给 :func:`skills.crypto_enigma_crib.run`：crib 匹配数分层
-    海选（numpy 向量化 210 海军约束序 × 26³ 位置，环 AAA 空插板）→
-    环量扫描 → 插板爬山（crib 匹配评分）→ 2641/2641 逐字母校验 →
-    归一化设置串派生 Fernet 密钥（PBKDF2-SHA256 390000 轮）解密同目录
-    flag.fernet.txt → 德语指令文本解析 flag。隔离子进程跑
-    （run_skill_isolated，墙钟 WALLCLOCK_ENIGMA 真终止）。
-
-    题型本质：M3 Enigma（转子 I-VIII / 反射器 B / 10 插板对）flag 消息。
-    插板使「无插板解密」不是明文置换（IoC 信号 0.0405 vs 0.0385 被稀释，
-    10-09 实证），故用公开 crib + 匹配数评分；crib 为本题开发期标定的
-    已知明文（挑战公开仓库数据），密钥由求解器搜索恢复，未内嵌设置/flag。
-
-    诚实口径：本路是「crib 匹配数分层海选 + 插板爬山」的确定性实现，
-    非读答案文件；实测 Google CTF 2022 enigma 恢复官方设置串逐字一致、
-    解出 flag 且与题库 flag_sha256 逐字匹配。⚠️ 属 B1 工具链补齐产物，
-    不代表 LLM 自主能力。命中由下游 flag_pattern + 答案校验把关。
-    """
-    cat = str(getattr(question, "category", "")).lower()
-    if cat not in ("crypto", "misc"):
-        return None
-    attach = _attachments(question)
-    if not attach:
-        return None
-    # 展平：附件可能是目录（如 enigma 题的 messages/），浅walk 取文件
-    candidates = []
-    for a in attach:
-        p = str(a)
-        if os.path.isdir(p):
-            for root, _dirs, files in os.walk(p):
-                for fn in files:
-                    candidates.append(os.path.join(root, fn))
-        else:
-            candidates.append(p)
-    for p in candidates:
-        if not os.path.isfile(p) or os.path.getsize(p) > 8 * 1024 * 1024:
-            continue
-        # 廉价预检：长字母文本（密文为 A-Z 流；skill 内再做 crib 长度比对）
-        try:
-            with open(p, "rb") as fh:
-                blob = fh.read()
-        except OSError:
-            continue
-        if sum(1 for c in blob if 65 <= c <= 90) < 500:
-            continue
-        try:
-            res = await run_skill_isolated(
-                "skills.crypto_enigma_crib", "run",
-                args=({"path": p},), timeout=WALLCLOCK_ENIGMA)
-        except SkillTimeout:
-            logger.info("[presolve:enigma_crib] %s 超时 %ds，子进程已终止",
-                        p, WALLCLOCK_ENIGMA)
-            continue
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("[presolve:enigma_crib] %s 异常: %s", p, exc)
-            continue
-        if not isinstance(res, dict):
-            continue
-        flag = res.get("flag")
-        if flag and _is_plausible_flag(str(flag)):
-            logger.info("[presolve:enigma_crib] %s 命中 flag=%s",
-                        getattr(question, "id", "?"), str(flag)[:60])
-            _save_candidates(question, [str(flag)])
-            return str(flag)
     return None
