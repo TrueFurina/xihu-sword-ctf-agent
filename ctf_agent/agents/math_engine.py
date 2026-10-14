@@ -106,7 +106,15 @@ class MathEngineMatrix:
             "rsa_chain", "lfsr", "reverse_static",
             "crypto_pkcs1_oracle", "crypto_high_exponent",
             "web_source_audit_cms",
-            "misc_decode", "misc_zip", "misc_bigfile_lime",
+            # ⚠️ 顺序即正确性（2026-10-15 实测）：misc_zip 必须**先于** misc_decode。
+            # 套娃 zip 题（真题库 10663 形态）的真 flag 编码在**文件名链**里，而最
+            # 内层 flag.txt 是**诱饵**（实测样本 `DASCTF{ni_cai?}`）。misc_decode
+            # 走 deterministic_decode_adapter 的 direct_search，**直接正则扫 zip 内
+            # 文本** ⇒ 0.0s 抢先命中诱饵即 return，真解路径 misc_zip（实测 0.04s
+            # 出真 flag）**永远拿不到机会跑** ⇒ 该题恒提交错 flag 且日志显示"命中"。
+            # 提前成本实测≈0（一层 zip 明文 0.02s / zip 内无 flag 0.00s / 纯文本
+            # 附件 0.00s 秒返 None 后回落 misc_decode，行为不变）。
+            "misc_zip", "misc_decode", "misc_bigfile_lime",
         ]
 
 
