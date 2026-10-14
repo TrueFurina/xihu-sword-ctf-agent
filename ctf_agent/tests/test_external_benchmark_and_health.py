@@ -84,6 +84,48 @@ class TestLedgerExclusionSource(unittest.TestCase):
                         "台账题 id 没进排除集——_seen_ids() 的 ledger 源又是死的")
 
 
+class TestPoolShrinkTransparency(unittest.TestCase):
+    """池缩小必须逐题有据可查（2026-10-15 ext_gctf2022_ocr 数据丢失事故护栏）。
+
+    事故链：源 JSON 位于 gitignore 的 data/ 下 → 10-12 删除事件永久丢失 →
+    10-13 重建时该题静默离开池子（53→51），全仓仅提交信息里一句"源 JSON
+    磁盘失踪"，没有任何机器可检的痕迹。本次经 HEAD benchmark 旧副本恢复
+    该题（载荷 sha256 逐字节比对上游 google-ctf misc-ocr 证实完好）后立此
+    护栏：池子每缩小一题，MANIFEST.dropped 必须记录离开原因；"源 JSON
+    失踪"类数据损失必须显式登记 KNOWN_DATA_LOSS，未登记即红（与合并闸门
+    LOST_PAYLOAD 同型的登记放行模式）。
+    """
+
+    def test_classify_dropped_records_reason_per_id(self):
+        dropped = bench.classify_dropped(
+            previous_ids={"a", "b", "c", "d"},
+            picked_ids={"a"},
+            seen={"b"},
+            skip_reasons={"c": "not_ok:leaky"},
+        )
+        self.assertEqual(dropped, {
+            "b": "already_solved_or_authorized",
+            "c": "failed_selection:not_ok:leaky",
+            "d": "source_json_missing",
+        })
+
+    def test_manifest_dropped_all_explained(self):
+        man = json.loads((ROOT / "benchmarks" / "external_unseen" / "MANIFEST.json")
+                         .read_text(encoding="utf-8"))
+        self.assertIn("dropped", man, "MANIFEST 必须记录 dropped（池缩小逐题明细）")
+        self.assertEqual(bench.dropped_problems(man["dropped"]), [],
+                         "存在无原因或未登记的数据损失")
+
+    def test_unregistered_data_loss_is_red(self):
+        problems = bench.dropped_problems({"x": "source_json_missing"})
+        self.assertTrue(problems, "未登记 KNOWN_DATA_LOSS 的 source_json_missing 必须判红")
+
+    def test_registered_data_loss_passes(self):
+        self.assertEqual(
+            bench.dropped_problems({"x": "source_json_missing"},
+                                   known_loss=bench.KNOWN_DATA_LOSS | {"x"}), [])
+
+
 class TestHealthBaselineGate(unittest.TestCase):
     def test_only_regressions_are_red(self):
         base = {"p": {"total": 10, "ok": 2, "leaky": 1, "broken": 7}}
