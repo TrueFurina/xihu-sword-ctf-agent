@@ -54,6 +54,7 @@ PAPAPAPA_QID = "ext_gctf2023_papapapa"
 DAVID_QID = "ext_gctf2021_david-and-the-tree"
 DATAIEGE_QID = ("ext_cybench_hackthebox_cyber_apocalypse_2024"
                 "_forensics_medium_data_siege")
+ENIGMA_QID = "ext_gctf2022_enigma"
 
 
 def _big(rng, bits=136):
@@ -84,7 +85,8 @@ def test_b1_skills_are_wired():
                     ("skills.crypto_zip_bkcrack", "_try_zip_bkcrack"),
                     ("skills.misc_jpeg_padding_stego", "_try_jpeg_padding_stego"),
                     ("skills.misc_pcap_ezrat_chat", "_try_pcap_ezrat_chat"),
-                    ("skills.misc_deflate_huffman_flag", "_try_deflate_huffman_flag")):
+                    ("skills.misc_deflate_huffman_flag", "_try_deflate_huffman_flag"),
+                    ("skills.crypto_enigma_crib", "_try_enigma_crib")):
         assert mod in wired, f"{mod} 未接线（只是库，不算能力）"
         assert callable(getattr(P, fn, None)), f"{fn} 未定义"
 
@@ -425,4 +427,27 @@ def test_presolve_data_siege_solves_real_problem_via_main_entry():
     assert truth, "题目缺 flag_sha256（真值源损坏？）"
     flag = asyncio.run(P.presolve(q, answers=preset_answers([q]), force=True))
     assert flag, "presolve 主入口未解出 data_siege（内部命中但被主入口闸丢弃？）"
+    assert hashlib.sha256(flag.encode()).hexdigest() == truth
+
+
+@pytest.mark.slow
+def test_presolve_enigma_solves_real_problem_via_main_entry():
+    r"""enigma（Enigma M3 crib 分层海选）端到端走 **presolve 主入口**。
+
+    必须验证整条生产链：隔离子进程 skill（numpy 海选 ~145-290s）+ flag_pattern
+    闸 + answer_check 闸 + sha256 仲裁。⚠️ 本题元数据 flag_pattern 是外部池
+    默认 ``flag\{[^}]+\}``，而真 flag 实为 ``CTF\{...\}``——靠 2026-10-05 的
+    sha256 旁路过闸；且本题附件（flag.ciphertext.txt）曾在 10-12 删除事件中
+    丢失、后从挑战公开仓库恢复（与古腾堡/仓库副本逐字一致），缺附件则 skip。
+    """
+    import asyncio
+
+    from eval.cases import preset_answers
+
+    q = _load(ENIGMA_QID)
+    assert q is not None, f"题库里找不到 {ENIGMA_QID}"
+    truth = str(getattr(q, "flag_sha256", "") or "")
+    assert truth, "题目缺 flag_sha256（真值源损坏？）"
+    flag = asyncio.run(P.presolve(q, answers=preset_answers([q]), force=True))
+    assert flag, "presolve 主入口未解出 enigma（内部命中但被主入口闸丢弃？）"
     assert hashlib.sha256(flag.encode()).hexdigest() == truth
