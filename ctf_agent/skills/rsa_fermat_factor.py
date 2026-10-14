@@ -312,17 +312,28 @@ def _wiener_attack(n: int, e: int, c: int) -> int:
 
 
 def _continued_fraction(e: int, n: int):
-    """连分数展开，返回 (k, d) 对。"""
+    """e/n 的连分数展开，返回收敛子列表 [(分子, 分母), ...]。
+
+    ⚠️ 修复（2026-10-15 实测）：原实现的递推初值写反了——
+    `num, den = 0, 1` / `num_prev, den_prev = 1, 0` 是**分母**序列的初值，
+    导致返回的 (num, den) 实际是 (分母, 分子)。`_wiener_attack` 按
+    `for k, d in cf` 解包，于是 k 拿到分母、d 拿到分子 ⇒ 判定
+    `(e*d - 1) % k == 0` 恒不成立 ⇒ **Wiener 攻击从未解出过任何题**
+    （实测 d/n 比值 0.18~0.25 全部返回 None，静默失败）。
+
+    标准递推：h_j = q_j·h_{j-1} + h_{j-2}，k_j = q_j·k_{j-1} + k_{j-2}
+    初值 h_{-2}=0, h_{-1}=1, k_{-2}=1, k_{-1}=0。
+    """
     cf = []
     a, b = e, n
     while b:
         q = a // b
         cf.append(q)
         a, b = b, a - q * b
-    # 收敛
+    # 收敛子（分子 num / 分母 den），初值按标准递推
     convs = []
-    num, den = 0, 1
-    num_prev, den_prev = 1, 0
+    num, den = 1, 0
+    num_prev, den_prev = 0, 1
     for q in cf:
         num, num_prev = q * num + num_prev, num
         den, den_prev = q * den + den_prev, den
