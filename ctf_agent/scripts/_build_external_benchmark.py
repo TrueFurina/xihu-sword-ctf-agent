@@ -89,11 +89,51 @@ def _seen_ids() -> set[str]:
     return seen
 
 
+# 已知数据损失登记表（与 _merge_gate.LOST_PAYLOAD 同型的"登记后放行"模式）：
+# 源 JSON 位于 gitignore 的 data/ 下，历史上发生过整题静默消失（2026-10-12
+# 删除事件致 ext_gctf2022_ocr 源 JSON 永久丢失，10-13 重建时静默离池，
+# 53→51 无任何机器痕迹）。登记=人工确认"该损失已知且暂时接受"；未登记的
+# source_json_missing 会被 tests/test_external_benchmark_and_health.py 判红。
+KNOWN_DATA_LOSS: frozenset[str] = frozenset()
+
+
+def classify_dropped(previous_ids: set[str], picked_ids: set[str],
+                     seen: set[str], skip_reasons: dict[str, str]) -> dict[str, str]:
+    """逐题判定离池原因。三类都必须可解释：
+    - already_solved_or_authorized：设计行为（解出即自动剔除）；
+    - failed_selection:<原因>：设计行为（本题未过选池规则，原因来自 skip_reasons）；
+    - source_json_missing：**数据损失**（上一版在池、本轮连源文件都发现不了），
+      必须登记 KNOWN_DATA_LOSS 方可放行。
+    """
+    dropped: dict[str, str] = {}
+    for qid in sorted(previous_ids - picked_ids):
+        if qid in seen:
+            dropped[qid] = "already_solved_or_authorized"
+        elif qid in skip_reasons:
+            dropped[qid] = f"failed_selection:{skip_reasons[qid]}"
+        else:
+            dropped[qid] = "source_json_missing"
+    return dropped
+
+
+def dropped_problems(dropped: dict[str, str],
+                     known_loss: set[str] | frozenset[str] = KNOWN_DATA_LOSS) -> list[str]:
+    """离池明细自检：无原因 / 未登记的数据损失 → 问题清单（空=通过）。"""
+    problems: list[str] = []
+    for qid, reason in sorted(dropped.items()):
+        if not reason:
+            problems.append(f"{qid}: 离池无原因记录")
+        elif reason == "source_json_missing" and qid not in known_loss:
+            problems.append(f"{qid}: 源 JSON 失踪且未登记 KNOWN_DATA_LOSS（数据损失）")
+    return problems
+
+
 def build() -> dict:
     aci = _load_auditor()
     seen = _seen_ids()
     picked: dict[str, dict] = {}
     skipped = Counter()
+    skip_reasons: dict[str, str] = {}
     for pool in SRC_POOLS:
         d = ROOT / "data" / pool
         if not d.is_dir():
@@ -104,21 +144,26 @@ def build() -> dict:
             qid = row["id"]
             if row["level"] != "ok":
                 skipped[f"not_ok:{row['level']}"] += 1
+                skip_reasons[qid] = f"not_ok:{row['level']}"
                 continue
             if qid in seen:
                 skipped["already_solved_or_authorized"] += 1
+                skip_reasons[qid] = "already_solved_or_authorized"
                 continue
             if qid in picked:
                 skipped["duplicate_id_across_pools"] += 1
+                skip_reasons[qid] = "duplicate_id_across_pools"
                 continue
             q = json.loads(Path(row["file"]).read_text(encoding="utf-8"))
             atts = list(q.get("attachments") or [])
             if not atts or not all((ROOT / a).is_file() for a in atts):
                 skipped["payload_missing"] += 1
+                skip_reasons[qid] = "payload_missing"
                 continue
             truth = str(q.get("flag_sha256") or q.get("flag") or "").strip().lower()
             if not HEX64.match(truth):
                 skipped["no_verifiable_truth"] += 1
+                skip_reasons[qid] = "no_verifiable_truth"
                 continue
             picked[qid] = {"id": qid, "category": q.get("category", "misc"),
                            "title": str(q.get("title") or "")[:120],
@@ -128,13 +173,24 @@ def build() -> dict:
                            "attachments": atts,
                            "difficulty": q.get("difficulty", "MEDIUM"),
                            "source_pool": pool}
-    return {"picked": picked, "skipped": dict(skipped), "seen_pool_size": len(seen)}
+    return {"picked": picked, "skipped": dict(skipped), "seen_pool_size": len(seen),
+            "skip_reasons": skip_reasons, "seen": seen}
 
 
 def write_manifest(built: dict) -> dict:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     qdir = OUT_DIR / "questions"
     qdir.mkdir(exist_ok=True)
+    # 先读旧 MANIFEST 的题单（rebuild 前的池），用于逐题判定离池原因；
+    # 缺文件时按空集处理（首次构建）。
+    mpath = OUT_DIR / "MANIFEST.json"
+    previous_ids: set[str] = set()
+    if mpath.is_file():
+        try:
+            previous_ids = set(json.loads(mpath.read_text(encoding="utf-8"))
+                               .get("question_ids", []))
+        except Exception:  # noqa: BLE001
+            previous_ids = set()
     for f in qdir.glob("*.json"):
         f.unlink()
     for qid, q in built["picked"].items():
@@ -161,7 +217,9 @@ def write_manifest(built: dict) -> dict:
         "source_pools": list(SRC_POOLS),
         "total": len(built["picked"]),
         "question_ids": sorted(built["picked"]),
-        "question_ids": sorted(built["picked"]),
+        "dropped": classify_dropped(previous_ids, set(built["picked"]),
+                                    built.get("seen", set()),
+                                    built.get("skip_reasons", {})),
         "by_category": dict(cats),
         "attachment_files": att_files,
         "excluded_seen_ids": built["seen_pool_size"],
@@ -215,6 +273,10 @@ def main() -> int:
     print(f"[bench] 已构建 {man['total']} 题 → {OUT_DIR}")
     print(f"[bench] 题型分布 {man['by_category']}")
     print(f"[bench] 排除统计 {man['skipped']}")
+    for qid, reason in sorted(man.get("dropped", {}).items()):
+        print(f"[bench] 离池 {qid}: {reason}")
+    for p in dropped_problems(man.get("dropped", {})):
+        print(f"[bench] ⚠️ {p}")
     return 0
 
 
