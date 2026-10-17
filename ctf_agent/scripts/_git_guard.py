@@ -194,6 +194,46 @@ def check_l0(git_dir: str) -> list[dict]:
     ]
 
 
+def check_core_bare(git_dir: str) -> dict:
+    """core.bare 健康判据（纯文件系统，**零 git 依赖**；2026-10-12 防复发）。
+
+    事故（2026-10-11 时间窗内复现两次）：真实 commit 时 git 向钩子导出 `GIT_DIR`，
+    ⑥ 中「在 tmp_path 构造临时仓库」的用例继承后把**主仓共享 `.git/config`** 改写成
+    `core.bare = true`（并附 `user.name = d`）。此后主工作树被 git 判为 bare ——
+    `git status` 报 `fatal: this operation must be run in a work tree`、merge/status
+    全部失效，且 git GUARD 的 L0 四查全是「文件在不在」，**看不出这个语义损坏**。
+
+    本判据补这一刀：只要 `[core] bare = true` 即判不健康，fail-closed。
+    config 不存在/不可读时判 ok=True —— 不误伤 `test_git_guard.py` 里没有 config 的假 .git 夹具。
+
+    返回 {"id","ok","detail"}，形状与 L0 各项一致，便于统一渲染。
+    """
+    cfg = _read_text(os.path.join(git_dir, "config"))
+    if cfg is None:
+        return {"id": "core-bare", "ok": True,
+                "detail": "config 不存在/不可读，跳过 core.bare 判定"}
+    section = ""
+    bare = False
+    for raw in cfg.splitlines():
+        line = raw.strip()
+        if not line or line[0] in "#;":
+            continue
+        m = re.match(r"^\[([^\]]+)\]", line)
+        if m:
+            section = m.group(1).strip().lower()
+            continue
+        if section.split()[:1] != ["core"]:
+            continue
+        m2 = re.match(r"^bare\s*=\s*(\S+)", line, re.IGNORECASE)
+        if m2:
+            bare = m2.group(1).strip().lower() in ("true", "yes", "on", "1")
+    if bare:
+        return {"id": "core-bare", "ok": False,
+                "detail": "core.bare=true（事故特征：主工作树被误标为 bare，git status/merge 全部失效）。"
+                          "处置：git config --local core.bare false"}
+    return {"id": "core-bare", "ok": True, "detail": "core.bare 未置 true（正常）"}
+
+
 def all_ok(results: list[dict]) -> bool:
     return all(bool(r.get("ok")) for r in results)
 
@@ -449,19 +489,23 @@ def main(argv: list[str] | None = None) -> int:
         print("✅ 重建后仓库健康" if ok else "❌ 重建后仍不健康，请人工介入")
         return 0 if ok else 1
 
-    # ── 默认：L0（+L1）健康检查 ──
+    # ── 默认：L0 + core.bare（+L1）健康检查 ──
     l0 = check_l0(git_dir)
-    ok = all_ok(l0)
+    core_bare = check_core_bare(git_dir)
+    ok = all_ok(l0) and core_bare["ok"]
     l1: list[dict] = []
     if args.l1 and ok:
         l1 = check_l1(git_dir, explicit=explicit, deep=True)
         ok = ok and all_ok(l1)
 
     if args.json:
-        print(json.dumps({"git_dir": git_dir, "ok": ok, "l0": l0, "l1": l1},
+        print(json.dumps({"git_dir": git_dir, "ok": ok, "l0": l0,
+                          "core_bare": core_bare, "l1": l1},
                          ensure_ascii=False, indent=2))
     else:
         print_report(l0, git_dir, quiet=args.quiet)
+        if not core_bare["ok"]:
+            print(f"❌ L0[{core_bare['id']}] {core_bare['detail']}")
         for r in l1:
             print(f"{'✅' if r.get('ok') else '❌'} L1[{r['id']}] {r['detail']}")
     return 0 if ok else 1
