@@ -57,24 +57,44 @@ def _matches(cand: bytes, truth: str) -> bool:
     return bool(m) and sha_hex(m.group(1)) == truth
 
 
+def _resolve_attachment(rel: str, fp: Path, root: Path,
+                        att_root: "Path | None" = None) -> "Path | None":
+    """解析单个附件声明路径 → 磁盘实际文件；找不到返回 None。
+
+    解析候选序（单一事实源，`missing_attachments` 与 `audit_question` 共用，
+    避免「两处各写一遍」的判定漂移）：
+      base=CWD(仓库根) → 绝对路径自身 → 题库根 → 仓库根 → base.parent
+    """
+    base = att_root or Path.cwd()
+    cands = [base / rel, Path(rel), root / rel, root.parent / rel, base.parent / rel]
+    return next((c for c in cands if c.is_file()), None)
+
+
+def missing_attachments(q: dict, fp: Path, root: Path,
+                        att_root: "Path | None" = None) -> "list[str]":
+    """返回题面声明了、但磁盘上找不到的附件清单（**逐文件**，非「全缺才算」）。
+
+    为什么必须逐文件（2026-10-14 实证）：能力分母 heldout_candidates=1 的
+    `real_reverse_js` 声明 2 个附件、只缺 1 个（flag 源头 index.html，10-12 删除
+    事件永久丢失）—— 按「全缺才算」判定它是健康的，而它结构上不可解。
+    缺一个就足够让 0/N 被误读成「模型能力失败」。
+    """
+    return [str(rel) for rel in (q.get("attachments") or [])
+            if _resolve_attachment(str(rel), fp, root, att_root) is None]
+
+
 def audit_question(q: dict, fp: Path, root: Path, att_root: Path | None = None) -> dict:
     qid = str(q.get("id") or fp.stem)
     truth = str(q.get("flag_sha256") or "").strip().lower()
     flag_field = str(q.get("flag") or "").strip().lower()
     if not truth and HEX64.match(flag_field):
         truth = flag_field  # flag 字段本身是 sha256 占位
-    base = att_root or Path.cwd()
     issues, atts = [], list(q.get("attachments") or [])
     payload_on_disk, keyish, leak = 0, 0, False
     for rel in atts:
-        # 题库里的附件路径是相对**仓库根**（如 data/questions_real/_attachments/...），
-        # 初版按题库目录拼接 → 93 题全报 payload_missing（假阳性）。改为多候选探测：
-        # 先按 CWD（仓库根）解析，再退回题库根，任一命中即算存在。
-        # 2026-10-12：个别题目（real_reverse_vnctf_cm1）的附件路径带 ctf_agent/ 前缀
-        # （仓根相对），而调用方 att_root 传的正是 ctf_agent 目录 → 前四候选全部落空
-        # → 假 payload_missing。补 base.parent（仓库根）候选覆盖该形态。
-        cands = [base / rel, Path(rel), root / rel, root.parent / rel, base.parent / rel]
-        p = next((c for c in cands if c.is_file()), None)
+        # 多候选解析的历史坑（2026-10-12 real_reverse_vnctf_cm1：附件路径带
+        # ctf_agent/ 前缀而 att_root 已是 ctf_agent）见 `_resolve_attachment` 注释。
+        p = _resolve_attachment(str(rel), fp, root, att_root)
         if p is None:
             continue
         payload_on_disk += 1

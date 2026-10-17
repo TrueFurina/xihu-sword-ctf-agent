@@ -41,7 +41,18 @@ import _git_guard  # noqa: E402 - 同目录模块，import 前需先补 sys.path
 import _git_snapshot  # noqa: E402
 
 
-def sh(cmd, cwd=ROOT, timeout=600):
+# ── 时间预算（2026-10-14 用户授权校准，实测基线，禁拍脑袋）────────────────
+# 全量 `-m "not slow"` 套件独立实跑实测：572.4s（不带 -o）/ 495.4s（带
+# -o tmp_path_retention_count=100000），1804 passed —— 早就不是本文件旧注释里写的
+# "~30s"。原写死 600s 只剩 3–5% 余量，钩子内再叠加 KPI 真值回归的串行开销后
+# 必然 TimeoutExpired（同日三次合并两次被掐，全部与被测改动无关 ⇒ 属假红）。
+# 按 ~3× 实测基线放宽到 1800s：**超时仍在、fail-closed 不变**，只是预算校到真值。
+# 后续套件再涨到此量级须重新校准，不得无限上调。
+_SH_TIMEOUT_DEFAULT = 1800
+_PYTEST_FULL_TIMEOUT = 1800
+
+
+def sh(cmd, cwd=ROOT, timeout=_SH_TIMEOUT_DEFAULT):
     return subprocess.run(cmd, cwd=cwd, capture_output=True, timeout=timeout,
                           text=True, encoding="utf-8", errors="replace")
 
@@ -393,7 +404,8 @@ def regression_check() -> bool:
         try:
             r = sh(item["cmd"])
         except subprocess.TimeoutExpired:
-            print(f"❌ 回归超时（>600s）：{item['id']}——skill/verify 链路异常")
+            print(f"❌ 回归超时（>{_SH_TIMEOUT_DEFAULT}s）：{item['id']}"
+                  f"——skill/verify 链路异常")
             ok = False
             continue
         hit = item["flag_contains"] in (r.stdout or "")
@@ -507,7 +519,8 @@ def _pytest_stats() -> dict | None:
     py = os.path.join(ROOT, ".venv", "Scripts", "python.exe")
     if not os.path.exists(py):
         py = sys.executable
-    r = sh([py, "-m", "pytest", "tests/", "-q", "-m", "not slow"])
+    r = sh([py, "-m", "pytest", "tests/", "-q", "-m", "not slow"],
+           timeout=_PYTEST_FULL_TIMEOUT)
     tail = (r.stdout or "")[-1500:]
     m = re.search(r"(\d+) passed", tail)
     if not m:
@@ -617,7 +630,7 @@ def kpi_check() -> bool:
 def full_tests() -> bool:
     """全量测试门禁：pytest tests/ -m "not slow"。通过后把测试数写入 KPI 基线
     （测试基线漂移检测：278→271 类下降在看板暴露并须解释，2026-08-24 锐评⑦）。"""
-    print("── 全量测试（merge 级门禁，~30s）──")
+    print("── 全量测试（merge 级门禁，实测 ~8–10min，预算 %ds）──" % _PYTEST_FULL_TIMEOUT)
     ts = _pytest_stats()
     if ts is None:
         print("❌ 全量测试解析失败：pytest 未产出 passed 数")

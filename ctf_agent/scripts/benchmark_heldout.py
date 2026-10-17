@@ -39,6 +39,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
@@ -52,6 +53,14 @@ ROOT = Path(__file__).resolve().parent.parent
 # 让 `python scripts/benchmark_heldout.py` 也能 import scripts 包下的模块
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+logger = logging.getLogger(__name__)
+
+# 载荷完整性：复用语料审计器里唯一的附件解析真值源（逐文件缺失判定），
+# 禁止在本文件重写解析规则（两份实现必然漂移——㉚ 模仿实现的自检不算守卫）。
+from scripts._audit_corpus_integrity import (  # noqa: E402 - 需在 sys.path 注入后导入
+    missing_attachments as _missing_attachments,
+)
 
 
 def _path_rel(p) -> str:
@@ -326,7 +335,8 @@ def _is_writeup_reconstructed(q: dict) -> bool:
 
 def select_candidates(require_sha256: bool = True,
                       include_neutralized: bool = False,
-                      external_dir: "Path | None" = None) -> tuple[list[dict], list[dict]]:
+                      external_dir: "Path | None" = None,
+                      require_payload: bool = False) -> tuple[list[dict], list[dict]]:
     """返回 (候选池, 全部记录含排除原因)。
 
     include_neutralized=True 时：不再排除「答案泄露」题（flag.txt 附件 / 题面明文 flag），
@@ -347,6 +357,13 @@ def select_candidates(require_sha256: bool = True,
     reverse/crypto/pwn 题「挑战文件内嵌 flag」的误判，如 real_reverse_js 的 flag 在 coso.js）。
     该差异正是 _kpi_canonical 中 heldout_candidates(能力分母) 与
     heldout_runnable_pool(可选跑池) 的区分来源。
+    ⚠️ 2026-10-14 载荷完整性（ITEM4）：`scripts/_audit_corpus_integrity.py` 早就能判
+    `payload_missing`，但**能力分母的生产入口从不查它**——完整性结论到不了测量入口
+    （能力分母 heldout_candidates=1 的 real_reverse_js，其 flag 源头 index.html 已在
+    10-12 删除事件中永久丢失 ⇒ 结构上不可解，却一直被当作可测题）。
+    现每题计算**逐文件**缺失清单写进记录 `payload_missing` 字段；仅在显式开关
+    `require_payload=True` 时才作为排除原因 `payload-missing(unmeasurable)`。
+    默认 False＝**只标记不剔除**，能力分母口径不变（口径变更须用户授权）。
     """
     # 机器真值：14 个已训练题（KPI 口径）
     try:
@@ -382,6 +399,12 @@ def select_candidates(require_sha256: bool = True,
             validatable = bool(q.get("flag_sha256")) or (include_neutralized and has_plain)
             # desc_leak 一次性算出，排除链与 rec 字段共用（清单命中为 O(1) 集合查询）
             desc_leak = _is_desc_leak(q, qid)
+            # 逐文件载荷缺失（源文件失踪 ⇒ 结构上不可解，详见 docstring 2026-10-14 条目）
+            try:
+                missing_payload = _missing_attachments(q, jf, qdir)
+            except Exception as _exc:  # noqa: BLE001 - 缺依赖/坏路径不得炸掉整个选题
+                logger.warning("[select] %s 载荷完整性检查失败(按健康处理): %s", qid, _exc)
+                missing_payload = []
             reason_excluded = None
             if qid in trained:
                 reason_excluded = "trained(KPI)"
@@ -403,6 +426,9 @@ def select_candidates(require_sha256: bool = True,
                 reason_excluded = "source-leaked-flag(sha256-in-attachment)"
             elif require_sha256 and not validatable:
                 reason_excluded = "no-flag_sha256(unvalidatable)"
+            elif require_payload and missing_payload:
+                # 仅在显式开关下剔除：默认只标记（口径变更需授权）
+                reason_excluded = "payload-missing(unmeasurable)"
             rec = {
                 "id": qid,
                 "path": _path_rel(jf),
@@ -415,6 +441,7 @@ def select_candidates(require_sha256: bool = True,
                 "leaked_attachment": _is_leaked_attachment(q),
                 "known_leak": _is_leaked_attachment(q),
                 "desc_leak": desc_leak,
+                "payload_missing": missing_payload,
                 "excluded": reason_excluded,
             }
             all_recs.append(rec)

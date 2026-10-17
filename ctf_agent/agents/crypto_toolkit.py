@@ -1110,6 +1110,77 @@ def _bacon_decode(seq: str) -> dict:
     return {"ok": True, "flag": text, "flags": flags, "method": "bacon_decode"}
 
 
+_EN_FREQ = {'e': 12.7, 't': 9.1, 'a': 8.2, 'o': 7.5, 'i': 7.0, 'n': 6.7,
+            's': 6.3, 'h': 6.1, 'r': 6.0, 'd': 4.3, 'l': 4.0, 'c': 2.8,
+            'u': 2.8, 'm': 2.4, 'w': 2.4, 'f': 2.2, 'g': 2.0, 'y': 2.0,
+            'p': 1.9, 'b': 1.5, 'v': 1.0, 'k': 0.8, 'j': 0.15, 'x': 0.15,
+            'q': 0.1, 'z': 0.07}
+
+
+def _vigenere_crack(cipher: str, key_len: int = 0, max_key_len: int = 12) -> str:
+    """维吉尼亚**无密钥**破解：卡方频率分析逐位恢复密钥后解密。
+
+    ⚠️ 为什么要有这个函数（2026-10-15 实测）：`fast_solve("vigenere")` 原本调用
+    `vigenere_crack(...)`，但这个名字只存在于 `attack_templates` 的**字符串模板**
+    里（供 LLM 沙盒 exec 用），本模块从未定义 ⇒ 必抛 `NameError`，又被 `fast_solve`
+    的 `except Exception` 静默吞掉 ⇒ **所有维吉尼亚题 0 解出且无任何报错**。
+    此处把模板里的实现落地为真实函数，使该分支至少能跑完并给出结果。
+
+    局限（诚实标注）：卡方频率分析只对**较长英文文本**可靠；CTF 的 flag 密文通常
+    只有十几个字母，破解会失败 ⇒ 返回的字符串不含 `flag{...}`，调用方据此判定
+    未命中，不会误报。
+    """
+    letters = [c for c in cipher if c.isalpha()]
+    if not letters:
+        return ""
+
+    def chi2(text):
+        n = len(text)
+        if n == 0:
+            return 1e9
+        total = 0.0
+        for l, p in _EN_FREQ.items():
+            exp = n * p / 100
+            obs = text.count(l)
+            if exp > 0:
+                total += (obs - exp) ** 2 / exp
+        return total
+
+    def decrypt(text, key):
+        out, ki = [], 0
+        for ch in text:
+            if ch.isalpha():
+                base = ord('A') if ch.isupper() else ord('a')
+                shift = ord(key[ki % len(key)].upper()) - ord('A')
+                ki += 1
+                out.append(chr((ord(ch) - base - shift) % 26 + base))
+            else:
+                out.append(ch)
+        return ''.join(out)
+
+    best_result = ""
+    lengths = [key_len] if key_len else range(1, max_key_len + 1)
+    for klen in lengths:
+        key = ""
+        for pos in range(klen):
+            group = [c.lower() for c in letters[pos::klen]]
+            best = (1e18, 'A')
+            for shift in range(26):
+                dec = ''.join(chr((ord(ch) - ord('a') - shift) % 26 + ord('a'))
+                              for ch in group)
+                sc = chi2(dec)
+                if sc < best[0]:
+                    best = (sc, chr(ord('A') + shift))
+            key += best[1]
+        plain = decrypt(cipher, key)
+        if "flag" in plain.lower():
+            return plain
+        if not best_result or len([c for c in plain if c.isalpha()]) > len(
+                [c for c in best_result if c.isalpha()]):
+            best_result = plain
+    return best_result
+
+
 def fast_solve(kind: str = "", **params) -> dict:
     """crypto 高频题型一键直出（识别题型即出答案，减少 LLM 轮次——提速二）。
 
@@ -1146,8 +1217,35 @@ def fast_solve(kind: str = "", **params) -> dict:
         if kind in ("bacon", "培根", "ab序列", "A/B"):
             return _bacon_decode(str(params.get("s", "")))
         if kind in ("vigenere", "维吉尼亚"):
-            r = vigenere_crack(str(params.get("s", "")))
-            return {"ok": bool(r), "flag": r, "method": "vigenere_crack"}
+            # ⚠️ 修复（2026-10-15）：原实现 `vigenere_crack(...)` 只是 attack_templates
+            # 的**字符串模板**，本模块从未定义 ⇒ 必抛 NameError，被外层 except
+            # 静默吞掉 ⇒ 维吉尼亚题恒 0 解出、日志无痕（同类坑已第 4 次：
+            # decode_multi_layer / crack_hash / common_modulus）。
+            # 现改为：有 key → skills.vigenere_decode（精确）；无 key →
+            # 落地后的 _vigenere_crack（频率分析，可能失败但不再静默崩溃）。
+            import re as _vre
+            s = str(params.get("s", "") or "")
+            key = str(params.get("key", "") or "")
+            if not key:
+                km = _vre.search(r"key\s*[:：=]\s*([A-Za-z]+)", s, _vre.I)
+                if km:
+                    key = km.group(1)
+            if key:
+                try:
+                    from skills.vigenere_decode import run as _vig_run
+                    r = _vig_run({"text": s, "key": key})
+                    if isinstance(r, dict) and r.get("ok"):
+                        plain = str(r.get("decoded", ""))
+                        flags = _vre.findall(r"flag\{[^}\s]{3,}\}", plain, _vre.I)
+                        return {"ok": True, "flag": plain, "flags": flags,
+                                "method": "vigenere_decode"}
+                    return {"ok": False, "note": "vigenere 解码失败（有 key）"}
+                except Exception as _exc:  # noqa: BLE001 - skill 异常不得静默
+                    return {"ok": False, "note": f"vigenere skill 异常: {_exc}"}
+            plain = _vigenere_crack(s)
+            flags = _vre.findall(r"flag\{[^}\s]{3,}\}", plain, _vre.I) if plain else []
+            return {"ok": bool(plain), "flag": plain, "flags": flags,
+                    "method": "vigenere_crack"}
         if kind in ("common_modulus", "共模", "c_mod"):
             # 内联共模攻击（common_modulus 是 attack_templates 字符串模板非真实函数——
             # 同 decode_multi_layer/crack_hash 教训：不依赖不存在的模块函数）
@@ -1183,9 +1281,36 @@ def fast_solve(kind: str = "", **params) -> dict:
                     hi = mid - 1
             return {"ok": False, "note": "非整数 e 次方根——可能需其他小指数攻击"}
         if kind in ("wiener", "wiener攻击"):
-            return {"ok": True, "flag": wiener_attack(
-                int(params["n"]), int(params["e"]), int(params["c"])),
-                "method": "wiener_attack"}
+            # ⚠️ 修复（2026-10-15）：原实现 `wiener_attack(...)` 同样是 attack_templates
+            # 字符串模板里的名字，本模块未定义 ⇒ 必抛 NameError 被静默吞掉。
+            # 改接真实实现 skills.rsa_fermat_factor（attack="wiener"）。
+            try:
+                n = int(params.get("n") or 0)
+                e = int(params.get("e") or 0)
+                c = int(params.get("c") or 0)
+            except (TypeError, ValueError):
+                return {"ok": False, "note": "wiener 参数 n/e/c 非整数"}
+            if not (n and e and c):
+                return {"ok": False, "note": "wiener 缺参数 n/e/c"}
+            try:
+                from skills.rsa_fermat_factor import run as _rsa_run
+                m = _rsa_run({"n": n, "e": e, "c": c, "attack": "wiener"})
+            except Exception as _exc:  # noqa: BLE001 - skill 异常不得静默
+                return {"ok": False, "note": f"wiener skill 异常: {_exc}"}
+            if m is None:
+                return {"ok": False, "note": "wiener 未解出"}
+            import re as _wre
+            # skill 返回可能是 int（明文整数）或 bytes（已解码明文）
+            if isinstance(m, bytes):
+                raw = m.decode("utf-8", errors="ignore")
+            elif isinstance(m, int):
+                raw = m.to_bytes((m.bit_length() + 7) // 8, "big").decode(
+                    "utf-8", errors="ignore")
+            else:
+                raw = str(m)
+            flags = _wre.findall(r"flag\{[^}\s]{3,}\}", raw, _wre.I)
+            return {"ok": True, "flag": raw, "flags": flags,
+                    "method": "wiener_attack"}
         if kind in ("hash", "哈希", "hash_crack"):
             # 内联哈希爆破（crack_hash 是 attack_templates 字符串模板非真实函数——
             # 同 decode_multi_layer 教训：不依赖不存在的模块函数）
@@ -1219,18 +1344,34 @@ def fast_solve(kind: str = "", **params) -> dict:
             return {"ok": False, "note": "弱密码字典未命中——需更大字典"}
         if kind in ("morse", "摩斯", "摩斯电码"):
             # 摩斯电码解码（. - 点划 → 字母——高频 misc 题型秒解）
-            code = {".": "E", "-": "T", ".-": "A", "-...": "B", "-.-.": "C",
-                    "-..": "D", "..": "I", "--.": "G", "....": "H", ".---": "J",
-                    "-.-": "K", ".-..": "L", "--": "M", "-.": "N", "---": "O",
-                    ".--.": "P", "--.-": "Q", ".-.": "R", "...": "S", "..-": "U",
-                    "...-": "V", ".--": "W", "-..-": "X", "-.--": "Y", "--..": "Z"}
-            import re
+            # ⚠️ 修复（2026-10-15 实测）：原内联码表缺 `F`（..-.）且**完全没有数字
+            # 0-9**，未知 token 又用 `.get(tok, "")` **静默丢弃** ⇒ 不报错、只悄悄
+            # 少字：实测 `flagmorse`→`LAGMORSE`、`m0rse2026`→`MRSE`。
+            # 而 skills.morse_decoder 有完整码表（A-Z + 0-9），这条路径却没用它
+            # ——又一次「声明已覆盖、实际用残缺版」。现改为复用同一份表。
+            import re as _mre
+            try:
+                from skills.morse_decoder import MORSE_TABLE as _MORSE
+            except Exception:  # noqa: BLE001 - 导入失败回退到内联完整表
+                _MORSE = {
+                    '.-': 'a', '-...': 'b', '-.-.': 'c', '-..': 'd', '.': 'e',
+                    '..-.': 'f', '--.': 'g', '....': 'h', '..': 'i', '.---': 'j',
+                    '-.-': 'k', '.-..': 'l', '--': 'm', '-.': 'n', '---': 'o',
+                    '.--.': 'p', '--.-': 'q', '.-.': 'r', '...': 's', '-': 't',
+                    '..-': 'u', '...-': 'v', '.--': 'w', '-..-': 'x', '-.--': 'y',
+                    '--..': 'z', '-----': '0', '.----': '1', '..---': '2',
+                    '...--': '3', '....-': '4', '.....': '5', '-....': '6',
+                    '--...': '7', '---..': '8', '----.': '9',
+                }
             s = str(params.get("s", ""))
             out = []
-            for tok in re.split(r"[ /]+", s.strip()):
-                out.append(code.get(tok, ""))
+            for tok in _mre.split(r"[ /]+", s.strip()):
+                if not tok:
+                    continue
+                # 未知 token 用 '?'（与 skills.morse_decoder 一致）——不静默丢弃
+                out.append(_MORSE.get(tok, "?"))
             text = "".join(out)
-            flags = re.findall(r"(?:flag|ctf|DASCTF)\{[^}\s]{3,}\}", text.lower())
+            flags = _mre.findall(r"(?:flag|ctf)\{[^}\s]{3,}\}", text.lower())
             return {"ok": bool(text), "flag": text, "flags": flags, "method": "morse_decode"}
         if kind in ("rsa_pq", "已知pq", "rsa_pq"):
             # RSA 已知 p/q 解密（p,q,e,c → m——高频 RSA 变种秒解）

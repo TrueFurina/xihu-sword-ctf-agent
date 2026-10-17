@@ -1,7 +1,7 @@
 {
  "schema": "external_unseen_benchmark/v1",
- "generated_at": "2026-10-13T14:10:10",
- "git_head": "6eaa4c2c",
+ "generated_at": "2026-10-15T02:46:32",
+ "git_head": "1c35d72d",
  "selection_rules": [
   "载荷完整：所有声明附件在磁盘存在",
   "无答案泄漏：附件字节不含真值（sha256 精确比对 + flag{}/裸值形态扫描）",
@@ -17,7 +17,7 @@
   "questions_ext_A_20261001",
   "questions_ext_trial5_20261001"
  ],
- "total": 51,
+ "total": 50,
  "question_ids": [
   "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_hard_permuted",
   "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_medium_partial_tenacity",
@@ -30,9 +30,7 @@
   "ext_cybench_project_sekai_ctf_sekaictf_2022_crypto_diffecient",
   "ext_cybench_project_sekai_ctf_sekaictf_2023_crypto_randsubware",
   "ext_gctf2021_abc-arm-and-amd",
-  "ext_gctf2021_david-and-the-tree",
   "ext_gctf2021_filestore",
-  "ext_gctf2021_h1",
   "ext_gctf2021_ican-tbelieveit-snotcrypto",
   "ext_gctf2021_pythia",
   "ext_gctf2021_story",
@@ -43,6 +41,7 @@
   "ext_gctf2022_electric-mayhem-pqc",
   "ext_gctf2022_legit",
   "ext_gctf2022_maybe-someday",
+  "ext_gctf2022_ocr",
   "ext_gctf2022_segfault-labyrinth",
   "ext_gctf2023_cursved",
   "ext_gctf2023_zip",
@@ -71,23 +70,26 @@
   "ext_nyu_ctf_bench_2022f_msc_farmlang",
   "ext_nyu_ctf_bench_2023f_for_hypokrinesthai"
  ],
+ "dropped": {
+  "ext_gctf2021_david-and-the-tree": "already_solved_or_authorized",
+  "ext_gctf2021_h1": "already_solved_or_authorized"
+ },
  "by_category": {
-  "crypto": 24,
+  "crypto": 23,
   "misc": 12,
   "forensics": 5,
   "rev": 10
  },
- "attachment_files": 105,
- "excluded_seen_ids": 185,
+ "attachment_files": 107,
+ "excluded_seen_ids": 188,
  "skipped": {
-  "already_solved_or_authorized": 38,
-  "payload_missing": 1,
+  "already_solved_or_authorized": 41,
   "not_ok:broken": 6,
   "not_ok:leaky": 1,
   "duplicate_id_across_pools": 4
  },
  "judge": "scripts/_run_validity_guard.py（跑批有效性）+ ctf_agent/verify/flag_checker.py::sha256_matches（判真值）",
  "answers": "本目录不含任何明文答案，仅 flag_sha256 占位",
- "written_at": "2026-10-13T14:10:10",
+ "written_at": "2026-10-15T02:46:32",
  "written_by": "scripts/_build_external_benchmark.py"
 }

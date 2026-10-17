@@ -218,6 +218,66 @@ def _fast_solve_proven(kind: str) -> bool:
     return kind in _PROVEN_FAST_SOLVE_KINDS
 
 
+# ── 题面密文候选提取（2026-10-15 新增）──────────────────────────────────
+# ⚠️ 实测出来的盲区（本机，4 例构造题，端到端跑 presolve）：
+#   「密文写在**题目描述**里」时命中 **0/4**；把同一段密文挪进附件则 2/4 命中。
+#   根因两条，都必须修，只修一条仍为 0：
+#     ① `_try_fast_solve` 的输入 s **只从附件正文取**，无附件时 s="" ⇒ 空转；
+#     ② 原实现先 `desc.lower()`，而 base64/base58 等编码**大小写敏感**，
+#        即便把题面喂进去也解不开（必须保留原始大小写）。
+# 这也是 KNOWN_GAP 里「fast_solve 已覆盖编码类」这条免责声明的证伪：
+# 覆盖的是「密文在附件」这一种形态，题面形态从未被覆盖。
+_CJK_RE = re.compile(r"[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]")
+# 注意：`{}` **不能**当分隔符——CTF 密文常是 `flag{...}` / `xxx{...}` 形态，
+# 切开会破坏密文完整性（这条也是实测发现的：切了就再也解不出）。
+_TOKEN_SPLIT_RE = re.compile(r"[\s,;|()\[\]<>「」『』【】\"'`]+")
+_MORSE_RE = re.compile(r"[.\-\u2013\u2014][.\-\u2013\u2014\s]{7,}")
+# 只在「纯解码」模板上遍历题面候选：hash(词典爆破) / small_e(二分) /
+# common_modulus 等计算密集分支不参与题面遍历，避免无界开销。
+_DESC_PROBE_KINDS = frozenset({
+    "b64", "caesar", "morse", "vigenere", "bacon", "base58",
+    "rail", "xor", "affine", "brainfuck",
+})
+_DESC_CAND_MAX = 24          # 候选条数上限（有界，防题面噪声爆炸）
+_DESC_CAND_MAXLEN = 2000     # 单条截断长度
+_DESC_CAND_MINLEN = 8
+
+
+def _desc_cipher_candidates(raw: str) -> list:
+    """从**原始**题面（保留大小写）提取疑似密文片段：去重、有界、顺序稳定。
+
+    两类形态分别处理（各形态都拿真样本验过「抓得到」）：
+      ① 摩斯整段：`..-. .-.. .- --.`——空格分隔，须同时含 `.` 与 `-`；
+      ② 其余编码：先剔除中文/全角标点（中文常与密文粘连，如 `密文为：xxx，求原文`），
+         再按分隔符切 token，保留含字母数字且长度 ≥6 的片段。
+    """
+    out, seen = [], set()
+    text = raw or ""
+
+    def _push(t):
+        t = t.strip()
+        if len(t) < _DESC_CAND_MINLEN or t in seen:
+            return False
+        seen.add(t)
+        out.append(t[:_DESC_CAND_MAXLEN])
+        return len(out) >= _DESC_CAND_MAX
+
+    # ① 摩斯
+    for m in _MORSE_RE.finditer(text):
+        t = m.group(0).strip()
+        if "." in t and "-" in t:
+            if _push(t):
+                return out
+    # ② 剔除中文后切 token
+    for tok in _TOKEN_SPLIT_RE.split(_CJK_RE.sub(" ", text)):
+        t = tok.strip().strip("。，、；：！？.,;:!?")
+        if len(t) < 6 or not re.search(r"[A-Za-z0-9]", t):
+            continue
+        if _push(t):
+            return out
+    return out
+
+
 # ── presolve 已接线的确定性 skill 清单（2026-09-22 大确定性 skill 覆盖）────
 # 单一真值：本模块经生产链路（_tasks 并发嗅探）实际调用的 skills.* 模块。
 # tests/test_skill_coverage.py 据此断言覆盖度，杜绝「写过的 skill 没接线 / RDD 自夸」。
@@ -594,11 +654,21 @@ async def _try_math_engine(question) -> Optional[str]:
 
 
 async def _try_fast_solve(question) -> Optional[str]:
-    """关键词 fast_solve（crypto/misc 描述含模板关键词）。"""
+    """关键词 fast_solve（crypto/misc 描述含模板关键词）。
+
+    输入源（2026-10-15 起两条，顺序即优先级）：
+      ① 附件正文（原行为，保持不动——不动就不会有回归）；
+      ② **题面密文候选**（新增）：无附件 / 附件未命中时，从原始题面提取疑似
+         密文片段逐个试探。此前「密文写在题面」的题命中率实测 0/4。
+
+    大小写纪律：`desc`（小写）只用于**关键词匹配**；喂给解码器的**必须是原始
+    大小写**的 `raw` —— base64/base58 大小写敏感，lower() 后必解不开。
+    """
     cat = str(getattr(question, "category", "")).lower()
     if cat not in ("crypto", "misc"):
         return None
-    desc = str(getattr(question, "description", "") or "").lower()
+    raw = str(getattr(question, "description", "") or "")
+    desc = raw.lower()
     attach = _attachments(question)
     s = ""
     if attach and os.path.exists(str(attach[0])):
@@ -607,23 +677,41 @@ async def _try_fast_solve(question) -> Optional[str]:
                 s = fh.read()[:2000]
         except Exception:  # noqa: BLE001
             s = ""
+
+    def _attempt(kind: str, text: str):
+        """单模板 × 单输入；命中返回 flag，否则 None。"""
+        try:
+            from agents.crypto_toolkit import fast_solve
+            r = fast_solve(kind, s=text)
+        except Exception as exc:  # noqa: BLE001 - 单模板失败继续下一个
+            _warn_import_once("agents.crypto_toolkit.fast_solve", exc)
+            return None
+        flag = str(r.get("flag", "") or "")
+        if bool(r.get("ok")) and _FLAG_RE.search(flag):
+            # 实证标记（锐评「写过 vs 解出过」）：实证 kind 记 proven，
+            # 未实证 kind 记 unproven——答辩诚实口径
+            tag = "proven" if _fast_solve_proven(kind) else "unproven"
+            logger.info("[presolve:fast_solve:%s:%s] %s 命中 flag=%s",
+                        kind, tag, getattr(question, "id", "?"), flag[:60])
+            _save_candidates(question, [flag])
+            return flag
+        return None
+
+    # ① 附件正文（原行为）
     for kind, hint in _FAST_SOLVE_KEYWORDS:
         if hint in desc:
-            try:
-                from agents.crypto_toolkit import fast_solve
-                r = fast_solve(kind, s=s)
-                flag = str(r.get("flag", ""))
-                if bool(r.get("ok")) and _FLAG_RE.search(flag):
-                    # 实证标记（锐评「写过 vs 解出过」）：实证 kind 记 proven，
-                    # 未实证 kind 记 unproven——答辩诚实口径
-                    tag = "proven" if _fast_solve_proven(kind) else "unproven"
-                    logger.info("[presolve:fast_solve:%s:%s] %s 命中 flag=%s",
-                                kind, tag, getattr(question, "id", "?"), flag[:60])
-                    _save_candidates(question, [flag])
-                    return flag
-            except Exception as exc:  # noqa: BLE001 - 单模板失败继续下一个
-                _warn_import_once("agents.crypto_toolkit.fast_solve", exc)
-                continue
+            got = _attempt(kind, s)
+            if got:
+                return got
+    # ② 题面密文候选（新增；仅解码类模板，见 _DESC_PROBE_KINDS 注释）
+    cands = _desc_cipher_candidates(raw)
+    if cands:
+        for kind, hint in _FAST_SOLVE_KEYWORDS:
+            if hint in desc and kind in _DESC_PROBE_KINDS:
+                for c in cands:
+                    got = _attempt(kind, c)
+                    if got:
+                        return got
     return None
 
 

@@ -414,11 +414,26 @@ def test_solves_with_third_party_imports_blocked(monkeypatch):
 
 
 def test_no_flag_plaintext_in_source():
-    """反捷径：skill 源码不得含 flag 明文 / 题库 sha256。"""
+    """反捷径：skill 源码不得含 flag 明文 / 已知 sha256 前缀（静态判据）。"""
     src = (_ROOT / "skills" / "misc_deflate_huffman_flag.py").read_text(encoding="utf-8")
     assert "CTF{" not in src
     assert "OLE-E-COM" not in src
-    assert _TRUTH_SHA not in src and "b05a30c3" not in src
+    # 这条不需要题库即可断言，必须永远留在门禁视野里
+    assert "b05a30c3" not in src
+
+
+@needs_question
+def test_no_question_sha256_in_source():
+    """反捷径：skill 源码不得含**题库真值** sha256（需题库落地才能判定）。
+
+    2026-10-17 从 `test_no_flag_plaintext_in_source` 拆出。原先写成
+    `assert _TRUTH_SHA not in src and "b05a30c3" not in src`：题库未落地时
+    `_TRUTH_SHA == ""`，而 `"" not in src` 对任何字符串恒为 False →
+    干净克隆 / CI 上该用例必然红，且报错信息（`'' is contained here`）指向不明。
+    拆开后：静态判据照跑；真值判据按 `needs_question` 可审计地跳过。
+    """
+    src = (_ROOT / "skills" / "misc_deflate_huffman_flag.py").read_text(encoding="utf-8")
+    assert _TRUTH_SHA not in src
 
 
 # ─────────────────────────── 6. 守卫接线 + 变异 ───────────────────────────
