@@ -109,6 +109,18 @@ class Question:
             answer_disclosed=bool(data.get("answer_disclosed", False)),
         )
 
+    def __post_init__(self) -> None:
+        """类别归一化对齐 from_dict（2026-10-21 接线审计续）。
+
+        缘起：external_unseen 真题直接构造 Question(category="rev")，
+        `inventory("rev")` 按 adapters 声明的 categories 过滤（rea_probe 声明
+        ["reverse","misc"]），"rev" 不在内 → **工具清单里看不到 rea_probe**
+        → agent 9 步只调 file_analyze，真题 0 解。from_dict 一直归一化，
+        直接构造路径不归一化，两条路径行为不一致即漏洞。
+        归一化是纯别名映射（rev→reverse、forensics→misc），未知值原样返回。
+        """
+        self.category = normalize_category(self.category)
+
     def to_prompt_text(self) -> str:
         """生成给 LLM 的题目描述文本。"""
         parts = [f"题目: {self.title}"]

@@ -345,16 +345,25 @@ def make_bundle(out_dir: str | None = None, keep: int = DEFAULT_KEEP, daily: boo
         want_full = False
     else:  # auto
         want_full = _incrementals_since_full(out_dir) >= max(1, int(full_every))
-    # 增量基点必须是上一份 bundle 的**全部 ref tips**（孤立历史 ref 的对象
-    # 不在 master 祖先里，只排除 HEAD 会把它们每次全量重打）。
-    prev_tips = bundle_tips(prev, git_dir) if (prev and not want_full) else []
 
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    if want_full or not prev_tips:
+    if want_full:
+        # 全量：自包含，可独立恢复（仅首次 / 每 full_every 份增量 / --full / 无基点时）
         out = _unique_path(out_dir, stamp, FULL_PREFIX)
         rev_args = ["--all"]
         kind = "全量"
     else:
+        # 增量基点必须是上一份 bundle 的**全部 ref tips**（孤立历史 ref 的对象
+        # 不在 master 祖先里，只排除 HEAD 会把它们每次全量重打）。
+        prev_tips = bundle_tips(prev, git_dir) if prev else []
+        if not prev_tips:
+            # 修复（2026-10-19）：上一份 bundle 存在却读不到 refs tips（list-heads 返回空/
+            # 超时）→ 旧逻辑会 fallback 成整份全量（≈2.7G），每提交堆一份 → 曾炸到 19G。
+            # 改为跳过：最新全量仍可作有效兜底，list-heads 恢复后下次会正常打 KB 级增量。
+            # 绝不静默生成 2.7G 全量。
+            print("⚠️ 跳过增量快照：上一份 bundle 读取 refs tips 失败（list-heads 为空），"
+                  "为避免静默生成整份全量（≈2.7G）已跳过；最新全量仍可用作兜底。")
+            return "skip", None
         out = _unique_path(out_dir, stamp, INC_PREFIX)
         rev_args = ["--all"] + [f"^{t}" for t in prev_tips]  # 增量：排除上份全部对象
         kind = "增量"

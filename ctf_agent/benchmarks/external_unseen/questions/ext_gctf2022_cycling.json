@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2022_cycling",
+ "category": "crypto",
+ "title": "Cycling",
+ "description": "It is well known that any RSA encryption can be undone by just encrypting the ciphertext over and over again.\nIf the RSA modulus has been chosen badly then the number of encryptions necessary to undo an encryption is small.\nHowever, if the modulus is well chosen then a cycle attack can take much longer. This property can be used for a timed release of a message.\nWe have confirmed that it takes a whopping 2^1025-3 encryptions to decrypt the flag.\nPack out your quantum computer and perform 2^1025-3 encryptions to solve this challenge. Good luck doing this in 48h.",
+ "flag_sha256": "acbe3fcecd1f7bdfda277fc41a8df3a24d02f19f0d6a20936b61aeb50cef3f3d",
+ "flag": "acbe3fcecd1f7bdfda277fc41a8df3a24d02f19f0d6a20936b61aeb50cef3f3d",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2022_cycling\\_attachments\\chall.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

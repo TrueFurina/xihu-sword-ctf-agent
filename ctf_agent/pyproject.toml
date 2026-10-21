@@ -33,6 +33,14 @@ vision = [
     "pytesseract>=0.3.10",
     "pymupdf>=1.24",
 ]
+# 可选：pcap 通道（tools/adapters/pcap_probe.py）。scapy 负责解析与 TCP 重组；
+# brotli/zstandard 负责 Content-Encoding: br/zstd 的正文还原 —— 缺任一个都只降级
+# 不崩，但现代站点的 flag 常压在 br 正文里，语义上应视为必备。
+pcap = [
+    "scapy>=2.5",
+    "brotli>=1.1",
+    "zstandard>=0.22",
+]
 
 [tool.setuptools]
 packages = [

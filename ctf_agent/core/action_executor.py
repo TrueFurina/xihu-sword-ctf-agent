@@ -30,6 +30,30 @@ async def execute_tool(registry, ctx, plan: dict, detail: str) -> dict:
                 params[_k] = plan[_k]
         if "target_url" in params and "url" not in params:
             params["url"] = params.pop("target_url")
+    # ── 声明式参数透传（2026-10-20 接线审计）──
+    # 原实现只白名单透传 http_request 的 6 个字段，其余 plan 字段全部丢弃：
+    # 于是带参数的通道（rea_probe 的 lane/selector、pcap_probe 的 flow/top_n）
+    # 在主链上永远走默认值——适配器写得再全也等于不可用。
+    # 现在由适配器用 `param_spec` 自己声明收哪些键，主链只转发声明过的：
+    # 恢复能力，又不让 LLM 的任意 plan 字段污染适配器签名。
+    # 鸭子类型守卫：registry 只要能被 run 调用就必须能用。测试里存在只实现
+    # `run` 的假 registry（test_main_agent_e3_evidence 的 _FakeReg），直接
+    # `registry.get(...)` 会 AttributeError 把整条执行链打断（实测踩到）。
+    _getter = getattr(registry, "get", None)
+    _adapter = _getter(tool_name) if callable(_getter) else None
+    _spec = getattr(_adapter, "param_spec", None) or {}
+    if isinstance(_spec, dict):
+        for _k in _spec:
+            if plan.get(_k) is not None and _k not in params:
+                params[_k] = plan[_k]
+    # ── 显式 path 必须直达（2026-10-20 接线审计修复）──
+    # 原实现只在 plan **没有** path 时才注入 params["path"]，于是「plan 里明确
+    # 指定附件」的调用反而丢参数，适配器报 `路径不存在: `（ok=false），
+    # 模型只能反复收到失败、换着花样重试。
+    if plan.get("path"):
+        params["path"] = str(plan["path"])
+        if tool_name == "file_analyze":
+            ctx._attachment_analyzed = True
     # ── file_analyze 未指定 path → 遍历分析全部未读附件 ──
     if tool_name == "file_analyze" and not plan.get("path"):
         attachments = filter_answer_key_attachments(  # ITEM4-A：答案密钥不进 file_analyze

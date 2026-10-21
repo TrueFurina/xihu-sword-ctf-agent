@@ -51,8 +51,78 @@ FEW_SHOT_BANK = """\
   再据漏洞类型构造 payload；切勿盲打。sql→先测注入点，ssrf→探内网，xxe→读文件。
 例4(reverse): 拿到二进制 → 先 file/strings/查壳确定语言与保护，
   再决定 IDA/Ghidra/pyc反编译；切勿一上来反编译最大函数空读。
-例5(misc·流量/图像): 拿到 pcap→先 tshark 过滤协议与字符串；拿到图像→先 steg
-  工具扫描+网格采样(如 VNCTF 类需逐格 OCR)，切勿只做单层 base 解码即放弃。"""
+  本机无 IDA 时用 rea_probe（lane=managed/go/pe 先摸结构，lane=decompile_batch 一次导全量
+  伪代码；单函数 lane=decompile 每次要付 ~40s 分析成本，别逐个炸）。
+  加壳（UPX 等）会让函数数骤降且不报错，先看 rea_probe 的 packer/degraded 提示再下结论。
+例5(misc·流量/图像): 拿到 pcap→用 pcap_probe（本机无 tshark）拿协议分布+流表+HTTP/DNS/TLS 正文，
+  flag 被拆在多个 TCP 段时它按 seq 重组；定位到流号后用 flow=N 取该流全文。
+  拿到图像→先 steg 工具扫描+网格采样(如 VNCTF 类需逐格 OCR)，切勿只做单层 base 解码即放弃。"""
+
+
+def _clip_value(s, limit: int = 64) -> str:
+    """参数取值截断：按枚举分段边界切，绝不切出半个成员名。
+
+    `lane=auto|managed|go|pe|elf|decompile|decompile_batch` 全长 49 字符。
+    旧的 `[:44]` 把它切成 `...decompile|decompile_b` —— prompt 里出现一个
+    不存在的 lane 名，模型要么忽略要么报错，都比不告诉更糟（2026-10-21
+    test_tool_wiring 因此红）。limit 64 覆盖现有最长枚举；超长时在最后一个
+    分段符后下刀，保证每个留下的成员名完整。
+    """
+    s = str(s)
+    if len(s) <= limit:
+        return s
+    cut = s[:limit]
+    for sep in ("|", "；", ";", "，", ","):
+        i = cut.rfind(sep)
+        if i > limit // 2:
+            return cut[: i + 1] + "…"
+    return cut + "…"
+
+
+def _tool_inventory_block(ctx) -> str:
+    """渲染真实工具清单（2026-10-20 接线审计）。
+
+    为什么要有这一块：plan prompt 原先不列任何工具名，模型只能从
+    SOLVE_DISCIPLINE 的静态文案里认工具。结果是「注册≠可见」——
+    rea_probe / wasm_probe / pcap_probe 注册进 registry 后从未被调用过。
+
+    渲染策略（控 token）：只为「声明了额外参数」的工具展开一行说明（这类工具
+    光知道名字没用，必须知道能传什么）；其余工具压成一行名字列表。
+
+    失败即静默省略：清单渲染故障不得影响解题主流程。
+    """
+    reg = getattr(ctx, "registry", None)
+    if reg is None:
+        return ""
+    try:
+        items = reg.inventory(str(getattr(ctx.question, "category", "") or ""), limit=30)
+    except Exception:  # noqa: BLE001 - 清单故障降级为不注入
+        return ""
+    if not items:
+        return ""
+    detailed: list[str] = []
+    plain: list[str] = []
+    for it in items:
+        params = it.get("params") or {}
+        if params:
+            # 渲染成 `lane=auto|managed|...`：只列名字不够，模型必须知道可选值
+            # （实测：仅列名字时 `decompile_batch` 会被 64 字截断切掉，那行等于没用）。
+            # 2026-10-21 续：[:44] 又会把 49 字符的 lane 值切成
+            # `...decompile|decompile_b` —— 模型看到的是一个**不存在的 lane 名**，
+            # 比不告诉更糟。改成 limit=64 + 按枚举分段边界切（|/；/，），
+            # 半个成员名永远不出现在 prompt 里。
+            spec = ", ".join(f"{k}={_clip_value(v)}" for k, v in sorted(params.items()))
+            raw = str(it.get("desc") or "").split("\n")[0].strip()
+            desc = (raw[:50] + "…") if len(raw) > 50 else raw
+            detailed.append(f"- {it['name']}［{spec}］: {desc}")
+        else:
+            plain.append(it["name"])
+    lines = ["【可用工具】action=tool 时 tool 取下列名字；括号内是该工具能接收的 plan 参数"
+             "（写在 plan 顶层，不写则用默认值；未声明的参数不会生效）:"]
+    lines.extend(detailed)
+    if plain:
+        lines.append("其余可用: " + ", ".join(plain))
+    return "\n".join(lines)
 
 
 def build_plan_prompt(ctx, attempt: int) -> str:
@@ -142,6 +212,9 @@ def build_plan_prompt(ctx, attempt: int) -> str:
     _audit = _extra.get("web_audit_report")
     if _audit:
         parts.append(f"【web 源码审计报告】{_audit}")
+    _inv = _tool_inventory_block(ctx)
+    if _inv:
+        parts.append(_inv)
     parts.append(SOLVE_DISCIPLINE)  # 作战铁律运行时强制注入
     # E6（2026-08-25 桶B攻坚）：few-shot 方向决策范例注入（仅 ctx.few_shot 开启时）
     # 帮模型在"先判断题型→选正确首步"上少走错方向（桶B=方向决策错 占失败 57.1%）。

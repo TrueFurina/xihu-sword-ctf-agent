@@ -1,0 +1,16 @@
+{
+ "id": "ext_gctf2022_electric-mayhem-cls",
+ "category": "crypto",
+ "title": "Electric Mayhem CLS",
+ "description": "The server presents power traces of a secret firmware crypto operation. The goal is to recover the secret key.\nNote, the flag is 'CTF{XXX}' where XXX is your recovered key.",
+ "flag_sha256": "408e722c601b1a154611b19e808c73bbce676d318f38ab1cc30819663e6dad19",
+ "flag": "408e722c601b1a154611b19e808c73bbce676d318f38ab1cc30819663e6dad19",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2022_electric-mayhem-cls\\_attachments\\elmo.tgz",
+  "data\\questions_external\\crypto\\ext_gctf2022_electric-mayhem-cls\\_attachments\\firmware.tgz",
+  "data\\questions_external\\crypto\\ext_gctf2022_electric-mayhem-cls\\_attachments\\stm32f0_aes.json.gz"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

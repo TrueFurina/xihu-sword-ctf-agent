@@ -113,6 +113,175 @@ def _strategy_signature(step) -> tuple:
     return (action, "<no-payload>", tool, str(getattr(step, "plan_fp", "") or ""))
 
 
+# ── 浅层工具空转升级检测（2026-10-21 glm 真题实证补漏）──────────────────
+# 实证：glm-4-flash 跑 cybench crushing 8 步 / flecks 9 步**全程只调
+# file_analyze**（每次参数微调 → 观测输出不同 → E2 签名判重与同参数判重都不触发），
+# 直到预算硬顶（81,794 ≥ 80,000）或空转止损。终止机制有效，但**恢复机制缺失**：
+# reverse 题的专用深挖工具 rea_probe 从未被调用，也没有任何提示告诉模型该换工具。
+#
+# 与 web 空转检测（主循环内）同款范式：空转在浅层工具上、且本题型专用工具
+# 从未露面时，从注册表取专用清单生成具名升级提示（经 advisor_hint 进 plan prompt）。
+# 浅层工具 = 只能看文件明文/元数据的通用首看工具；专用工具 = 按题型注册的深挖适配器。
+_SHALLOW_TOOLS = frozenset({"file_analyze", "flag_scan"})
+_SHALLOW_STREAK = 3
+#: 软提示被无视后的强制深挖阈值（与监督强制路由的 ≥5 步同口径）
+_FORCED_STREAK = _SHALLOW_STREAK + 2
+#: 可强制调用的专用探针（三个 probe 适配器统一吃 {"path": ...}，2026-10-21 核对签名）
+_FORCED_PROBES = ("rea_probe", "wasm_probe", "pcap_probe")
+#: 附件魔数 → 探针（选目标用；多态签名防误选）
+_PROBE_MAGIC = {
+    "rea_probe": (b"\x7fELF", b"MZ", b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe"),
+    "wasm_probe": (b"\x00asm",),
+    "pcap_probe": (b"\xd4\xc3\xb2\xa1", b"\xa1\xb2\xc3\xd4", b"\x0a\x0d\x0d\x0a"),
+}
+
+
+def _shallow_tool_escalation(agent, ctx) -> Optional[tuple[str, str]]:
+    """连续重复浅层工具且本题型专用工具从未使用 → (工具名, 升级提示)；否则 None。
+
+    纯函数（只读 ctx / agent.registry），便于单测锁口径；去重与注入由
+    `_apply_shallow_escalation` 负责。registry.inventory 失败不阻塞主循环。
+    """
+    steps = list(getattr(ctx, "steps", None) or [])
+    if len(steps) < _SHALLOW_STREAK or getattr(ctx, "candidate_flag", None):
+        return None
+    window = steps[-_SHALLOW_STREAK:]
+    tool = str(getattr(window[0], "tool_used", "") or "")
+    if not tool or tool not in _SHALLOW_TOOLS:
+        return None
+    if any(str(getattr(s, "tool_used", "") or "") != tool for s in window):
+        return None
+    registry = getattr(agent, "registry", None)
+    if registry is None:
+        return None
+    try:
+        from eval.cases import normalize_category
+        cat = normalize_category(str(getattr(ctx.question, "category", "") or ""))
+        inv = registry.inventory(cat)
+    except Exception:  # noqa: BLE001 - 清单失败不阻塞主循环
+        return None
+    used = {str(getattr(s, "tool_used", "") or "") for s in steps}
+    unused = [t for t in inv if t.get("name") != tool and t.get("name") not in used]
+    if not unused:
+        return None
+    lines = [f"- {t['name']}：{t.get('desc', '')}" for t in unused[:6]]
+    return tool, (
+        f"⚠️ 检测到连续 {_SHALLOW_STREAK} 步重复调用浅层工具 {tool} 且无候选 flag 推进。"
+        f"浅层工具只能看文件明文/元数据，本题型（{cat or '未知'}）的专用深挖工具尚未使用：\n"
+        + "\n".join(lines)
+        + "\n立即改用上述专用工具深挖（或用 python 沙盒写脚本做确定性变换）；"
+          "禁止继续重复同一浅层工具——换个工具或换个切入点。"
+    )
+
+
+def _apply_shallow_escalation(agent, ctx) -> bool:
+    """检测并注入浅层工具升级提示（带去重）。返回本次是否新注入。"""
+    esc = _shallow_tool_escalation(agent, ctx)
+    if not esc:
+        return False
+    tool, hint = esc
+    if tool in getattr(ctx, "escalated_tools", set()):
+        return False
+    ctx.escalated_tools.add(tool)
+    ctx.advisor_hint = hint
+    return True
+
+
+def _pick_probe_target(tool: str, attachments: list) -> Optional[str]:
+    """按魔数为探针选目标附件；无魔数命中时取最大文件（二进制通常是最大的）。"""
+    magics = _PROBE_MAGIC.get(tool, ())
+    best = None
+    for path in attachments:
+        try:
+            with open(path, "rb") as fh:
+                head = fh.read(8)
+            size = os.path.getsize(path)
+        except OSError:
+            continue
+        if any(head.startswith(m) for m in magics):
+            return path
+        if best is None or size > best[1]:
+            best = (path, size)
+    return best[0] if best else None
+
+
+async def _force_deep_probe(agent, question, ctx) -> Optional[str]:
+    """软提示被无视（同一浅层工具 streak 继续增长）→ 确定性强制调用一次专用探针，
+    把深挖产物（反编译代码/流量摘要）写进步骤历史，供后续 plan 使用。
+
+    与监督强制路由的区别：那只看 flag 字面量；探针产物是**证据**——人工解
+    crushing 的第一步就是拿到反编译代码。返回注入的探针名；不适用/失败返回 None。
+
+    两种空转形态（2026-10-21 goal_log 实证均存在）：
+      ① 浅层工具循环：连续 _FORCED_STREAK 步同一浅层工具，且软提示已注入被无视
+         （deepseek 时代 packedaway 9 步 file_analyze 形态）；
+      ② 纯推理循环：连续 _FORCED_STREAK 步 reason 零工具（glm crushing/flecks
+         实证形态——run_e2e 的 tools 字段只反映 act 兜底的那一次 file_analyze，
+         真实步骤是 reason）。reason 链的软提示由监督强制路由在 3 步时已给，
+         此处到 5 步直接由机器动手，不再等模型自觉。
+    每探针每题只强制一次；无候选 flag、有目标附件才触发。
+    """
+    steps = list(getattr(ctx, "steps", None) or [])
+    if len(steps) < _FORCED_STREAK or getattr(ctx, "candidate_flag", None):
+        return None
+    window = steps[-_FORCED_STREAK:]
+    _tool = str(getattr(window[0], "tool_used", "") or "")
+    _tool_loop = (
+        _tool in _SHALLOW_TOOLS
+        and all(str(getattr(s, "tool_used", "") or "") == _tool for s in window)
+        and _tool in getattr(ctx, "escalated_tools", set())
+    )
+    _reason_loop = all(
+        str(getattr(s, "action", "") or "") == "reason"
+        and not str(getattr(s, "tool_used", "") or "")
+        for s in window
+    )
+    if not (_tool_loop or _reason_loop):
+        return None
+    registry = getattr(agent, "registry", None)
+    if registry is None:
+        return None
+    forced_done = getattr(ctx, "forced_probes", set())
+    try:
+        from eval.cases import normalize_category
+        cat = normalize_category(str(getattr(ctx.question, "category", "") or ""))
+        inv = registry.inventory(cat)
+    except Exception:  # noqa: BLE001 - 清单失败不阻塞主循环
+        return None
+    used = {str(getattr(s, "tool_used", "") or "") for s in steps}
+    probe = next((t["name"] for t in inv
+                  if t.get("name") in _FORCED_PROBES
+                  and t["name"] not in used and t["name"] not in forced_done), None)
+    if not probe:
+        return None
+    attachments = filter_answer_key_attachments(
+        question, list(getattr(question, "attachments", None) or []))
+    target = _pick_probe_target(probe, attachments)
+    if not target:
+        return None
+    try:
+        out = await registry.run(probe, {"path": os.path.abspath(target)})
+        text = str(getattr(out, "text", "") or "")
+    except Exception as exc:  # noqa: BLE001 - 探针失败不阻塞主循环
+        logger.warning("[%s] 强制深挖 %s 异常: %s", getattr(question, "id", "?"), probe, exc)
+        return None
+    from core.phases import _truncate_preserve_tail
+    ctx.forced_probes.add(probe)
+    obs = _truncate_preserve_tail(text, 6000) if text else "(空输出)"
+    ctx.record(StepRecord(
+        stage=STAGE_EXPLOIT,
+        action=f"tool:{probe}",
+        observation=obs,
+        tool_used=probe,
+        error_category=None,
+        plan_fp=f"forced-{probe}",
+    ))
+    logger.info("[%s] 空转恢复：强制深挖 %s 已注入步骤历史（%d 字符，形态=%s）",
+                getattr(question, "id", "?"), probe, len(obs),
+                "工具循环" if _tool_loop else "推理循环")
+    return probe
+
+
 @dataclass
 class SupervisionVerdict:
     """监督反思 Agent 的裁决。"""
@@ -163,6 +332,11 @@ class AgentContext:
     hint_text: Optional[str] = None
     correction: Optional[dict] = None   # 结构化修正指令（v2.0 错误归因）
     advisor_hint: Optional[str] = None  # 监督建议累积（抄 NUS Advisor：定向提示注入）
+    # 2026-10-21 浅层工具空转升级去重：已注入过升级提示的浅层工具名集合
+    # （同题同一浅层工具只提示一次，避免提示词每步重复稀释）
+    escalated_tools: set = field(default_factory=set)
+    # 2026-10-21 强制深挖去重：已被确定性强制调用过的探针名（每题每探针一次）
+    forced_probes: set = field(default_factory=set)
     _attachment_analyzed: bool = False  # 附件是否已被工具读取（防止空想）
     _attachments_seen: set = field(default_factory=set)  # 已实际分析过的附件路径（多附件遍历）
     attachment_evidence: list = field(default_factory=list)  # E3(2026-08-25 桶C攻坚): file_analyze 全文累积，强制注入 plan prompt 防"证据不进脑"
@@ -209,6 +383,9 @@ class AgentContext:
     last_confidence: Optional[float] = None
     # Writeup RAG（IDEA-5 务实落地）：每步检索到的历史解法/工具手册，注入 plan prompt
     knowledge_hits: Optional[list] = None
+    # 工具清单注入（2026-10-20 接线审计）：plan prompt 需要知道注册表里真实有哪些
+    # 工具及其可透传参数，否则新适配器注册了也不会被调用（注册≠可见）。
+    registry: Any = None
     # budget-reflection（race-intelligence 第二层，2026-08-27）：预算反思决策快照（只读日志写入）
     last_reflection: Optional[dict] = None
     # G1/G5（2026-09-29 接入运行时）：持久会话 + 会话记忆。
@@ -492,6 +669,7 @@ class MainAgent:
             correction: 结构化修正指令（错误归因：error_category/key_info/suggestion）
         """
         ctx = AgentContext(question=question, hint_text=hint, correction=correction)
+        ctx.registry = self.registry  # 2026-10-20：plan prompt 渲染真实工具清单用
         ctx.few_shot = self.few_shot  # E6 开关透传：plan 提示按需注入方向决策范例
         ctx.e3_enabled = self.e3_enabled  # E3 开关透传：plan 提示按需注入附件全文
         # P2 记忆层（2026-10-03）：题内「已试策略黑板」——每次 solve 新建（题内记忆，
@@ -695,6 +873,19 @@ class MainAgent:
                 # Writeup RAG（IDEA-5 务实落地）：每步按"题型+最新观察"检索历史解法/工具手册
                 self._retrieve_knowledge(ctx, step)
 
+                # ── 空转恢复两级机制（2026-10-21 glm 实证，必须在卡关处理块之前）──
+                # 软提示（3 步）→ 强制深挖（5 步），覆盖浅层工具循环 / 纯推理循环两种形态。
+                # 为什么必须在卡关处理之前：observe_step 给连续 reason 打 ERR_STUCK_LOOP
+                # → stuck_count≥2 → 卡关块 _supervise 后无条件 continue，**其后所有检测器
+                # （E2/同参数/web/监督强制路由/本机制）全部被跳过**——glm crushing 实证
+                # 第 3 步起这些全是死代码（forced4：8 步 7 reason 空烧 81,539 token）。
+                if _apply_shallow_escalation(self, ctx):
+                    logger.info("[%s] 浅层工具空转升级提示已注入（连续 %d 步同工具，"
+                                "本题型专用工具尚未使用）", question.id, _SHALLOW_STREAK)
+                _forced_probe = await _force_deep_probe(self, question, ctx)
+                if _forced_probe:
+                    logger.info("[%s] 强制深挖已执行: %s", question.id, _forced_probe)
+
                 # ── 卡关处理（P0-A 修复：先升级再放弃，而非直接 break）──
                 # 原逻辑在监督咨询前就 break，导致 HARD 题未升级重型模型就被放弃，
                 # 监督的 upgrade/switch/reset 在连续失败场景永远到不了（死锁）。
@@ -810,6 +1001,10 @@ class MainAgent:
                         )
                         logger.info("[%s] web 无靶机空转检测：注入模板兜底提示", question.id)
 
+                # ── 浅层工具空转升级检测（2026-10-21 glm 真题实证补漏）──
+                # 见 _shallow_tool_escalation 文档：glm crushing 8 步 / flecks 9 步
+                # 全程 file_analyze，因观测微挑导致 E2/同参数判重都不触发，直到硬停。
+                # 此处按 web 空转检测同款范式补「换工具」恢复提示（带去重，只注一次）。
                 # ── 监督强制路由（战役A/IDEA-1 最小实现，2026-08-27 多轮实测迭代）──
                 # 触发：① 连续 3 步纯 reason 空转；或 ② 总步数≥5 仍无 candidate_flag
                 #   （LLM 交替做无效 tool 调用也会卡死，仅靠①漏判）。最多强制 3 次，避免无限干预主循环。

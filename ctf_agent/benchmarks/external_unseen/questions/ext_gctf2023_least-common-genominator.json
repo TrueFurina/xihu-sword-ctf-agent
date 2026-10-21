@@ -1,0 +1,17 @@
+{
+ "id": "ext_gctf2023_least-common-genominator",
+ "category": "crypto",
+ "title": "Least Common Genominator?",
+ "description": "Someone used this program to send me an encrypted message but I can't read it! It uses something called an LCG, do you know what it is? I dumped the first six consecutive values generated from it but what do I do with it?!",
+ "flag_sha256": "69981daf9abdebef789ff622d1672c37c6a1e97737415369dc77a4ba6360fd96",
+ "flag": "69981daf9abdebef789ff622d1672c37c6a1e97737415369dc77a4ba6360fd96",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2023_least-common-genominator\\_attachments\\dump.txt",
+  "data\\questions_external\\crypto\\ext_gctf2023_least-common-genominator\\_attachments\\flag.txt",
+  "data\\questions_external\\crypto\\ext_gctf2023_least-common-genominator\\_attachments\\generate.py",
+  "data\\questions_external\\crypto\\ext_gctf2023_least-common-genominator\\_attachments\\public.pem"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}
