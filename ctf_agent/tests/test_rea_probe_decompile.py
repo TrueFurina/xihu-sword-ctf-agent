@@ -230,3 +230,30 @@ def test_unknown_lane_is_rejected_not_silently_fallback(tmp_path):
     assert out.ok is False
     assert "未知 lane" in out.text
     assert "decompile_batch" in out.text  # 报错要顺带给出合法值，否则等于让人猜
+
+
+# ── ELF 头解析不完整分支（2026-10-21，ruff F821 实测抓出的真 bug）─────────
+
+def test_lane_elf_parse_error_branch_does_not_crash(tmp_path, monkeypatch):
+    """parseError 分支必须先定义 lines 再 append —— 原实现先 append 后定义，
+    节头表在 0x2000 读窗之外的 ELF（大二进制常见）走到即 NameError。"""
+    import tools.adapters.rea_probe as rp
+
+    f = tmp_path / "big.bin"
+    f.write_bytes(b"\x7fELF" + b"\x00" * 128)
+
+    monkeypatch.setattr(rp, "_elf_info_file", lambda _p: {
+        "class": "64", "machine": "x86-64", "type": "EXEC",
+        "sections": [], "sectionHeaders": 0,
+        "parseError": "节头表超出已读范围（只读了文件头部）",
+    })
+    monkeypatch.setattr(rp.ReaProbeAdapter, "_objdump_exe", lambda self: None)
+
+    text, contract = rp.ReaProbeAdapter()._lane_elf(str(f))
+
+    assert "ELF 头解析不完整" in text
+    assert "节头表超出已读范围" in text
+    # 契约层已知不一致（未修，记录在此防遗忘）：objdump 缺失时 contract_parts 里
+    # degraded=True，但最终合并结果 degraded=False、只把原因留在 limitations——
+    # 本条只锁「不许崩」，不锁 degraded 语义。
+    assert contract.get("limitations"), contract
