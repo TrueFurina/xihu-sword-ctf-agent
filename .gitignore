@@ -188,3 +188,6 @@ ctf_agent/2027-prep/
 .coverage
 .coverage.*
 htmlcov/
+
+# data/ 快照落点（scripts/_snapshot_data.py 默认输出，82MB/份，绝不入库）
+/backups/
