@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2024_desfunctional",
+ "category": "crypto",
+ "title": "desfunctional",
+ "description": "A newbie friend of mine was trying to implement a secure server\nfor DES encryption and decryption but there seem to be some errors\nunexpectedly creeping in the key. It is getting frustrating, please help",
+ "flag_sha256": "c1dcdcf4ec34958734643d15f431721d3b88e7af4d9b102c65040520d0fe79f1",
+ "flag": "c1dcdcf4ec34958734643d15f431721d3b88e7af4d9b102c65040520d0fe79f1",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2024_desfunctional\\_attachments\\chall.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

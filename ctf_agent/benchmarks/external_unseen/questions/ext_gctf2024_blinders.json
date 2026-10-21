@@ -1,0 +1,15 @@
+{
+ "id": "ext_gctf2024_blinders",
+ "category": "crypto",
+ "title": "Blinders",
+ "description": "If you are really efficient at guessing which number is missing from {0, 1, ..., 255}, I am more than happy to share you the flag!",
+ "flag_sha256": "099cc26a39b564a47674d865c54245c8bc83532dd11d5ad872a85175d00404fa",
+ "flag": "099cc26a39b564a47674d865c54245c8bc83532dd11d5ad872a85175d00404fa",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2024_blinders\\_attachments\\chall.py",
+  "data\\questions_external\\crypto\\ext_gctf2024_blinders\\_attachments\\client.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

@@ -1,0 +1,45 @@
+{
+ "repo": "andyzorigin/cybench",
+ "commit": "ca483c6443f17a20ba7d6bac3d274859a1721e51",
+ "payloads": {
+  "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_very_easy_packedaway": {
+   "packed": "f246f7f5a246db91904a714b1d144f59685c3b27f538d0e6ac78a4c1022aef46"
+  },
+  "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_easy_crushing": {
+   "crush": "73d37d3041adeb169ce420f1424d3d0063c185ea8e8cbcea669381be790d4a8a",
+   "message.txt.cz": "5831d91ab8dfb29712c787b686386aadc0062cef75014bf3d5e0fd76815e76ce"
+  },
+  "ext_cybench_hackthebox_cyber_apocalypse_2024_reversing_hard_flecksofgold": {
+   "flecks": "6927e5721f9405b5903b7e679ea313b423335240818cf2eb381d2e265d12864a"
+  },
+  "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_hard_permuted": {
+   "output.txt": "81cbbe9f97534045e3d6b540b44716c0205a0cb74ee1e291a31b4480aa068183",
+   "source.py": "f3f521dfb7d81d92ab28f6c53c277f9ccf20a163c8a2ec1c15df1189bd7a00c8"
+  },
+  "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_medium_partial_tenacity": {
+   "output.txt": "43b5dad448f4a962fac2b456b5345b1620728a00e0f2d2ed97a94412f1f7c4ab",
+   "source.py": "4b5d6e9435c6990c37e8832dedf48515d3cfa5a68c75d51f4490dd3e77233778"
+  },
+  "ext_cybench_hackthebox_cyber_apocalypse_2024_crypto_very_easy_dynastic": {
+   "secret.py": "4d2f93bdd052415181c93d0fc94d9d6db14e69abc09fe03d5d013d4e2eafdde5"
+  },
+  "ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_very_easy_it_has_begun": {
+   "script.sh": "5ce310ea3eec3b99c723742a273e5de4e09c0fe377dc8b6e888e75518a2fd760"
+  },
+  "ext_cybench_hackthebox_cyber_apocalypse_2024_forensics_very_easy_urgent": {
+   "Urgent Faction Recruitment Opportunity - Join Forces Against KORP™ Tyranny.eml": "d6b2f637e99b0f4210b3e8388a70692d8daeeab1df2050c5bf8c29f4a1b248cd"
+  },
+  "ext_cybench_project_sekai_ctf_sekaictf_2022_crypto_diffecient": {
+   "Dockerfile": "43c70e31c9e1829a3a9dfb01f0507e90594c23fdc04699f6c40b7d7a8bd4e055",
+   "xinetd": "4c8419dcf6618092cd06d81b6717556efb98257bf29b359ae21cebbf03398d0e",
+   "diffecient.py": "bf4668f888f33cea4280e878300f3f738a8e46ae7a9ed25ba507844f65d3b245"
+  },
+  "ext_cybench_project_sekai_ctf_sekaictf_2023_crypto_randsubware": {
+   "chall.py": "e8f1adc85143e5213f2992d735383862482da62d1f9356b87fabb63909e50c4f"
+  }
+ },
+ "schema": "external_payloads_lock/v1",
+ "written_at": "2026-10-21T02:15:02",
+ "written_by": "scripts/_fetch_cybench_payloads.py",
+ "git_head": "38833e2a"
+}

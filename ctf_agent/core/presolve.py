@@ -749,7 +749,20 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
                     _fp = str(getattr(question, "flag_pattern", "") or "").strip()
                     _pattern_ok = ((not _fp) or bool(re.search(_fp, _cf, re.IGNORECASE))
                                    or _matches_expected_sha256(question, _cf))
-                    if _pattern_ok and _passes_answer_check(question, _cf, answers):
+                    # 2026-10-20 补闸：缓存直返同样要过 sha256 真值。原实现只比
+                    # flag_pattern —— 而 `flag{...}` 这种格式对任何一道题都成立，
+                    # 等于没有校验。实测：基准里 pcap 题的黑板缓存写着 wasm 题的
+                    # flag（同目录兄弟文件被 flag_scan 扫进来），命中后 0.0s 直接
+                    # 返回、steps=0，把别的题的 flag 当答案送出去。sha256 抗碰撞，
+                    # 不符即确定不是本题答案，必须落回引擎重算。
+                    _sha_ok = True
+                    if getattr(question, "expected_sha256", None):
+                        _sha_ok = _matches_expected_sha256(question, _cf)
+                        if not _sha_ok:
+                            logger.info(
+                                "[presolve:blackboard] %s 缓存条目与题面 sha256 不符，"
+                                "作废重算: %s", _qid, str(_cf)[:40])
+                    if _pattern_ok and _sha_ok and _passes_answer_check(question, _cf, answers):
                         logger.info("[presolve:blackboard] %s 黑板缓存命中 flag=%s",
                                     _qid, str(_cf)[:40])
                         return _cf
@@ -902,6 +915,20 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
                 logger.debug("[presolve] %s 命中但疑似垃圾/占位 flag，丢弃: %r",
                              getattr(question, "id", "?"), _r)
         if _fallback is not None:
+            # 2026-10-20 收紧：题面声明了 sha256 真值、暂存候选又**确定不符**时，
+            # 只有答案表对本题有显式条目（且已比对通过）才可信。否则直接返回等于
+            # 把「已知是错的 flag」当答案提交——CTF 每题提交次数有限，错一次就是
+            # 净损失；交回 LLM 继续算至少还有机会。实测触发场景：基准题附件目录里
+            # 混进别的题的文件，flag_scan 把邻居的 flag 扫成本题答案。
+            _explicit = bool(answers) and bool(
+                str(answers.get(str(getattr(question, "id", ""))) or "").strip())
+            if _sha_truth_declared and not _explicit \
+                    and not _matches_expected_sha256(question, _fallback):
+                logger.info(
+                    "[presolve] %s 暂存候选与题面 sha256 不符且答案表无本题条目 → "
+                    "不返回（确定错误，交 LLM 重算）: %s",
+                    getattr(question, "id", "?"), str(_fallback)[:40])
+                return None
             _cache_presolve_hit(question, _fallback)
         return _fallback
     finally:

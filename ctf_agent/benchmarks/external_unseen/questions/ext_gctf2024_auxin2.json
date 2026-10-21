@@ -1,0 +1,15 @@
+{
+ "id": "ext_gctf2024_auxin2",
+ "category": "misc",
+ "title": "auxin2",
+ "description": "It's only 208 bytes this time, how bad could it really be?\nNote: The flag is in 'flag'. The server is running uxncli compiled from the commit https://git.sr.ht/~rabbits/uxn/commit/bb57b85f5724ccabdb081ff83080c2e3e0e122f7.",
+ "flag_sha256": "36bd44fae041e18a99298ab874f3cf9c08c9f038da8ebd19ad4e9ce502f9ea14",
+ "flag": "36bd44fae041e18a99298ab874f3cf9c08c9f038da8ebd19ad4e9ce502f9ea14",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\misc\\ext_gctf2024_auxin2\\_attachments\\auxin2.rom",
+  "data\\questions_external\\misc\\ext_gctf2024_auxin2\\_attachments\\run.py"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

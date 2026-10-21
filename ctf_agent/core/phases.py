@@ -165,6 +165,17 @@ async def plan_step(agent, ctx: AgentContext, attempt: int) -> dict:
             )
     user = agent._build_plan_prompt(ctx, attempt)
     result = await agent._llm_json(system, user, attempt, recover_script=True)
+    # ── plan 嵌套拍平（2026-10-21 真题验证发现）──
+    # 工具清单写「参数写在 plan 顶层」，LLM 稳定地把参数塞进一个叫 plan 的
+    # **嵌套对象**：{"action":"tool","tool":"rea_probe","plan":{"lane":"decompile_batch"}}。
+    # 而 execute_tool 只读顶层 plan.get("lane") → 嵌套参数全丢，四次调用
+    # 全是 lane=auto、观察逐字相同、死循环闸止损。改提示词只能治新对话；
+    # 在执行出口拍平才能同时兜住历史格式。规则：嵌套键补齐，显式顶层键优先。
+    if result and isinstance(result.get("plan"), dict):
+        _nested = result.pop("plan")
+        for _k, _v in _nested.items():
+            if result.get(_k) is None:
+                result[_k] = _v
     if not result:
         if has_attachment and not ctx._attachment_analyzed:
             return {"action": "tool", "tool": "file_analyze",

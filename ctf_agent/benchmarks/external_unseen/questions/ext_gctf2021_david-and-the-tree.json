@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2021_david-and-the-tree",
+ "category": "misc",
+ "title": "David and the Tree",
+ "description": "Sometimes, what's more important is not what you have, but what you're missing.",
+ "flag_sha256": "b05a30c36ed8e082856d1758d60cd06360c5cb2c8aa2b779abb5af87caf8e8aa",
+ "flag": "b05a30c36ed8e082856d1758d60cd06360c5cb2c8aa2b779abb5af87caf8e8aa",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\misc\\ext_gctf2021_david-and-the-tree\\_attachments\\challenge.zip"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

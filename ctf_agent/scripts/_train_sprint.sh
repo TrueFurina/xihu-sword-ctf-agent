@@ -94,15 +94,15 @@ step 2 "配置：备份当前环境变量 → 覆盖刷题参数（仅脚本内 
   # 注意：_provider_failover.py --auto 会把主 provider 写成 baidu（免费源），此处必须覆盖。
   export CTF_AGENT_USE_REAL_LLM=1
   export CTF_AGENT_LLM_PROVIDER=deepseek
-  export CTF_AGENT_LIGHT_MODEL=deepseek-chat
+  export CTF_AGENT_LIGHT_MODEL=deepseek-flash
   export CTF_AGENT_MID_MODEL=qwen3.8-27b
-  export CTF_AGENT_HEAVY_MODEL=deepseek-reasoner
+  export CTF_AGENT_HEAVY_MODEL=deepseek-flash
   export CTF_AGENT_MAX_CONCURRENCY=3          # 靶机并发 ≤3（用户硬约束）
   export CTF_AGENT_PER_Q_WALLCLOCK=300        # 单题墙钟止损 300s
   export CTF_AGENT_UPGRADE_AFTER=2            # 连续 2 次失败升级重型模型
   export CTF_AGENT_MAX_RETRIES=2              # 校验循环收紧（止损）
   export CTF_AGENT_ENFORCE_WHITELIST=1        # 白名单合规闸门
-  note "主 provider: ${CTF_AGENT_LLM_PROVIDER}（light=deepseek-chat / heavy=deepseek-reasoner）"
+  note "主 provider: ${CTF_AGENT_LLM_PROVIDER}（light=deepseek-flash / heavy=deepseek-flash）"
   note "并发=3 墙钟=300s 升级=2次 重试=2 白名单=开"
   echo "  关键变量已生效（仅本脚本进程）"
 fi

@@ -14,8 +14,8 @@ from llm.client import ai_chat, _resolve_settings  # noqa: E402
 
 # (label, provider, model) —— 覆盖赛时矩阵各路
 PROBES = [
-    ("deepseek(deepseek-chat)", "deepseek", None),
-    ("deepseek(reasoner)", "deepseek", "deepseek-reasoner"),
+    ("deepseek(deepseek-flash)", "deepseek", None),
+    ("deepseek(deepseek-v4-pro 重型)", "deepseek", "deepseek-v4-pro"),
     ("qwen(qwen3.7-plus)", "qwen", "qwen3.7-plus"),
     ("qwen(glm-4.7 via 百炼)", "qwen", "glm-4.7"),
     ("glm(智谱 bigmodel)", "glm", "glm-4.7"),
