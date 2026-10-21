@@ -183,3 +183,8 @@ ctf_agent/.pytest_tmp*
 #    ctf_agent/2027-prep/作战规划_2027.md
 /2027-prep/
 ctf_agent/2027-prep/
+
+# 覆盖率产物（2026-10-21 pytest-cov 接入）
+.coverage
+.coverage.*
+htmlcov/

@@ -1023,11 +1023,13 @@ class ReaProbeAdapter(ToolAdapter):
         info = _elf_info_file(path)
         sec_count = info["sectionHeaders"]
         sec_names = [n for n in info["sections"] if n]
-        if info.get("parseError"):
-            lines.append(f"  ⚠ ELF 头解析不完整：{info['parseError']}")
         head_line = (f"[rea_probe] lane=elf  {os.path.basename(path)}  {size:,} B  "
                      f"ELF{info['class']} {info['machine']} {info['type']}")
         lines = [head_line]
+        # 2026-10-21 ruff F821 修复：原实现先 append 后定义 lines（NameError 只在
+        # parseError 分支触发——ELF 节头表在 0x2000 读窗之外/解析不完整时）。
+        if info.get("parseError"):
+            lines.append(f"  ⚠ ELF 头解析不完整：{info['parseError']}")
         contract_parts: list[dict] = []
 
         exe = self._objdump_exe()
