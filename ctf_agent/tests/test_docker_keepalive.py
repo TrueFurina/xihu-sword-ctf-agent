@@ -76,19 +76,33 @@ def test_interval_well_inside_window_is_accepted():
 
 # ── 3. 心跳真的在跳 ──────────────────────────────────────────
 def test_keepalive_thread_actually_pokes():
-    """合成自检：心跳线程必须在若干周期内累计 poke。
+    """合成自检：心跳线程必须真的累计 poke（不许"对象在、计数不动"）。
 
     这一条守护 `KeepAlive.run()`。若日后有人把 poke 移出循环或让异常直接跳出，
     对象仍会被 start()，`pokes` 属性仍在，只是**永不增长**——不看计数看不出来。
+
+    判据口径（2026-10-21 改）：**等条件，不等墙钟**。
+    原实现是 `sleep(1.2)` 后断言 `pokes >= 2`——这个断言同时依赖两件事：
+    "每次 poke 都会自增"（要守的）和"本机 1.2s 内能跑完 2 次子进程"（不该守的）。
+    merge 门禁实测：bkcrack 的 OMP 线程把机器占满时本条转红（pokes=1），
+    单独复跑立刻 1.88s 通过——**判据在测机器忙闲**，不是测机制。
+    现在改为在 DEADLINE 内轮询 `pokes >= 2`：机制坏了（永不 poke / 异常跳出）
+    照样失败，机器慢只是多等一会儿。
     """
+    deadline = 10.0
     k = ka.KeepAlive(interval=0.2, docker_bin=sys.executable)
     k.start()
+    started = time.monotonic()
     try:
-        time.sleep(1.2)
+        while time.monotonic() - started < deadline and k.pokes < 2:
+            time.sleep(0.05)
     finally:
         k.stop()
         k.join(timeout=5)
-    assert k.pokes >= 2, f"心跳线程没在发心跳：pokes={k.pokes}（期望 >=2）"
+    elapsed = time.monotonic() - started
+    assert k.pokes >= 2, (
+        f"心跳线程没在发心跳：pokes={k.pokes}（{elapsed:.1f}s 内期望 >=2；"
+        f"interval=0.2s，说明 run() 循环里的 poke 没有增长）")
 
 
 def test_keepalive_stops_on_request():
