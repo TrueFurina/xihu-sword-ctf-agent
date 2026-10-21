@@ -94,7 +94,6 @@ def _truth_match(text: str, sha256: str) -> str | None:
     持有明文就成了泄漏源。这里只做「抽候选 → 哈希 → 比对 sha256」。
     """
     import hashlib
-    import re as _re
 
     from tools.adapters.flag_scan_adapter import FLAG_PATTERNS
 

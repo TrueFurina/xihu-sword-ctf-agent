@@ -19,7 +19,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from core.goal_directive import GOAL_SYSTEM_PROMPT, GoalLogger, parse_skill_require
+# 转导出（re-export）：core/phases.py 从本模块取 GOAL_SYSTEM_PROMPT，本模块自身
+# 不直接使用。2026-10-21 ruff F401 自动清理曾把它删掉 → phases.py ImportError
+# （7 条测试红）。保留并显式标注 noqa，防止再次被"清理"。
+from core.goal_directive import GoalLogger, GOAL_SYSTEM_PROMPT  # noqa: F401
 from core.answer_key_filter import filter_answer_key_attachments  # ITEM4-A：隔离答案密钥附件
 
 logger = logging.getLogger(__name__)
@@ -1342,7 +1345,6 @@ class MainAgent:
         try:
             from core.budget_reflection import (
                 reflect as _reflect_budget, BudgetState as _BudgetState,
-                DECISION_ABANDON,
             )
         except Exception:  # noqa: BLE001 - 反思日志不应影响主流程
             return

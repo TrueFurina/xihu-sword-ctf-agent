@@ -20,7 +20,6 @@ CTF 里的 flag 经常被拆在相邻两个包里（本适配器的测试样本�
 from __future__ import annotations
 
 import asyncio
-import gzip
 import json
 import logging
 import os

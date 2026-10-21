@@ -106,7 +106,6 @@ class ToolRegistry:
         if name not in ToolRegistry._HIGH_RISK_TOOLS:
             return True
         import os
-        import time
         hitl = os.getenv("CTF_AGENT_HITL", "").strip() == "1"
         action = str(params.get("action", "") or "")
         detail = str(params)[:120]
