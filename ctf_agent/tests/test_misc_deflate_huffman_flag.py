@@ -413,8 +413,16 @@ def test_solves_with_third_party_imports_blocked(monkeypatch):
     assert hashlib.sha256(res["flag"].encode()).hexdigest() == _TRUTH_SHA
 
 
+@needs_question
 def test_no_flag_plaintext_in_source():
-    """反捷径：skill 源码不得含 flag 明文 / 题库 sha256。"""
+    """反捷径：skill 源码不得含 flag 明文 / 题库 sha256。
+
+    必须挂 needs_question：真值缺失时 `_TRUTH_SHA` 是空串，而空串是**任何字符串
+    的子串**，`"" not in src` 恒为 False —— 断言会变成「永远失败」，与它想守的
+    「源码没有泄漏真值」毫无关系（2026-10-20 实测就是这么红的）。
+    这里再加一道非空断言，防止以后有人把 skip 标记去掉又把空值放回来。
+    """
+    assert _TRUTH_SHA, "真值缺失时本断言无意义，应走 skip 而不是判红"
     src = (_ROOT / "skills" / "misc_deflate_huffman_flag.py").read_text(encoding="utf-8")
     assert "CTF{" not in src
     assert "OLE-E-COM" not in src

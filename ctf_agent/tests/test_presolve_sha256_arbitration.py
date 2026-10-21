@@ -75,11 +75,31 @@ def test_no_truth_keeps_first_wins_behavior(tmp_path, monkeypatch):
     assert got == DECOY_FLAG
 
 
-def test_truth_declared_but_never_verified_falls_back(tmp_path, monkeypatch):
-    """有真值声明但扫完无验真候选 → 回退暂存的先到合格候选（不比旧行为更差）。"""
+def test_truth_declared_candidate_mismatch_is_not_returned(tmp_path, monkeypatch):
+    """2026-10-20 语义收紧：题面有 sha256 真值、暂存候选又确定不符 → 不返回。
+
+    旧行为是「回退暂存的先到合格候选（不比旧行为更差）」，前提是「返回个候选总比
+    空手强」。在限次提交的赛制下这个前提不成立：候选过不了 sha256 = **确定不是
+    本题答案**，直接返回等于拿一次提交额度换一个必然错误。实测触发路径：基准题
+    的附件目录里混进别的题的文件，flag_scan 把邻居的 flag 扫成本题答案，命中后
+    steps=0 直接提交。现在返回 None，交回 LLM 继续算。
+    """
     _patch_tasks(monkeypatch, fast=DECOY_FLAG, slow=None)
     q = _make_q(TRUE_SHA)
     got = asyncio.run(P.presolve(q, registry=None, force=True))
+    assert got is None, "确定不符 sha256 的候选不得作为答案返回"
+
+
+def test_explicit_answer_entry_still_allows_fallback(tmp_path, monkeypatch):
+    """答案表对本题有显式条目且比对通过 → 仍可按暂存候选回退（真值链路不降级）。
+
+    这条保住既有能力：题库答案表与题面 sha256 冲突时，答案表是更贴近评测口径的
+    真值源，不该被新闸一刀切掉。
+    """
+    _patch_tasks(monkeypatch, fast=DECOY_FLAG, slow=None)
+    q = _make_q(TRUE_SHA)
+    got = asyncio.run(P.presolve(q, registry=None, force=True,
+                                 answers={q.id: DECOY_FLAG}))
     assert got == DECOY_FLAG
 
 
