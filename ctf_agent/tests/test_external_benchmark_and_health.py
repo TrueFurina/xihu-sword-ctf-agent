@@ -8,7 +8,6 @@
 """
 import importlib.util
 import json
-import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -38,7 +37,6 @@ class TestBenchmarkManifestRules(unittest.TestCase):
 
     def test_no_plaintext_answers_in_benchmark(self):
         """反注水硬门：基准里不得出现明文答案，只有 64 位占位。"""
-        import re
         for f in (ROOT / "benchmarks" / "external_unseen" / "questions").glob("*.json"):
             q = json.loads(f.read_text(encoding="utf-8"))
             self.assertRegex(q["flag_sha256"], r"^[0-9a-f]{64}$", f"{f.stem} 真值非法")

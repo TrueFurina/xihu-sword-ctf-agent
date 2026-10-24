@@ -414,7 +414,7 @@ if __name__ == "__main__":
     test_readme_count_check_green_on_synthetic_consistent()
     test_readme_count_check_bites_on_synthetic_drift()
     test_readme_count_check_skips_when_corpus_absent()
-    test_heldout_status_is_machine_derived()
+    test_heldout_status_internally_consistent()
     test_summarize_benchmark_report_follows_input()
     test_readme_heldout_green_on_live_repo()
     test_readme_heldout_bites_when_truth_moves()

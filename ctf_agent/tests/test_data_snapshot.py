@@ -138,3 +138,91 @@ def test_verify_detects_missing_empty_dir(tmp_path):
 
     os.rmdir(os.path.join(dst, "empty"))
     assert any("缺目录" in x for x in S.verify(dst)), S.verify(dst)
+
+
+# ── 每日定时快照的"没变就跳过"（2026-10-21）──────────────────────────────
+# 背景：单份 data/ 快照约 80 MB。每天无条件落一份，一年几十 GB，会把备份盘
+# 填满——真出事时反而写不进去。「跳过」不是省事，是让备份可持续。
+
+
+def test_stat_fingerprint_stable_across_identical_trees(tmp_path):
+    """同一棵树算两次指纹必须完全相同（否则跳过逻辑永不生效）。"""
+    src = tmp_path / "data"
+    src.mkdir()
+    _mk_tree(src)
+    assert S.stat_fingerprint(str(src)) == S.stat_fingerprint(str(src))
+
+
+def test_manifest_fingerprint_matches_stat_fingerprint(tmp_path):
+    """清单还原的指纹必须与 stat 指纹同口径。
+
+    这两个函数算的是同一个东西的两种来源（一边读目录、一边读旧清单）；
+    口径漂移会让"没变"永远判成"变了"，跳过永不生效，且没人会发现。
+    """
+    src = tmp_path / "data"
+    src.mkdir()
+    _mk_tree(src)
+    dst = S.snapshot(str(src), str(tmp_path / "backups"), "snap1")
+    with open(os.path.join(dst, S.MANIFEST_NAME), encoding="utf-8") as f:
+        m = json.load(f)
+    assert S.manifest_fingerprint(m) == S.stat_fingerprint(str(src))
+
+
+def test_skip_if_unchanged_creates_no_second_snapshot(tmp_path):
+    """内容没变时，第二次调用不得产生新快照目录。"""
+    src = tmp_path / "data"
+    src.mkdir()
+    _mk_tree(src)
+    out = tmp_path / "backups"
+    assert S.main(["--src", str(src), "--out", str(out), "--name", "snap1"]) == 0
+    # 第二次：--skip-if-unchanged 应跳过
+    assert S.main(["--src", str(src), "--out", str(out),
+                   "--skip-if-unchanged"]) == 0
+    assert sorted(p.name for p in out.iterdir()) == ["snap1"], \
+        f"应只有 1 份快照，实得 {sorted(p.name for p in out.iterdir())}"
+
+
+def test_skip_if_unchanged_snapshots_when_file_changed(tmp_path):
+    """内容真变了必须照常快照（防"永远跳过"的废逻辑）。"""
+    src = tmp_path / "data"
+    src.mkdir()
+    _mk_tree(src)
+    out = tmp_path / "backups"
+    S.main(["--src", str(src), "--out", str(out), "--name", "snap1"])
+
+    (src / "b" / "two.txt").write_text("hello world", encoding="utf-8")  # 4→11 字节
+    os.utime(src / "b" / "two.txt", (2_000_000_000, 2_000_000_000))  # mtime 也要动
+
+    assert S.main(["--src", str(src), "--out", str(out),
+                   "--skip-if-unchanged"]) == 0
+    names = sorted(p.name for p in out.iterdir())
+    assert len(names) == 2, f"内容变了应再落一份，实得 {names}"
+
+
+def test_skip_if_unchanged_runs_when_no_previous_snapshot(tmp_path):
+    """首次运行（无历史快照）必须照常快照，不能因缺失旧清单而跳过。"""
+    src = tmp_path / "data"
+    src.mkdir()
+    _mk_tree(src)
+    out = tmp_path / "backups"
+    assert S.main(["--src", str(src), "--out", str(out), "--name", "snap1",
+                   "--skip-if-unchanged"]) == 0
+    assert (out / "snap1" / S.MANIFEST_NAME).is_file()
+
+
+def test_latest_snapshot_picks_newest_by_name(tmp_path):
+    """多份快照时取名字排序最后一个（名字带时间戳，字典序即时间序）。"""
+    src = tmp_path / "data"
+    src.mkdir()
+    _mk_tree(src)
+    out = tmp_path / "backups"
+    S.snapshot(str(src), str(out), "data_snapshot_20260101_000000")
+    S.snapshot(str(src), str(out), "data_snapshot_20261021_120000")
+    assert os.path.basename(S.latest_snapshot(str(out))) == "data_snapshot_20261021_120000"
+
+
+def test_latest_snapshot_ignores_dirs_without_manifest(tmp_path):
+    """缺清单的目录不算快照（否则会去读一个不存在的清单）。"""
+    out = tmp_path / "backups"
+    (out / "data_snapshot_20260101_000000").mkdir(parents=True)
+    assert S.latest_snapshot(str(out)) is None
