@@ -65,13 +65,20 @@ def _extract_flag_from_zip(path: str) -> list:
             for name in z.namelist():
                 try:
                     c = z.read(name)
+                    # ⚠️ 2026-10-25 修复（实测）：原来只取 m.group(1)（花括号内
+                    # 内容），**丢掉 flag{} / DASCTF{} 外壳** ⇒ 返回
+                    # 'real_flag_here' 而 presolve 的 _FLAG_RE 要求完整外壳 ⇒
+                    # 本 skill 产出 100% 被丢弃（实测 _FLAG_RE 接受=False），
+                    # fast_solve('zip') 的伪加密回退路 0 贡献。
                     for m in FLAG_RE.finditer(c):
-                        if m.group(1) not in [f[1] for f in flags]:
-                            flags.append((name, m.group(1).decode("utf-8", errors="ignore")))
+                        _full = m.group(0).decode("utf-8", errors="ignore")
+                        if _full not in [f[1] for f in flags]:
+                            flags.append((name, _full))
                     fn = name.encode("utf-8", errors="ignore")
                     for m in FLAG_RE.finditer(fn):  # 文件名也可能是 flag
-                        if m.group(1) not in [f[1] for f in flags]:
-                            flags.append((name, m.group(1).decode("utf-8", errors="ignore")))
+                        _full = m.group(0).decode("utf-8", errors="ignore")
+                        if _full not in [f[1] for f in flags]:
+                            flags.append((name, _full))
                 except Exception:  # noqa: BLE001
                     pass
     except Exception:  # noqa: BLE001
@@ -108,6 +115,15 @@ def run(params: dict) -> dict:
         out["flag"] = flags[0][1]
         out["flags"] = flags
         out["file"] = flags[0][0]
+        # ⚠️ 2026-10-25：修截断后，zip 内诱饵（如最内层 flag.txt 放
+        # `DASCTF{ni_cai?}`）也会变成可提交形态。这里**不猜**哪个是真的，
+        # 只如实标注「zip 内命中多个不同候选」⇒ 上层（presolve / 批处理脚本）
+        # 可据此判歧义，而不是把第一个当真 flag 静默提交。
+        if len({f[1] for f in flags}) > 1:
+            out["ambiguous"] = True
+            out["note"] = ("zip 内命中 %d 个不同 flag 候选，可能含诱饵；"
+                           "flag 字段取第一个，请用 flags 自行裁决"
+                           % len({f[1] for f in flags}))
     return out
 
 
