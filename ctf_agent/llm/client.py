@@ -7,7 +7,7 @@ HTTP 错误、响应格式异常）都返回 None，绝不向上抛出异常，
 
 v2.0 迁移要点：
 - 配置改为从 ctf_agent/config.py 读取（不再依赖 security_agent.config）
-- 默认模型改为 deepseek-v4-flash（轻量），支持按 attempt 升级 deepseek-v4-pro
+- 默认模型改为 deepseek-flash（轻量），支持按 attempt 升级 deepseek-v4-pro
 - 密钥解析：DEEPSEEK_API_KEY > CTF_AGENT_LLM_API_KEY > 配置兜底
 
 密钥解析优先级：
@@ -353,7 +353,7 @@ def ai_chat(
         system: 可选的系统提示词，插入到消息最前面
         temperature: 采样温度，默认 0.3
         max_tokens: 最大输出 token 数
-        model: 显式指定模型；None 时用配置的轻量模型（deepseek-v4-flash）
+        model: 显式指定模型；None 时用配置的轻量模型（deepseek-flash）
         provider: 显式指定 provider（deepseek/qwen/...）；None 时读环境变量
 
     Returns:
@@ -718,9 +718,9 @@ def get_model_for_attempt(attempt: int, provider: Optional[str] = None) -> str:
     v2.0 核心：替代多模型竞速，成本可控。
     P0 修复（2026-08-21）：provider 显式时此前恒返回该 provider 默认模型，
     导致多 provider 场景（run.py build_solver 显式传 provider）attempt>=2 也
-    不升级重型——deepseek-reasoner 深推理永不触发（高难题解不出）。
+    不升级重型——deepseek 官方已弃 chat/reasoner，静默路由到 flash（无独立重型可升）。
     现在：attempt>=2 且 provider 有专属重型 env（CTF_AGENT_{PROV}_HEAVY_MODEL）
-    或命中 provider→重型映射（deepseek→deepseek-reasoner、qwen→deepseek-v4-pro-0813、
+    或命中 provider→重型映射（qwen→qwen3.8-max、tokenhub→deepseek-v4-pro、
     tokenhub→deepseek-v4-pro）时升级；无重型可升的 provider 维持默认（不破坏竞速）。
     """
     config = AppConfig.from_env()
@@ -734,7 +734,7 @@ def get_model_for_attempt(attempt: int, provider: Optional[str] = None) -> str:
             # 处理，qwen/tokenhub 等白名单 provider 显式传入时 attempt>=2 恒返回
             # 默认轻量模型，重型深推理永不触发（高难题解不出）。
             heavy_map = {
-                "deepseek": "deepseek-reasoner",   # 官方 R1：正式赛高难题深推理主源
+                "deepseek": "deepseek-flash",       # 官方已弃 reasoner，chat/reasoner 静默路由到 flash（无独立重型档）
                 "qwen": "qwen3.8-max",             # 2026-09-01 修复：此前误填 kimi-k3（不在 dashscope，
                 # 重型升级 404）。qwen3.8-max 是阿里云百炼真实存在的强推理模型，端点-模型匹配。
                 "tokenhub": "deepseek-v4-pro",     # 腾讯 TokenHub 免费重型
@@ -839,7 +839,7 @@ def _resolve_settings(model: Optional[str], provider: Optional[str] = None) -> d
     try:
         timeout_seconds = max(int(config.llm_timeout_seconds or DEFAULT_TIMEOUT_SECONDS), 1)
         # P1 修复（2026-08-21 第五轮锐评）：重型模型 read timeout 须放宽——
-        # deepseek-reasoner（R1）常态 60-300s；v4-pro 深推理亦常 >60s。
+        # v4-pro 深推理常态 60-300s；deepseek 官方已无 reasoner 档（静默路由 flash）。
         # 60s 统一 read timeout 会掐死 attempt≥2 升级路径。
         _ml = str(model).lower()
         if "reasoner" in _ml or "v4-pro" in _ml:
@@ -911,7 +911,7 @@ def _post_chat(
         payload["temperature"] = 1
 
     # DeepSeek V4/flash 等非推理模型关闭 thinking 换取速度；
-    # 但 deepseek-reasoner（R1）/deepseek-r1 必须保留 thinking，否则深推理能力失效。
+    # 但 deepseek-v4-pro 等深推理模型必须保留 thinking，否则深推理能力失效。
     # 百炼模式下 deepseek-v4-pro-0813 等模型也需关闭（provider=qwen 但 model 是 deepseek）
     _model_name = (settings.get("model", "") or "").lower()
     _is_reasoner = ("reasoner" in _model_name or "r1" in _model_name or "-r1-" in _model_name

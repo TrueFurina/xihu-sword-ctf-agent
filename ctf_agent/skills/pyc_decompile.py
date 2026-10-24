@@ -9,10 +9,8 @@
 依赖：uncompyle6（2026-08-21 已装成功）。
 """
 
-import dis
 import marshal
 import os
-import sys
 import types
 
 

@@ -40,7 +40,7 @@ def _min_roundtrip() -> None:
 
     t0 = time.time()
     text = ai_chat([{"role": "user", "content": "只回复两个汉字：正常"}],
-                   provider="deepseek", model="deepseek-chat", max_tokens=16)
+                   provider="deepseek", model="deepseek-flash", max_tokens=16)
     dt = time.time() - t0
     print(f"[2] 最小 LLM 往返: 耗时 {dt:.1f}s 响应={text!r}")
     if not text:

@@ -68,6 +68,12 @@ echo "[3.5/5] 网络三查（代理存活 / LLM 端点直连 / 平台直连）..
 
 # 4. 全测试（真门禁，锐评 A2：旧循环逐文件裸跑，27 个文件仅 9 个有 __main__，
 #    其余永远打印 OK——假门禁。现改为单次 pytest 真跑，失败即 exit 1 阻断开赛。）
+#
+# 口径说明（2026-10-21）：此处刻意**不排除 local**——setup.sh 是赛前就绪脚本，
+# 跑在本机（REAL_SOLVES_LEDGER.md、data/questions_real/_attachments/ 都真实存在），
+# local 用例应当真跑。CI（.github/workflows/ci.yml）上这些 gitignore 掉的文件不存在，
+# 所以 CI 排除 local。这个差异是有意的，不是两处口径漂移。
+# 想在本地复刻 CI 口径：bash scripts/_ci_local.sh
 echo "[4/5] 全测试套件（pytest -m \"not slow\"，失败即阻断）..."
 if ! "$PY" -m pytest tests/ -q -m "not slow"; then
     echo ""

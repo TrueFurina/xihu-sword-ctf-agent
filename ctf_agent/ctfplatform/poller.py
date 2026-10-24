@@ -21,7 +21,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Optional
+from typing import Awaitable, Callable, Optional
 
 logger = logging.getLogger(__name__)
 

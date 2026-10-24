@@ -749,7 +749,20 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
                     _fp = str(getattr(question, "flag_pattern", "") or "").strip()
                     _pattern_ok = ((not _fp) or bool(re.search(_fp, _cf, re.IGNORECASE))
                                    or _matches_expected_sha256(question, _cf))
-                    if _pattern_ok and _passes_answer_check(question, _cf, answers):
+                    # 2026-10-20 补闸：缓存直返同样要过 sha256 真值。原实现只比
+                    # flag_pattern —— 而 `flag{...}` 这种格式对任何一道题都成立，
+                    # 等于没有校验。实测：基准里 pcap 题的黑板缓存写着 wasm 题的
+                    # flag（同目录兄弟文件被 flag_scan 扫进来），命中后 0.0s 直接
+                    # 返回、steps=0，把别的题的 flag 当答案送出去。sha256 抗碰撞，
+                    # 不符即确定不是本题答案，必须落回引擎重算。
+                    _sha_ok = True
+                    if getattr(question, "expected_sha256", None):
+                        _sha_ok = _matches_expected_sha256(question, _cf)
+                        if not _sha_ok:
+                            logger.info(
+                                "[presolve:blackboard] %s 缓存条目与题面 sha256 不符，"
+                                "作废重算: %s", _qid, str(_cf)[:40])
+                    if _pattern_ok and _sha_ok and _passes_answer_check(question, _cf, answers):
                         logger.info("[presolve:blackboard] %s 黑板缓存命中 flag=%s",
                                     _qid, str(_cf)[:40])
                         return _cf
@@ -902,6 +915,20 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
                 logger.debug("[presolve] %s 命中但疑似垃圾/占位 flag，丢弃: %r",
                              getattr(question, "id", "?"), _r)
         if _fallback is not None:
+            # 2026-10-20 收紧：题面声明了 sha256 真值、暂存候选又**确定不符**时，
+            # 只有答案表对本题有显式条目（且已比对通过）才可信。否则直接返回等于
+            # 把「已知是错的 flag」当答案提交——CTF 每题提交次数有限，错一次就是
+            # 净损失；交回 LLM 继续算至少还有机会。实测触发场景：基准题附件目录里
+            # 混进别的题的文件，flag_scan 把邻居的 flag 扫成本题答案。
+            _explicit = bool(answers) and bool(
+                str(answers.get(str(getattr(question, "id", ""))) or "").strip())
+            if _sha_truth_declared and not _explicit \
+                    and not _matches_expected_sha256(question, _fallback):
+                logger.info(
+                    "[presolve] %s 暂存候选与题面 sha256 不符且答案表无本题条目 → "
+                    "不返回（确定错误，交 LLM 重算）: %s",
+                    getattr(question, "id", "?"), str(_fallback)[:40])
+                return None
             _cache_presolve_hit(question, _fallback)
         return _fallback
     finally:
@@ -1413,7 +1440,6 @@ async def _try_maze_solver(question) -> Optional[str]:
             continue
         if not src:
             continue
-        import re as _re
 
         # 迷宫地图行（'#' 墙 / 空格或 '.' 路 / S/E 出入口）
         rows = []
@@ -1747,7 +1773,7 @@ async def _try_zip_crypto_bruteforce(question) -> Optional[str]:
     if not zip_attach:
         return None
     try:
-        from skills.zip_crypto_bruteforce import run as zc_run
+        from skills.zip_crypto_bruteforce import run as zc_run  # noqa: F401  仅探测技能可导入
     except Exception as exc:  # noqa: BLE001
         logger.debug("[presolve:zip_crypto] 导入失败: %s", exc)
         return None
@@ -2270,7 +2296,7 @@ async def _try_svg_path_text(question) -> Optional[str]:
     if not attach:
         return None
     try:
-        from skills.svg_path_text import decode_container, run as svg_run
+        from skills.svg_path_text import decode_container, run as svg_run  # noqa: F401  同上
     except Exception as exc:  # noqa: BLE001
         _warn_import_once("skills.svg_path_text", exc)
         return None
@@ -2462,7 +2488,7 @@ async def _try_banana_script(question) -> Optional[str]:
         return None
     try:
         from skills.banana_script import is_banana_script as _is_banana
-        from skills.banana_script import run as banana_run
+        from skills.banana_script import run as banana_run  # noqa: F401  同上
     except Exception as exc:  # noqa: BLE001
         _warn_import_once("skills.banana_script", exc)
         return None
@@ -2651,7 +2677,7 @@ async def _try_mbr_sse_verify(question) -> Optional[str]:
         return None
     try:
         from skills.mbr_sse_verify import is_mbr_sse_verify as _is_mbr
-        from skills.mbr_sse_verify import run as mbr_run
+        from skills.mbr_sse_verify import run as mbr_run  # noqa: F401  同上
     except Exception as exc:  # noqa: BLE001
         _warn_import_once("skills.mbr_sse_verify", exc)
         return None
@@ -2814,7 +2840,7 @@ async def _try_knapsack_mhk(question) -> Optional[str]:
     if not pk or not ct:
         return None
     try:
-        from skills.crypto_knapsack_mhk import run as mhk_run
+        from skills.crypto_knapsack_mhk import run as mhk_run  # noqa: F401  同上
     except Exception as exc:  # noqa: BLE001
         _warn_import_once("skills.crypto_knapsack_mhk", exc)
         return None

@@ -1,5 +1,7 @@
 # 西湖论剑 CTF-Agent (xihu-sword-ctf-agent)
 
+> 🔒 **FROZEN / 已冻结（2026-10-23）**：本仓库已被 **SecAutoMind**（`E:\Program\SecAutoMind`）全量吞并，现为**只读知识库**。不再作为参赛主体或维护对象；后续能力发展一律在 SecAutoMind 进行。迁移路线图见 `E:\Program\SecAutoMind\docs\merge_xhlj_roadmap_20261023.md`。
+
 > 🌏 **English documentation / 英文文档**: [README.md](./README.md)
 
 > ⚠️ **诚实声明（务必先读）**：本项目在真实赛事平台上的最终成绩为 **0 个有效提交 flag**。仓库中所有"解出 / 通过率"数据，均指对历年真题（`data/questions_real/` 题库）的**离线确定性分析**，不代表任何线上赛事得分。本项目**不宣称具备 LLM 自主推理能力**——真实能力是一个**确定性静态分析器（presolve）**的题型覆盖度。详见下方[诚实 KPI](#诚实-kpi)。

@@ -13,10 +13,8 @@
 
 import base64
 import binascii
-import itertools
 import os
 import re
-import struct
 import tempfile
 import zipfile
 import zlib

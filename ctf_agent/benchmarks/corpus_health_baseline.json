@@ -3,12 +3,12 @@
   "questions_real": {
    "total": 93,
    "ok": 9,
-   "leaky": 1,
-   "broken": 83
+   "leaky": 2,
+   "broken": 82
   },
   "questions_external": {
-   "total": 43,
-   "ok": 40,
+   "total": 42,
+   "ok": 39,
    "leaky": 0,
    "broken": 3
   },
@@ -19,33 +19,30 @@
    "broken": 3
   },
   "questions_ext_cybench": {
-   "total": 13,
-   "ok": 11,
-   "leaky": 2,
-   "broken": 0
+   "total": 11,
+   "ok": 10,
+   "leaky": 0,
+   "broken": 1
   },
   "questions_ext_A_20261001": {
-   "total": 12,
-   "ok": 12,
+   "total": 11,
+   "ok": 11,
    "leaky": 0,
    "broken": 0
   },
   "questions_ext_trial5_20261001": {
-   "total": 5,
-   "ok": 5,
+   "total": 0,
+   "ok": 0,
    "leaky": 0,
    "broken": 0
   },
   "questions_real_kpi9": {
-   "total": 8,
-   "ok": 8,
+   "total": 0,
+   "ok": 0,
    "leaky": 0,
    "broken": 0
   }
-  },
- "incident_notes": [
-  "2026-10-12T04:40:38Z｜02-25 删除事件致 questions_real 6 道真题附件永久丢失（磁盘已验证缺失、missing_payload_manifest.txt 标注无副本、不可恢复）：BeCare4.md、depressed.md、easyzip.md、love_letter.md、[签到]键盘侠.txt、ezmult/s1.txt、classicCrypto.txt，另含若干 ../_archive 恢复文本引用及 flag.png/xz1.jpg。丢失的是解题载荷→对应题变 payload_missing→broken。按门禁设计（基线吸收已接受的永久损失，未来回归仍报警），将 questions_real 基线 broken 77→83、ok 14→9、leaky 2→1 吸收此事件。注意：questions_external/questions_ext/questions_ext_cybench 等池当前磁盘 manifest 亦大量缺失（≈93 题仅剩 _attachments 目录），但门禁将其误读为 improvement（broken 计数未升），属门禁逻辑缺陷，另立票跟踪，本次不擅自归一化以免掩盖真实数据丢失。"
- ],
+ },
  "tracked_pools": [
   "questions_real",
   "questions_external",
@@ -57,7 +54,11 @@
   "questions_real_kpi9"
  ],
  "schema": "corpus_health_baseline/v1",
- "written_at": "2026-10-12T04:40:38Z",
- "written_by": "manual-honest-update (02-25 incident absorption; see incident_notes)",
- "git_head": "fb681a53"
+ "written_at": "2026-10-21T02:32:23",
+ "written_by": "scripts/check_corpus_health.py --update + REA closing round incident merge",
+ "git_head": "38833e2a",
+ "incident_notes": [
+  "2026-10-12T04:40:38Z｜02-25 删除事件致 questions_real 6 道真题附件永久丢失（磁盘已验证缺失、missing_payload_manifest.txt 标注无副本、不可恢复）：BeCare4.md、depressed.md、easyzip.md、love_letter.md、[签到]键盘侠.txt、ezmult/s1.txt、classicCrypto.txt，另含若干 ../_archive 恢复文本引用及 flag.png/xz1.jpg。丢失的是解题载荷→对应题变 payload_missing→broken。按门禁设计（基线吸收已接受的永久损失，未来回归仍报警），将 questions_real 基线 broken 77→83、ok 14→9、leaky 2→1 吸收此事件。注意：questions_external/questions_ext/questions_ext_cybench 等池当前磁盘 manifest 亦大量缺失（≈93 题仅剩 _attachments 目录），但门禁将其误读为 improvement（broken 计数未升），属门禁逻辑缺陷，另立票跟踪，本次不擅自归一化以免掩盖真实数据丢失。",
+  "2026-10-21｜REA 真题验证收尾轮：主 worktree data/ 于 10-20 03:16 被清空，从同仓库兄弟 worktree（wt-core-bare-guard）cp -rn 只追加恢复 questions_external/questions_ext/questions_real/questions_ext_cybench 源题面、A_20261001、trial5 附件、KPI_BASELINE。仍确认丢失（两处 worktree 均无副本）：questions_external 1 题、questions_ext_cybench 2 题、questions_ext_A_20261001 1 题、questions_ext_trial5 5 题面 JSON（附件幸存）、questions_real_kpi9 全池 8 题（与 questions_real 同 qid 重复池；其中 5 题载荷已在 02-25 事件确认永久丢失）。cybench 坏题 0→1 = dynastic：其发布件 output.txt/source.py 含 HTB{} 字面量被泄漏闸拒写（已验证与真值不匹配，系 decoy，但纪律不落盘），该题以 payload_missing 正门离池（基准 50→79 题重建）。基线经 check_corpus_health --update 吸收当前磁盘真值，未来回归仍报警。"
+ ]
 }

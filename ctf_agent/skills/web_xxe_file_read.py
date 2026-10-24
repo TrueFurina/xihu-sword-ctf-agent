@@ -8,7 +8,6 @@
     result = web_xxe_file_read(params)  -> 文件内容字符串
 """
 
-import base64
 import re
 import time  # AST 白名单允许 import time（禁止 __import__()）
 

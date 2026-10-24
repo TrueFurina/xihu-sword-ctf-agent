@@ -129,7 +129,7 @@ def _run_async(coro):
     """
     import asyncio
     try:
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()  # 仅探测"当前线程是否已有事件循环"，不需要句柄
     except RuntimeError:
         return asyncio.run(coro)
     # 已有循环：新建任务并等待（线程安全；subprocess 场景 OK）
@@ -191,6 +191,8 @@ def _engine_caesar(question):
     """凯撒 26 位移爆破。"""
     if getattr(question, "category", "") != "crypto":
         return None
+    import re
+
     text = _attach_texts(question)
     for line in text.splitlines():
         s = line.strip()
@@ -201,11 +203,9 @@ def _engine_caesar(question):
                 else (chr((ord(c) - 65 + shift) % 26 + 65) if "A" <= c <= "Z" else c)
                 for c in s
             )
-            if re.search(r"(?i)(?:flag|ctf|dasctf)\{", pt):
-                import re as _re_m
-                _fm = _re_m.search(r"(?i)(?:flag|ctf|dasctf)\{[^}\s]+\}", pt)
-                if _fm:
-                    return _fm.group(0)
+            _fm = re.search(r"(?i)(?:flag|ctf|dasctf)\{[^}\s]+\}", pt)
+            if _fm:
+                return _fm.group(0)
     return None
 
 
@@ -249,7 +249,7 @@ def _engine_morse(question):
         "--..": "Z",
     }
     for line in text.splitlines():
-        if re_match := __import__("re").fullmatch(r"[.\- ]+", line.strip()):
+        if __import__("re").fullmatch(r"[.\- ]+", line.strip()):
             words = line.strip().split("  ")
             out = ""
             for w in words:
@@ -275,7 +275,6 @@ def _engine_rsa(question):
         return None
     try:
         from agents.crypto_toolkit import CryptoToolkit
-        import asyncio
         from sandbox.subprocess_executor import SubprocessExecutor
 
         atts = list(getattr(question, "attachments", None) or [])
@@ -311,7 +310,6 @@ def _engine_legendre(question):
         return None
     try:
         from agents.crypto_toolkit import CryptoToolkit
-        import asyncio
         from sandbox.subprocess_executor import SubprocessExecutor
 
         atts = list(getattr(question, "attachments", None) or [])
@@ -367,7 +365,6 @@ def _engine_reverse(question):
         return None
     try:
         from core.fallbacks import build_reverse_fallback_script
-        import asyncio
         from sandbox.subprocess_executor import SubprocessExecutor
 
         atts = list(getattr(question, "attachments", None) or [])
@@ -425,7 +422,6 @@ def _engine_misc_zip(question):
         # 2) 直接递归解 zip（无密码/常见密码），搜索 flag 文本
         # P1-2 修复（2026-08-21 赛后）：整段给 20s 时间预算——zip 5 位爆破
         # × 多层套娃实测可阻塞数分钟（to_thread 无法取消），必须硬性到点退出。
-        import io, zipfile
         _t_budget = 20.0
         _t_start = time.monotonic()
         zdata = open(zip_path, "rb").read()
@@ -447,7 +443,6 @@ def _engine_misc_decode(question):
         return None
     try:
         from tools.adapters.deterministic_decode_adapter import DeterministicDecodeAdapter
-        import asyncio
 
         adapter = DeterministicDecodeAdapter()
         # 优先读附件文本
@@ -635,7 +630,7 @@ def _engine_pkcs1_oracle(question):
     if idx >= 0:
         tail = src[idx:idx + 20_000]
         # 抽所有 200+ 位整数
-        all_ints = [(int(x), m.start()) for m in
+        all_ints = [(int(m.group(1)), m.start()) for m in
                     re.finditer(r"(?<!\d)(\d{200,})", tail)]
         # 优先 1) 无 label 的 600+ 位数字；2) 200+ 位数字中 bit_length 接近 2040 的
         unlabeled = []

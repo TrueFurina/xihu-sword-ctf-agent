@@ -1,5 +1,10 @@
 # xihu-sword-ctf-agent
 
+> 🔒 **FROZEN / 已冻结（2026-10-23）**：本仓库已被 **SecAutoMind**（`E:\Program\SecAutoMind`）全量吞并，
+> 现为**只读知识库**（攻击链、writeup、验证脚本、基准数据仍可参考复用）。不再作为参赛主体或维护对象，
+> 不再提交新功能。后续能力发展一律在 SecAutoMind 进行；迁移路线图见
+> `E:\Program\SecAutoMind\docs\merge_xhlj_roadmap_20261023.md`。Bug 级修复仅以支撑赛事复盘为限。
+
 > 🔧 **确定性优先的 CTF 智能体框架** — 先用 72 个可复现确定性技能横向爆破常见题型，LLM 仅在静态分析 miss 时才作为最后手段介入，且受白名单 / token 预算 / 墙钟止损三重约束。结果可复现、可调试、且**对自己能做什么诚实**。
 
 > 🌏 **中文文档 / Chinese documentation**: [README.zh.md](./README.zh.md)

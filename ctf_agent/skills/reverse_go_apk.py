@@ -10,7 +10,6 @@ REVERSE-02（MirrorShield.apk）strings 无 flag。本 skill 提供深挖路径�
 
 import os
 import re
-import struct
 import zipfile
 
 FLAG_RE = re.compile(rb"(?:DASCTF|flag)\{[^}\s]{3,}\}")

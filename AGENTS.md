@@ -1,3 +1,5 @@
+> 🔒 **FROZEN / 已冻结（2026-10-24）**：本仓库已停止维护，并全量并入 **SecAutoMind**（`E:\Program\SecAutoMind`，唯一参赛/维护主体，见其 AGENTS.md 唯一主体声明 2026-10-23）。本文件所述治理机制仅作历史存档，新工作一律在 SecAutoMind 进行；迁移证据链见 `E:\Program\SecAutoMind\docs\merge_xhlj_roadmap_20261023.md` 与 `CTF-Agent_融合/MIGRATION_DELTA_20261024.md`。对源仓的一切改动仅限冻结收尾。
+
 # AGENTS.md — 西湖论剑 CTF-Agent 协作与目录法规模约
 
 > 本文件是**所有 AI 协作者（含未来会话/子 agent）的强制约定**。先读后写。

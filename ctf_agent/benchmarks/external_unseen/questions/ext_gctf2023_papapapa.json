@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2023_papapapa",
+ "category": "misc",
+ "title": "papapapa",
+ "description": "Is this image really just white?",
+ "flag_sha256": "7f0a7016faa59671855edf5d995e43abc51f9ef8bd7a84a38fdb704fb9b957b8",
+ "flag": "7f0a7016faa59671855edf5d995e43abc51f9ef8bd7a84a38fdb704fb9b957b8",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\misc\\ext_gctf2023_papapapa\\_attachments\\white.jpg"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

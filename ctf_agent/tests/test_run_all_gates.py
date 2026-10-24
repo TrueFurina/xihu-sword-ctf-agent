@@ -159,10 +159,18 @@ class TestExitCodes(unittest.TestCase):
 
 
 class TestResultShape(unittest.TestCase):
-    def test_reports_all_three_data_gates(self):
+    def test_reports_all_registered_gates(self):
+        """聚合器必须跑满注册表里的每一道——漏跑一道等于那道门禁不存在。
+
+        2026-10-21 从三道扩到四道（新增 static 静态门禁）。这里刻意写成
+        「与 GATES 注册表一致」而不是再硬编码一个集合字面量：硬编码必然在下一次
+        扩表时变红，然后被人顺手改成新的字面量——测试就退化成"抄一遍实现"。
+        """
         rep = g.run_gates()
         keys = {r["key"] for r in rep["results"]}
-        self.assertEqual(keys, {"truth", "bench", "health"})
+        self.assertEqual(keys, {k for k, *_ in g.GATES})
+        # 静态门禁必须在列（它是唯一能抓 "NameError 被 try/except 吞掉" 的一道）
+        self.assertIn("static", keys)
 
     def test_each_result_has_diagnostics(self):
         """失败时必须能看出是哪道门禁、什么输出——静默红是不可诊断的。"""

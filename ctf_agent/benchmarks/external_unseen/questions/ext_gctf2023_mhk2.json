@@ -1,0 +1,15 @@
+{
+ "id": "ext_gctf2023_mhk2",
+ "category": "crypto",
+ "title": "MHK2",
+ "description": "I hid your flag using one of Murakami's knapsacks",
+ "flag_sha256": "57fadd46d13972fee45dd5da37db06be6f5781e9bfa7c12a4044273cc2595a8e",
+ "flag": "57fadd46d13972fee45dd5da37db06be6f5781e9bfa7c12a4044273cc2595a8e",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2023_mhk2\\_attachments\\MHK2.sage",
+  "data\\questions_external\\crypto\\ext_gctf2023_mhk2\\_attachments\\output.txt"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

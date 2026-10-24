@@ -100,7 +100,7 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     from config import AppConfig
     from core.main_agent import MainAgent
     from core.supervisor_agent import SupervisorAgent
-    from llm.client import ai_chat_json, get_model_for_attempt
+    from llm.client import get_model_for_attempt
     from scheduler.budget import BUDGET_STOP, BudgetExceeded, BudgetTracker
     from verify.feedback import FeedbackLoop
     from verify.flag_checker import FlagChecker
@@ -138,6 +138,9 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     from tools.adapters.deterministic_decode_adapter import DeterministicDecodeAdapter
     from tools.adapters.crypto_auto_adapter import CryptoAutoAdapter
     from tools.adapters.flag_scan_adapter import FlagScanAdapter
+    from tools.adapters.rea_probe import ReaProbeAdapter
+    from tools.adapters.wasm_probe import WasmProbeAdapter
+    from tools.adapters.pcap_probe import PcapProbeAdapter
     from tools.skill_manager import SkillManager
 
     sandbox = SubprocessExecutor(default_timeout=_cfg.sandbox_timeout)
@@ -155,6 +158,9 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     registry.register(DeterministicDecodeAdapter())  # 确定性解码 fallback（P1-6：postmortem #3）
     registry.register(CryptoAutoAdapter(sandbox=sandbox))  # 确定性 crypto 嗅探/攻击一键直出（2026-08-21 攻坚）
     registry.register(FlagScanAdapter())                    # 确定性 flag 明文扫描（源码注释/HTML alert 类）
+    registry.register(ReaProbeAdapter())                    # REA 无引擎静态分析（.NET/Go/PE，2026-10-20）
+    registry.register(WasmProbeAdapter())                   # WASM 静态分析（WABT 1.0.42，2026-10-20）
+    registry.register(PcapProbeAdapter())                   # 流量分析（scapy 主引擎，TCP 重组，2026-10-20）
     # ── 工具声明式配方（2026-09-02）：JSON 配方自动注册，降低加工具成本（新增工具只写配方）──
     from tools.recipe_loader import load_recipe_adapters
     for _ra in load_recipe_adapters():

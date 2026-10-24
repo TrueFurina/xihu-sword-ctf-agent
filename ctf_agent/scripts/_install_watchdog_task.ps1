@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   把 TOP-0 看门狗注册为 Windows 任务计划程序（开机自启、用户登录后后台运行）。
 .DESCRIPTION
@@ -22,7 +22,12 @@ if ($Uninstall) {
 }
 
 $Trigger = New-ScheduledTaskTrigger -AtLogOn
-$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBattery -ExecutionTimeLimit ([TimeSpan]::Zero)
+# 2026-10-21 修复：参数名是复数 DontStopIfGoingOnBatteries。
+# 单数写法（DontStopIfGoingOnBattery）会让 New-ScheduledTaskSettingsSet 直接抛
+# "找不到与参数名称…匹配的参数"，于是 Register-ScheduledTask 根本执行不到——
+# 脚本看起来"跑过了"，任务却没注册。同批新增的 _install_snapshot_task.ps1 首次注册时
+# 撞了同一个坑，才反查出来。
+$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Description "TOP-0 协同任务总账文件系统变更自动记录看门狗" -Force | Out-Null
 Write-Host "[TOP0] ✅ 已注册计划任务 $TaskName（登录时后台启动）"
 Write-Host "[TOP0] 验证: taskschd.msc 或 Get-ScheduledTask -TaskName $TaskName"

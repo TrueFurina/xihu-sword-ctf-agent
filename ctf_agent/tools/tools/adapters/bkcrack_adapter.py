@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import os
 import re
-import shlex
 from typing import Optional
 
 from tools.base import ToolAdapter, ToolOutput

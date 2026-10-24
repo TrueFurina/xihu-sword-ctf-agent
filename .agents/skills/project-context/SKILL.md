@@ -2,6 +2,8 @@
 name: project-context
 description: 西湖论剑 CTF-Agent 项目上下文与铁律入口；触发词：西湖论剑、ctf_agent、项目上下文、这个项目是什么
 ---
+
+> 🔒 **项目已冻结（2026-10-24）**：西湖论剑已全量并入 SecAutoMind（`E:\Program\SecAutoMind`）。本技能所述流程仅适用于冻结源仓的考古/复盘场景；一切新工作在 SecAutoMind 进行（宪章见其 `AGENTS.md`）。
 # 项目上下文 — 西湖论剑 CTF-Agent
 
 ## 项目是什么

@@ -183,3 +183,15 @@ ctf_agent/.pytest_tmp*
 #    ctf_agent/2027-prep/作战规划_2027.md
 /2027-prep/
 ctf_agent/2027-prep/
+
+# 覆盖率产物（2026-10-21 pytest-cov 接入）
+.coverage
+.coverage.*
+htmlcov/
+# coverage.json 是 scripts/_gate_coverage.py 的读数来源，机器生成、每次重写，
+# 不是真值（真值是 pyproject.toml 里的阈值）——所以不入库，避免每次跑测试都脏工作区。
+coverage.json
+ctf_agent/coverage.json
+
+# data/ 快照落点（scripts/_snapshot_data.py 默认输出，82MB/份，绝不入库）
+/backups/

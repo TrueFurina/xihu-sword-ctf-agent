@@ -176,7 +176,6 @@ def parse_subpaths(path_data: str) -> Optional[List[List[Tuple[float, float]]]]:
     cur: List[Tuple[float, float]] = []
     x = y = 0.0
     sx = sy = 0.0
-    start = None
     prev_ctrl = None          # S/T 的反射控制点
     prev_cmd = ""
     i = 0

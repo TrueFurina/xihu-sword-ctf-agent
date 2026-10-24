@@ -61,14 +61,14 @@ def test_error_classifier() -> None:
 def test_model_router() -> None:
     print("[llm/client 分级降级（原 scheduler/model_router 已删，P1-4）]")
     # 分级降级调度实际由 llm/client.get_model_for_attempt 承担：
-    # attempt 0-1 轻量模型，attempt >=2 升级重型（deepseek→reasoner 等映射）。
+    # attempt 0-1 轻量模型，attempt >=2 升级重型（qwen→qwen3.8-max、tokenhub→deepseek-v4-pro 映射）。
     from llm.client import get_model_for_attempt
 
     m0 = get_model_for_attempt(0, provider="deepseek")
     m2 = get_model_for_attempt(2, provider="deepseek")
     check("attempt0 轻量", bool(m0), m0)
-    check("attempt2 重型升级（deepseek→reasoner）",
-          m2 == "deepseek-reasoner", m2)
+    check("attempt2 重型升级（deepseek 无独立重型档，与 attempt0 同源 flash）",
+          m2 == "deepseek-flash" and m0 == m2, m2)
 
 
 def test_budget() -> None:

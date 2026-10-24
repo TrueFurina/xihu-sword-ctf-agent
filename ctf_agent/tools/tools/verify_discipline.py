@@ -11,7 +11,6 @@
     # ok=False 且 new_n <= old_n → 该增强无效——不得声称有效
 """
 
-import time
 
 
 def validate_improvement(name: str, baseline_solved: int, new_solved: int,

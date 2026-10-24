@@ -2,6 +2,8 @@
 name: session-boot
 description: 西湖论剑 CTF-Agent 会话启动标准流程（三铁律第 3 条：启动命令即门禁）；触发词：开工、启动会话、session boot、开工门禁
 ---
+
+> 🔒 **项目已冻结（2026-10-24）**：西湖论剑已全量并入 SecAutoMind（`E:\Program\SecAutoMind`）。本技能所述流程仅适用于冻结源仓的考古/复盘场景；一切新工作在 SecAutoMind 进行（宪章见其 `AGENTS.md`）。
 # 会话启动 SOP
 
 ## 开工固定顺序

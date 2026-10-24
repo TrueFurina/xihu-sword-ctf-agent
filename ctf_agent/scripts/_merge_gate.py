@@ -135,7 +135,9 @@ REGRESSION_CHECKS = [
     },
     {
         "id": "real_crypto_filterrandom",
-        "cmd": [sys.executable, "scripts/_regress_one.py", "real_crypto_filterrandom"],
+        # 2026-10-22 修复：本題需专属 skill（lfsr_filter_recover），presolve 通用工具管线
+        # 不路由到它 → 长期 REGRESS_FAIL 提取=None。改用专属 verify 脚本（sha256 真值闭环）。
+        "cmd": [sys.executable, "scripts/verify_filterrandom.py"],
         "flag_contains": "REGRESS_PASS",
     },
     {

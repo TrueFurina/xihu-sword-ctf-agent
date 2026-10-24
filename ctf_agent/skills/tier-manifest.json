@@ -1,0 +1,747 @@
+{
+  "schema": "ctf.skill-tier/v1",
+  "rule_version": "heuristic-v1（name suffix + purpose markers）",
+  "generated_at": "2026-10-22T06:46:00Z",
+  "note": "启发式分类，不是事实判断；medium 置信项需人工复核后再用于路由。",
+  "counts": {
+    "generic": 2,
+    "task": 13,
+    "action": 63
+  },
+  "total": 78,
+  "skills": {
+    "banana_script": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "reverse"
+      ],
+      "file": "banana_script.json"
+    },
+    "base64_multilayer": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "misc",
+        "crypto"
+      ],
+      "file": "base64_multilayer.json"
+    },
+    "caesar_bruteforce": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto",
+        "misc"
+      ],
+      "file": "caesar_bruteforce.json"
+    },
+    "crypto_complex_mult_group": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto"
+      ],
+      "file": "crypto_complex_mult_group.json"
+    },
+    "crypto_coppersmith": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto"
+      ],
+      "file": "crypto_coppersmith.json"
+    },
+    "crypto_cycling": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto",
+        "rsa",
+        "cycling-attack"
+      ],
+      "file": "crypto_cycling.json"
+    },
+    "crypto_ecb_block_attack": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto"
+      ],
+      "file": "crypto_ecb_block_attack.json"
+    },
+    "crypto_electric_mayhem_cls": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto",
+        "side-channel",
+        "cpa",
+        "aes"
+      ],
+      "file": "crypto_electric_mayhem_cls.json"
+    },
+    "crypto_enigma_crib": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto",
+        "enigma",
+        "known-plaintext",
+        "hill-climb",
+        "fernet"
+      ],
+      "file": "crypto_enigma_crib.json"
+    },
+    "crypto_h1_buggy_rng": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto",
+        "ecdsa",
+        "lattice",
+        "weak-rng",
+        "ecdh"
+      ],
+      "file": "crypto_h1_buggy_rng.json"
+    },
+    "crypto_hastad_broadcast": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板（py-only，无 JSON 元数据）",
+      "confidence": "medium",
+      "categories": null,
+      "file": "crypto_hastad_broadcast.py",
+      "source": "py-only"
+    },
+    "crypto_high_exponent": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto"
+      ],
+      "file": "crypto_high_exponent.json"
+    },
+    "crypto_keyboard_path": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板（py-only，无 JSON 元数据）",
+      "confidence": "medium",
+      "categories": null,
+      "file": "crypto_keyboard_path.py",
+      "source": "py-only"
+    },
+    "crypto_knapsack_mhk": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto",
+        "lattice"
+      ],
+      "file": "crypto_knapsack_mhk.json"
+    },
+    "crypto_lattice_attack": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto"
+      ],
+      "file": "crypto_lattice_attack.json"
+    },
+    "crypto_lcg_recover": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto",
+        "lcg",
+        "rsa",
+        "linear-congruential"
+      ],
+      "file": "crypto_lcg_recover.json"
+    },
+    "crypto_legendre_phi": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板（py-only，无 JSON 元数据）",
+      "confidence": "medium",
+      "categories": null,
+      "file": "crypto_legendre_phi.py",
+      "source": "py-only"
+    },
+    "crypto_modinv_factor": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板（py-only，无 JSON 元数据）",
+      "confidence": "medium",
+      "categories": null,
+      "file": "crypto_modinv_factor.py",
+      "source": "py-only"
+    },
+    "crypto_pkcs1_improved": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto"
+      ],
+      "file": "crypto_pkcs1_improved.json"
+    },
+    "crypto_pkcs1_padding_oracle": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto"
+      ],
+      "file": "crypto_pkcs1_padding_oracle.json"
+    },
+    "crypto_primes_subset": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto",
+        "coppersmith",
+        "lattice"
+      ],
+      "file": "crypto_primes_subset.json"
+    },
+    "crypto_zip_bkcrack": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto",
+        "zip",
+        "pkzip",
+        "known-plaintext",
+        "bkcrack"
+      ],
+      "file": "crypto_zip_bkcrack.json"
+    },
+    "emoji_binary": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "forensics",
+        "misc"
+      ],
+      "file": "emoji_binary.json"
+    },
+    "hash_crack": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto",
+        "misc"
+      ],
+      "file": "hash_crack.json"
+    },
+    "java_deserialization_flow": {
+      "tier": "task",
+      "reason": "名字后缀 `_flow`：一类任务的流程/范式",
+      "confidence": "high",
+      "categories": [
+        "web"
+      ],
+      "file": "java_deserialization_flow.json"
+    },
+    "java_nashorn_response": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "web"
+      ],
+      "file": "java_nashorn_response.json"
+    },
+    "jpeg_png_embedded": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板（py-only，无 JSON 元数据）",
+      "confidence": "medium",
+      "categories": null,
+      "file": "jpeg_png_embedded.py",
+      "source": "py-only"
+    },
+    "lfsr_filter_recover": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto"
+      ],
+      "file": "lfsr_filter_recover.json"
+    },
+    "mbr_sse_verify": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "reverse"
+      ],
+      "file": "mbr_sse_verify.json"
+    },
+    "misc_bigfile_analysis": {
+      "tier": "task",
+      "reason": "名字后缀 `_analysis`：一类任务的流程/范式",
+      "confidence": "high",
+      "categories": [
+        "misc"
+      ],
+      "file": "misc_bigfile_analysis.json"
+    },
+    "misc_bigfile_traffic": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "misc"
+      ],
+      "file": "misc_bigfile_traffic.json"
+    },
+    "misc_deflate_huffman_flag": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "misc",
+        "forensics",
+        "stego",
+        "compression",
+        "zip"
+      ],
+      "file": "misc_deflate_huffman_flag.json"
+    },
+    "misc_disk_forensics": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "misc"
+      ],
+      "file": "misc_disk_forensics.json"
+    },
+    "misc_grid_resample": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板（py-only，无 JSON 元数据）",
+      "confidence": "medium",
+      "categories": null,
+      "file": "misc_grid_resample.py",
+      "source": "py-only"
+    },
+    "misc_jpeg_padding_stego": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "misc",
+        "forensics",
+        "stego",
+        "jpeg"
+      ],
+      "file": "misc_jpeg_padding_stego.json"
+    },
+    "misc_pcap_ezrat_chat": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "misc",
+        "forensics",
+        "pcap",
+        "network",
+        "crypto"
+      ],
+      "file": "misc_pcap_ezrat_chat.json"
+    },
+    "misc_qr_matrix": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "crypto",
+        "misc",
+        "forensics"
+      ],
+      "file": "misc_qr_matrix.json"
+    },
+    "misc_traffic_analysis": {
+      "tier": "task",
+      "reason": "名字后缀 `_analysis`：一类任务的流程/范式",
+      "confidence": "high",
+      "categories": [
+        "misc"
+      ],
+      "file": "misc_traffic_analysis.json"
+    },
+    "misc_zip_fake_encryption": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "misc",
+        "zip"
+      ],
+      "file": "misc_zip_fake_encryption.json"
+    },
+    "morse_ab_decode": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板（py-only，无 JSON 元数据）",
+      "confidence": "medium",
+      "categories": null,
+      "file": "morse_ab_decode.py",
+      "source": "py-only"
+    },
+    "morse_decoder": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "misc",
+        "crypto"
+      ],
+      "file": "morse_decoder.json"
+    },
+    "pcap_http_carve": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "forensics",
+        "misc"
+      ],
+      "file": "pcap_http_carve.json"
+    },
+    "php_unserialize_pop": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": null,
+      "file": "php_unserialize_pop.json"
+    },
+    "pwn_exploit_flow": {
+      "tier": "task",
+      "reason": "名字后缀 `_flow`：一类任务的流程/范式",
+      "confidence": "high",
+      "categories": [
+        "pwn"
+      ],
+      "file": "pwn_exploit_flow.json"
+    },
+    "pwn_libc_fingerprint": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "pwn"
+      ],
+      "file": "pwn_libc_fingerprint.json"
+    },
+    "pwn_nogdb_flow": {
+      "tier": "task",
+      "reason": "名字后缀 `_flow`：一类任务的流程/范式",
+      "confidence": "high",
+      "categories": [
+        "pwn"
+      ],
+      "file": "pwn_nogdb_flow.json"
+    },
+    "pwn_ret2dlresolve": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "pwn"
+      ],
+      "file": "pwn_ret2dlresolve.json"
+    },
+    "pwn_sandbox_escape": {
+      "tier": "task",
+      "reason": "purpose 首句含「范式」：任务级流程而非单点动作",
+      "confidence": "medium",
+      "categories": [
+        "pwn"
+      ],
+      "file": "pwn_sandbox_escape.json"
+    },
+    "pwn_tcache_safelinking": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "pwn"
+      ],
+      "file": "pwn_tcache_safelinking.json"
+    },
+    "pyc_decompile": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "reverse"
+      ],
+      "file": "pyc_decompile.json"
+    },
+    "rev_const_compare": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "reverse"
+      ],
+      "file": "rev_const_compare.json"
+    },
+    "rev_xor_verify": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "reverse"
+      ],
+      "file": "rev_xor_verify.json"
+    },
+    "reverse_angr_solver": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "reverse"
+      ],
+      "file": "reverse_angr_solver.json"
+    },
+    "reverse_elf_general": {
+      "tier": "task",
+      "reason": "名字后缀 `_general`：一类任务的流程/范式",
+      "confidence": "high",
+      "categories": [
+        "reverse"
+      ],
+      "file": "reverse_elf_general.json"
+    },
+    "reverse_go_apk": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "reverse"
+      ],
+      "file": "reverse_go_apk.json"
+    },
+    "reverse_js_methodology": {
+      "tier": "task",
+      "reason": "名字后缀 `_methodology`：一类任务的流程/范式",
+      "confidence": "high",
+      "categories": [
+        "reverse"
+      ],
+      "file": "reverse_js_methodology.json"
+    },
+    "reverse_obfuscation": {
+      "tier": "task",
+      "reason": "purpose 首句含「范式」：任务级流程而非单点动作",
+      "confidence": "medium",
+      "categories": [
+        "reverse"
+      ],
+      "file": "reverse_obfuscation.json"
+    },
+    "reverse_router": {
+      "tier": "generic",
+      "reason": "调度/路由型（reverse_router），不直接解题",
+      "confidence": "high",
+      "categories": [
+        "reverse"
+      ],
+      "file": "reverse_router.json"
+    },
+    "rsa_fermat_factor": {
+      "tier": "task",
+      "reason": "purpose 首句含「全套」：任务级流程而非单点动作",
+      "confidence": "medium",
+      "categories": [
+        "crypto"
+      ],
+      "file": "rsa_fermat_factor.json"
+    },
+    "ssti_detect": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": null,
+      "file": "ssti_detect.json"
+    },
+    "svg_path_text": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "forensics",
+        "misc",
+        "crypto"
+      ],
+      "file": "svg_path_text.json"
+    },
+    "task_analyzer": {
+      "tier": "generic",
+      "reason": "调度/路由型（task_analyzer），不直接解题",
+      "confidence": "high",
+      "categories": [
+        "crypto"
+      ],
+      "file": "task_analyzer.json"
+    },
+    "thoroughlystripped": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "forensics",
+        "reverse",
+        "elf",
+        "null-stripped",
+        "static-recovery"
+      ],
+      "file": "thoroughlystripped.json"
+    },
+    "vigenere_decode": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板（py-only，无 JSON 元数据）",
+      "confidence": "medium",
+      "categories": null,
+      "file": "vigenere_decode.py",
+      "source": "py-only"
+    },
+    "web_jwt_prototype": {
+      "tier": "task",
+      "reason": "purpose 首句含「攻击链」：任务级流程而非单点动作",
+      "confidence": "medium",
+      "categories": [
+        "web"
+      ],
+      "file": "web_jwt_prototype.json"
+    },
+    "web_multi_step_chain": {
+      "tier": "task",
+      "reason": "名字后缀 `_chain`：一类任务的流程/范式",
+      "confidence": "high",
+      "categories": [
+        "web"
+      ],
+      "file": "web_multi_step_chain.json"
+    },
+    "web_race_condition": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "web"
+      ],
+      "file": "web_race_condition.json"
+    },
+    "web_second_order_injection": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "web"
+      ],
+      "file": "web_second_order_injection.json"
+    },
+    "web_source_audit": {
+      "tier": "task",
+      "reason": "名字后缀 `_audit`：一类任务的流程/范式",
+      "confidence": "high",
+      "categories": [
+        "web"
+      ],
+      "file": "web_source_audit.json"
+    },
+    "web_sqli": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": null,
+      "file": "web_sqli.json"
+    },
+    "web_ssrf": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": null,
+      "file": "web_ssrf.json"
+    },
+    "web_target_interact": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "web"
+      ],
+      "file": "web_target_interact.json"
+    },
+    "web_upload_bypass": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": null,
+      "file": "web_upload_bypass.json"
+    },
+    "web_xxe_file_read": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "web"
+      ],
+      "file": "web_xxe_file_read.json"
+    },
+    "zip_chain_decode": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "misc"
+      ],
+      "file": "zip_chain_decode.json"
+    },
+    "zip_crypto_bruteforce": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "misc",
+        "zip"
+      ],
+      "file": "zip_crypto_bruteforce.json"
+    },
+    "zip_fake_encryption": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板（py-only，无 JSON 元数据）",
+      "confidence": "medium",
+      "categories": null,
+      "file": "zip_fake_encryption.py",
+      "source": "py-only"
+    },
+    "zip_filename_chain_decode": {
+      "tier": "action",
+      "reason": "默认：单一技术/工具模板",
+      "confidence": "medium",
+      "categories": [
+        "misc"
+      ],
+      "file": "zip_filename_chain_decode.json"
+    }
+  }
+}

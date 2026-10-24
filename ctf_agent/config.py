@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 # 净化告警去重（同一组合只打一次，防每步 LLM 调用刷屏）
@@ -429,6 +429,11 @@ _PROVIDER_MODEL_ALLOWLIST: dict[str, set] = {
     # 探针实测三者本端点 200、吐合法 JSON 动作。登记用途同前：防 env 覆盖被静默回退。
     "glm": {"glm-4-flash", "glm-4.7", "glm-4.7-flash", "glm-4.5-flash",
             "glm-4-plus", "glm-4-air", "glm-4-air-250414"},
+    # deepseek：登记 OFM 本地网关（dsh-our-free-model，127.0.0.1:18899）的免费模型。
+    # 2026-10-21 接入：CTF_AGENT_LLM_BASE_URL 指向 OFM 网关 + LIGHT/MID/HEAVY 全部
+    # deepseek-v4.1-flash-free（免费不限量），登记用途同 glm——防 env 覆盖被静默回退。
+    # 默认档 deepseek-chat/reasoner 保留在册：切回官方端点时仍可用。
+    "deepseek": {"deepseek-chat", "deepseek-reasoner", "deepseek-v4.1-flash-free"},
 }
 
 
@@ -444,7 +449,7 @@ def _resolve_provider_defaults(provider: str) -> tuple[str, str, str, str]:
     保证重型升级端点-模型匹配。各 provider 默认模型取自参赛手册白名单：
     - baidu：3 个 ernie-4.5-turbo（32k 轻 / 128k 中重）。
     - qwen：qwen3.7-flash(轻) / qwen3.8-max(中重，dashscope 真实存在，非 kimi-k3)。
-    - deepseek：deepseek-chat(轻) / deepseek-reasoner(R1 深推理，重型)。
+    - deepseek：deepseek-flash(轻/中/重统一，官方已弃 chat/reasoner 静默路由到 flash)。
     - tokenhub：hy3(轻) / deepseek-v4-pro(重型，TokenHub 免费深推理)。
 
     ⚠️ 2026-10-08：本表只解决「哪个模型名配哪个端点」，**不声明任何源当前可用**
@@ -452,7 +457,7 @@ def _resolve_provider_defaults(provider: str) -> tuple[str, str, str, str]:
     `scripts/_llm_pool_status.py` 的新鲜快照。
     """
     mapping = {
-        "deepseek": ("https://api.deepseek.com/chat/completions", "deepseek-chat", "deepseek-chat", "deepseek-reasoner"),
+        "deepseek": ("https://api.deepseek.com/chat/completions", "deepseek-flash", "deepseek-flash", "deepseek-flash"),
         "qwen": ("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "qwen3.7-flash", "qwen3.8-max", "qwen3.8-max"),
         "baidu": ("https://qianfan.baidubce.com/v2/chat/completions", "ernie-4.5-turbo-32k", "ernie-4.5-turbo-128k", "ernie-4.5-turbo-128k"),
         "mimo": ("https://api.xiaomimimo.com/v1/chat/completions", "mimo-v2.5-pro", "mimo-v2.5-pro", "mimo-v2.5-pro"),
@@ -515,6 +520,16 @@ def resolve_api_key(provider: str = "") -> str:
     if provider in _key_env:
         return (
             _env_or_registry(_key_env[provider])
+            or _env_or_registry("CTF_AGENT_LLM_API_KEY")
+            or config.llm_api_key
+        )
+    # OFM 本地网关（dsh-our-free-model，127.0.0.1:18899）专用：
+    # base_url 指向 OFM 网关时，key 必须用 OFM_API_KEY（网关 forwardKey），
+    # 不能落回 DEEPSEEK_API_KEY（官方端点的 key 打 OFM 网关会 401）。
+    _base = os.getenv("CTF_AGENT_LLM_BASE_URL", "") or config.llm_base_url
+    if "127.0.0.1:18899" in _base or "localhost:18899" in _base:
+        return (
+            _env_or_registry("OFM_API_KEY")
             or _env_or_registry("CTF_AGENT_LLM_API_KEY")
             or config.llm_api_key
         )

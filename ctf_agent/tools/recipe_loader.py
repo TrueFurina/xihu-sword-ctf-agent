@@ -20,7 +20,6 @@
 import json
 import logging
 import os
-import re
 import subprocess
 
 from tools.base import ToolAdapter, ToolOutput

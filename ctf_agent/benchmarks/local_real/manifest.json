@@ -1,0 +1,49 @@
+{
+ "_note": "合成工件基准：flag 不以明文躺在容器里，须走对应能力才能拿到。仅证明机制与召回，不代表竞赛真题难度。",
+ "generatedBy": "benchmarks/local_real/build_artifacts.py",
+ "cases": {
+  "pcap_br": {
+   "id": "localreal_pcap_br",
+   "category": "misc",
+   "title": "流量分析：压缩的报表",
+   "description": "附件是一份 HTTP 抓包。服务端返回的报表页面被压缩传输，正文里有一段 flag。flag 格式 flag{}",
+   "artifact": "E:\\Program\\西湖论剑\\ctf_agent\\benchmarks\\local_real\\artifacts\\pcap_br\\capture.pcap",
+   "flagSha256": "a7c2e70f2df8b2b1da2ed8df286547d17ef14508b6f80066753330a6039e7ebc",
+   "provenance": "self_authored_training",
+   "hiddenBy": "br 压缩正文",
+   "factory": "scapy",
+   "bytes": 581
+  },
+  "pe_upx": {
+   "id": "localreal_pe_upx",
+   "category": "reverse",
+   "title": "逆向：被压缩的可执行文件",
+   "description": "附件是一个 Windows PE，flag 作为字符串常量写在某个节区里。flag 格式 flag{}",
+   "artifact": "E:\\Program\\西湖论剑\\ctf_agent\\benchmarks\\local_real\\artifacts\\pe_upx\\packed.exe",
+   "flagSha256": "c55e679ba20906a34d0cd4a69feffcbb0d6e84f3eaa76f39dec76ee5354074e0",
+   "provenance": "self_authored_training",
+   "hiddenBy": "UPX -9 打包（flag 位于被压缩的 .rdata/.text 节）",
+   "host": "mstsc.exe",
+   "patchedOffset": "0xdeec8",
+   "rawScanBeforeUnpack": 42,
+   "bytes": 418304
+  },
+  "wasm_data": {
+   "id": "localreal_wasm_data",
+   "category": "reverse",
+   "title": "逆向：wasm 校验器",
+   "description": "附件是一个 WebAssembly 模块，校验用的字符串放在数据段里。flag 格式 flag{}",
+   "artifact": "E:\\Program\\西湖论剑\\ctf_agent\\benchmarks\\local_real\\artifacts\\wasm_data\\checker.wasm",
+   "flagSha256": "3f5195ff8a2b563f280c02b347da2a4286288ea216bff405fbee337c23e6c3a9",
+   "provenance": "self_authored_training",
+   "hiddenBy": "wasm 数据段（flag 拆成两段相邻 segment）",
+   "factory": "wat2wasm",
+   "bytes": 131,
+   "splitFlag": true
+  }
+ },
+ "schema": "local_real_manifest/v1",
+ "written_at": "2026-10-24T18:16:40",
+ "written_by": "benchmarks/local_real/build_artifacts.py",
+ "git_head": "02e6f998"
+}

@@ -414,7 +414,17 @@ def test_solves_with_third_party_imports_blocked(monkeypatch):
 
 
 def test_no_flag_plaintext_in_source():
-    """反捷径：skill 源码不得含 flag 明文 / 已知 sha256 前缀（静态判据）。"""
+    """反捷径：skill 源码不得含 flag 明文 / 已知 sha256 前缀（静态判据）。
+
+    静态判据（CTF{ / OLE-E-COM / 已知 sha256 前缀）不依赖题库，干净克隆与 CI
+    上照跑，必须永远留在门禁视野里；题库真值判据在下一道
+    `test_no_question_sha256_in_source`，按 needs_question 可审计地跳过。
+
+    2026-10-24 合并裁决：T2 侧（10-20 给本测试挂 needs_question + 非空断言）与
+    origin/main 侧（10-17 拆分为静态/真值两道）修的是同一个坑——`_TRUTH_SHA`
+    为空串时是任何字符串的子串，`"" not in src` 恒为 False。合并取拆分结构
+    （静态判据不被 skip 掩盖），T2 的非空断言并入真值判据那道双重防。
+    """
     src = (_ROOT / "skills" / "misc_deflate_huffman_flag.py").read_text(encoding="utf-8")
     assert "CTF{" not in src
     assert "OLE-E-COM" not in src
@@ -433,6 +443,10 @@ def test_no_question_sha256_in_source():
     拆开后：静态判据照跑；真值判据按 `needs_question` 可审计地跳过。
     """
     src = (_ROOT / "skills" / "misc_deflate_huffman_flag.py").read_text(encoding="utf-8")
+    # 非空断言（T2 侧 2026-10-20 补，合并时并入）：有人去掉 skip 标记又把空值
+    # 放回来时，`"" not in src` 恒为 False → 永远红且报错指向不明。与拆分理由
+    # 同源同坑，两道防线各守一半。
+    assert _TRUTH_SHA, "真值缺失时本断言无意义，应走 skip 而不是判红"
     assert _TRUTH_SHA not in src
 
 

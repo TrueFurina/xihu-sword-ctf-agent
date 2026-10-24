@@ -13,7 +13,6 @@
     params = {'kind': 'partial_p|related_message|small_roots', ...}
 """
 
-import math
 
 
 def partial_p_factor(n: int, p_high: int = 0, known_bits: int = 0, low: bool = False) -> dict:

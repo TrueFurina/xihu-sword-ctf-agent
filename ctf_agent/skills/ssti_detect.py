@@ -5,7 +5,6 @@
 输出：flag 或确认 SSTI 存在的证据
 """
 import re
-import urllib.parse
 
 try:
     import httpx

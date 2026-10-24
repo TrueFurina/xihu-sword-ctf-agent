@@ -131,7 +131,7 @@ if __name__ == "__main__":
     test_extract_fail_classified()
     test_tool_failure_classified()
     test_wrong_direction_classified()
-    test_fresh_ctx_still_stuck_loop()
+    test_fresh_ctx_unresolved()
     test_wallclock_still_priority()
     test_classify_failure_mapping()
     test_extract_flag_reject_sets_marker()

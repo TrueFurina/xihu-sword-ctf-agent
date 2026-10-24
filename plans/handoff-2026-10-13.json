@@ -1,0 +1,147 @@
+{
+  "handoff_id": "handoff-2026-10-13-papapapa-jpeg-padding-stego",
+  "schema_version": "session-handoff/1.0",
+  "created_at": "2026-10-13T04:33:39+08:00",
+  "from": "team-lead（主会话）",
+  "to": "subagent（general-purpose）",
+  "status": "ready-for-execution",
+
+  "objective": "把 Google CTF 2023 misc「papapapa」的 JPEG padding-block 隐写分析（人工分析已 100% 完成、flag 已由 sha256 证实）工程化为确定性 presolve skill：新建 skills/misc_jpeg_padding_stego.py（+ .json sidecar），接入 core/presolve.py 生产预扫链，补主入口端到端测试，在真实题目上跑出 flag 且 sha256 匹配，同步 README 双语计数，按租约纪律分两次提交（测试/实现分离），不推送。",
+
+  "scope": {
+    "in": [
+      "新建 ctf_agent/skills/misc_jpeg_padding_stego.py（纯标准库，顶层暴露 run(params)->dict）+ misc_jpeg_padding_stego.json sidecar",
+      "新建 ctf_agent/tests/test_crypto_jpeg_padding_stego.py（求解器单测：真实题目 + 负例）",
+      "改 ctf_agent/core/presolve.py：WALLCLOCK_PAPAPAPA 常量、_WIRED_SKILL_MODULES 增项、_try_jpeg_padding_stego 协程、_tasks 注册",
+      "改 ctf_agent/tests/test_presolve_b1_wiring.py：接线断言增项 + @slow 主入口端到端用例（照 h1 模式）",
+      "改仓库根 README.md / README.zh.md：skills 计数 74→75（以 _kpi_canonical.py 实跑机器真值为准，6 个声明位全改）",
+      "两次 git commit（先测试后实现），msg 不含明文 flag（用 sha256 前缀），不推送",
+      "收尾重跑 KPI/README 漂移守卫确认无漂移"
+    ],
+    "out": [
+      "不推送远端（红线⑥：累计未推提交已约 24+ 笔，推送必须用户明确批准）",
+      "不动 git_hooks/pre-commit、benchmark_heldout.py、test_kpi_canonical.py 等他人文件",
+      "不改题目 JSON 的 flag_sha256 / provenance 等真值字段（flag_pattern 修正是可选项，见 assumptions A9）",
+      "不新增 LLM 调用、不跑真跑批、不碰 E3 生产开关",
+      "不把 _analysis/ 下的分析脚本搬进 skills/（那是开发期脚手架，只作蓝本）"
+    ]
+  },
+
+  "assumptions": [
+    "A1. flag 已由 sha256 证实为 CTF{rearview-monorail-mullets-backroom-stopped}（sha256=7f0a7016faa59671855edf5d995e43abc51f9ef8bd7a84a38fdb704fb9b957b8，与题目 flag_sha256 逐字匹配）。人工从渲染图目读得到，不是猜的。",
+    "A2. 开发期可用已知 flag 做 OCR 模板标定（对齐字形），但 skill 内严禁硬编码 flag 明文或 sha256 短路；模板只含字形位图（约 20-25 个唯一字符，多字符重复出现，本质是字体模型不是答案表）。skill 文档必须如实注明『模板为本题 payload 标定、question-specific，非通用 OCR』。",
+    "A3. 题目对象经 eval.cases.load_questions('data/questions_external') 可取到；附件路径在 JSON attachments 字段（反斜杠 Windows 风格，presolve 的 _attachments() 已处理）。",
+    "A4. 生产子进程是 multiprocessing spawn（core/skill_pool.py），用父进程同一解释器；skill 必须纯标准库（无 numpy/PIL），保证任何解释器下可跑。numpy/PIL 只允许出现在测试/开发脚本里。",
+    "A5. venv = ctf_agent/.venv/Scripts/python.exe（numpy 2.5.3 / PIL 12.3.0 / pytest 9.1.1 已验证在位）。pytest 全量须带 -o tmp_path_retention_count=100000； targeted 单文件跑可不带。",
+    "A6. 主入口 e2e 即使题目 flag_pattern 写错（flag\\{[^}]+\\} 而真 flag 是 CTF{...}）也能过——presolve 有 sha256 权威旁路（_matches_expected_sha256，core/presolve.py:373-396，主入口 775-776 行在 pattern 闸前旁路）。",
+    "A7. KPI 机器真值（2026-10-12T20:33Z 实跑）：skills=74 / offline_verified=14 / real_corpus=93 / heldout_candidates=1。新增本 skill 后应为 75；README 6 个声明位全部更新，改完必须实跑 _kpi_canonical.py 复核（禁止手抄数字）。",
+    "A8. presolve 主入口 as_completed 有 sha256 仲裁：题面声明 expected_sha256 时，未验真候选被暂存、继续等验真候选——本 skill 若先返回未验真垃圾串不会污染结果，但 e2e 仍要求最终返回 sha256 验真 flag。",
+    "A9.（可选，推荐）题目 ext_gctf2023_papapapa.json 的 flag_pattern='flag\\{[^}]+\\}' 与真 flag 格式 CTF{...} 不符，属元数据错误。有 2026-09-03 vnctf 先例（同型错误已修）。修与否 e2e 都能过（A6），但修掉更诚实；若修，commit msg 注明依据 sha256 真值。",
+    "A10. OCR 是唯一未决环节；分析期结论：作者衬线字体不在本机（最佳 IoU 0.60），通用字体 OCR 路线已放弃，定为内嵌模板 + 整行 DP（gap 0-3）。若子 agent 有更稳的通用方案可自行裁决，但验收标准不变（e2e sha256 必须匹配）。"
+  ],
+
+  "verified_facts": {
+    "jpeg_structure": {
+      "file": "ctf_agent/data/questions_external/misc/ext_gctf2023_papapapa/_attachments/white.jpg（9240 字节）",
+      "markers": "APP0 + 2×DQT（表0=[3,2,2,...] 低值；表1=[3,3,3,4,...]）+ SOF0(512×512, 3 分量全部 sampling 0x31 即 H=3,V=1) + 4×DHT + SOS(03 01 00 02 11 03 11 00)；无 DRI、无 RST",
+      "huffman_usage": "Y 用表(0,0)DC/(1,0)AC（8+34 符号）；两个色度分量用(0,1)/(1,1)（各 1 符号 → 恒平，每块 2 bit '00'）",
+      "mcu_geometry": "Hmax=Vmax... 更正：Hmax=3, Vmax=1 → MCU=24×8；mcu_cols=ceil(512/24)=22；第 22 列（mx=21）每行每分量有 bx=1,2 两个越界 padding 块（col=64,65 ≥ grid_w=64）→ 共 128 个 Y padding 块，构成隐写信道",
+      "scan": "全文件 12672 块（1408 MCU×9）、71034 bits 干净解出"
+    },
+    "decode_facts": {
+      "block_full_rule": "AC 系数落到 zigzag 63 位时编码器省略 EOB（libjpeg 同样块满即退出 AC 循环）——这是全文件能解的关键，缺它会在 block 1583 报 bad huffman code",
+      "ff00": "scan 内 0xFF 后跟 0x00 是拆位，读 bit 时跳过 00",
+      "level_shift": "JPEG +128：量化 DC=339 → 反量化 1017 → 均值 127.1 → +128 = 255.1 → 纯白（曾因此误判解码器有 bug，用 PIL 地面真相确认纯白后推翻）",
+      "phantom_dc_reset": "mx=0 的 Y bx=0 显示块（第 3 行起）DC 差精确把预测器重置回 339（339→数据块→+42→339→+130→339…完全精确），使显示图像钳位纯白——这是题目『Is this image really just white?』的机关"
+    },
+    "payload_geometry": {
+      "data_blocks": "114 个 Y padding 数据块 = 行 2-59 × 每行 2 块（行 0-1 及 60-63 的 padding 块为 DC-only 平块，被『非空 AC』过滤）；判据 generic 化：Y 分量 + is_pad + AC 非空 + 解码像素非均匀",
+      "layout": "2 块宽 × 57 块高的 16×456 文本图像；np.rot90(img,1)（CCW）后水平可读（456×16）",
+      "ink_region": "旋转后墨区 cols 7-449",
+      "ocr_calibration": "阈值 180 + 合并 ≤1px 间隙 → 40 段 vs 47 字符（比例字体粘连）；前 12 段精确对应 'CTF{rearview'，逐字墨宽 C=7,T=8,F=6,{=5,r=5,e=7,a=7,r=5,v=8,i=2,e=7,w=12"
+    },
+    "ground_truth": {
+      "flag_sha256": "7f0a7016faa59671855edf5d995e43abc51f9ef8bd7a84a38fdb704fb9b957b8",
+      "flag_plaintext_for_dev_only": "CTF{rearview-monorail-mullets-backroom-stopped}",
+      "question_json": "ctf_agent/data/questions_external/misc/ext_gctf2023_papapapa.json（id=ext_gctf2023_papapapa, category=misc, flag_pattern=flag\\{[^}]+\\}（错，见 A9））"
+    }
+  },
+
+  "algorithm_blueprint": {
+    "note": "以下为已验证管线的精确蓝本；开发期脚手架在题目 _analysis/ 下（decode2.py=工作版解码器、render.py=渲染器、dp_ocr.py=失败原型），子 agent 应读它们但把逻辑重写为纯标准库 skill",
+    "steps": [
+      "1. 解析 JPEG marker 段（APPn/DQT/DHT/SOF0/SOS；0xD0-0xD7/0x01 无长度段；遇 0xD9 结束）",
+      "2. 规范法构建 Huffman 表：build_huff(counts,syms) → {(length,code):symbol}；canonical code 分配（每长度 code 左移补 1）",
+      "3. BitReader：MSB first；遇 0xFF 00 跳过 00 返回 0xFF；huff(tkey) 按长度递增匹配",
+      "4. 基线顺序解码：每块先 huff((0,td)) 取 DC size → 读 size 位 → extend() 差分 → pred[cs]+=dc；再循环 huff((1,ta))：0x00=EOB break；0xF0=ZRL pos+=16（pos>=63 也 break）；否则 run=rs>>4,size=rs&15，读 size 位 extend，pos+=run+1，pos>=63 → break（块满省略 EOB，不得再读 EOB）",
+      "5. extend(v,size): size==0→0; v < 2^(size-1) → v-2^size+1; 否则 v",
+      "6. MCU 网格：mcu_cols=ceil(W/(8*Hmax)), mcu_rows=ceil(H/(8*Vmax)); grid_w[cs]=ceil(W*Hc/(8*Hmax)), grid_h[cs]=ceil(H*Vc/(8*Vmax)); is_pad = (col>=grid_w[cs]) or (row>=grid_h[cs])，col=mx*Hc+bx, row=my*Vc+by",
+      "7. 数据块判据：cs==Y(component id 1) and is_pad and acs 非空（→114 块；再加『解码后非均匀』更 generic）",
+      "8. IDCT（纯 Python 8×8）：A[x][u]=0.5*C(u)*cos((2x+1)uπ/16)，C(0)=1/√2；zigzag→自然序 F[ZIGZAG[k]]=coef[k]*Q[nat//8][nat%8]（Q=dqt[Y 的表]）；S=A@F@A.T；pixel=clip(round(S+128),0,255)",
+      "9. 布局 2 块宽（W=2）逐块贴 8×8 → 16 宽 × 456 高；rot90 CCW → 456×16 水平文本",
+      "10. 二值化阈值 180 → 墨掩码；列墨剖面 → 分段（间隙 ≤1px 合并）→ DP 模板匹配（gap 0-3，IoU 或归一化互相关）→ 拼串",
+      "11. 多取向兜底：W=2 的 CCW/CW × 翻转共 4 取向（CCW 是已验证可读的），输出首个匹配 [A-Za-z0-9_]+\\{[^}]+\\} 形态的结果；全部失败返回 None",
+      "12. run(params)->dict 入口：params={'path': <jpg路径>}；返回 {'flag': <str>} 或 {'flag': None}（与 B1 skill 惯例一致；presolve 侧 _try_* 负责 _flag_from_text + _is_plausible_flag + _save_candidates）"
+    ],
+    "templates": "从本题 payload 开发期标定（A2）：按已知 flag 与墨段对齐，提取每唯一字符的墨位图（char, ink_width, 16 行位图）；运行时 DP 按墨宽+IoU 分类。约 20-25 个唯一字符（CTF{rearview-monorail-mullets-backroom-stopped} 去重）。"
+  },
+
+  "changed_files": [
+    "（预期新增）ctf_agent/skills/misc_jpeg_padding_stego.py",
+    "（预期新增）ctf_agent/skills/misc_jpeg_padding_stego.json",
+    "（预期新增）ctf_agent/tests/test_crypto_jpeg_padding_stego.py",
+    "（预期修改）ctf_agent/core/presolve.py",
+    "（预期修改）ctf_agent/tests/test_presolve_b1_wiring.py",
+    "（预期修改）README.md",
+    "（预期修改）README.zh.md",
+    "（可选）ctf_agent/data/questions_external/misc/ext_gctf2023_papapapa.json（仅 flag_pattern 修正，见 A9）"
+  ],
+
+  "raw_diff": "无。分析期全部工件写在题目自带 _analysis/ 目录（decode2.py / render.py / blocks2.pkl / read_ccw.png 等），未改任何仓库代码文件；git 工作区当前 clean（最近提交 57df1a4d）。",
+
+  "commands": [
+    "cd /e/Program/西湖论剑/ctf_agent && ./.venv/Scripts/python.exe -c \"import hashlib; print(hashlib.sha256(open('data/questions_external/misc/ext_gctf2023_papapapa/_attachments/white.jpg','rb').read()).hexdigest())\"  # 附件完整性自检",
+    "cd /e/Program/西湖论剑/ctf_agent && ./.venv/Scripts/python.exe scripts/_kpi_canonical.py  # 机器真值（改前改后各跑一次）",
+    "cd /e/Program/西湖论剑/ctf_agent && ./.venv/Scripts/python.exe -m pytest tests/test_crypto_jpeg_padding_stego.py tests/test_presolve_b1_wiring.py -q -o tmp_path_retention_count=100000",
+    "cd /e/Program/西湖论剑/ctf_agent && ./.venv/Scripts/python.exe -m pytest tests/test_presolve_b1_wiring.py -q -m slow -o tmp_path_retention_count=100000  # 含真实题目 e2e",
+    "cd /e/Program/西湖论剑/ctf_agent && ./.venv/Scripts/python.exe -m pytest tests/test_kpi_canonical.py tests/test_doc_consistency.py -q -o tmp_path_retention_count=100000  # KPI/README 漂移守卫"
+  ],
+
+  "failures": [
+    "字体 OCR 失败：系统衬线字体（Times/Calibri/Georgia/Cambria/Constantia/DejaVu Serif）最佳 IoU 0.60，作者字体不在本机 → 放弃通用字体路线，改内嵌模板（见 A10）",
+    "dp_ocr.py 原型失败：宽度模型误用 font.getlength（advance）而非墨宽（C=12.7 vs 实际 7）→ EM 对齐失败；子 agent 做 DP 必须用墨宽/人工边界标定",
+    "decode_blocks.py v1 在 block 1583（mx=21,my=7,cs=3,bx=2）报 bad huffman code：根因=块满省略 EOB（见 verified_facts）→ decode2.py 修复后全文件干净解出",
+    "渲染全噪声（两 bug 叠加）：① zigzag 映射写反（F[i]=coef[ZIGZAG[i]] 应为 F[ZIGZAG[k]]=coef[k]）② IDCT 乘反（A.T@F@A 应为 A@F@A.T）→ 用第一块（DC-only 必全 255）健全性校验定位",
+    "曾误判『解码器从第一块就错』：忘 JPEG +128 level shift → 用 PIL 地面真相推翻",
+    "分析期 bit/byte 混算：bits_before 与零区 byte 偏移直接对比无效（FF00 拆位）→ 一度产生虚假『漂移』结论；一律以程序化 bit 日志为准"
+  ],
+
+  "pending_approvals": [
+    "推送远端需用户明确批准（红线⑥；本地已累积约 24+ 笔未推提交）——本 handoff 明确要求不推送",
+    "若需修题目 flag_pattern（A9），属数据真值元数据修正，依据 sha256 已确证，可直接做并在 commit msg 注明；不需额外批准"
+  ],
+
+  "stop_reason": "主会话上下文压缩前中断；人工分析已全部完成（flag 已证实），剩余纯工程化工作，无未解技术问题（OCR 方案已定为内嵌模板+DP）。",
+
+  "next_safe_command": "cd /e/Program/西湖论剑/ctf_agent && ./.venv/Scripts/python.exe -c \"import pickle; d=pickle.load(open('data/questions_external/misc/ext_gctf2023_papapapa/_analysis/blocks2.pkl','rb')); print(len(d['blocks']), d['total_bits'])\"  # 应输出 12672 71034，确认工件完好后再动工",
+
+  "completion_criteria": [
+    "CC1. e2e：asyncio.run(P.presolve(q, answers=preset_answers([q]), force=True)) 在 ext_gctf2023_papapapa 上返回 flag，且 sha256(flag) == 题目 flag_sha256（走主入口两道闸 + sha256 仲裁，照 h1 模式，禁止只测 _try_* 内部函数——那会绕过生产闸形成假绿）",
+    "CC2. 求解器单测全绿：真实 white.jpg 解出（sha256 比对，从题目对象读真值不硬编码）+ 负例（非 JPEG 输入 / 标准 sampling 无 padding 数据块 → 优雅返回 None 不崩）",
+    "CC3. 接线断言：skills.misc_jpeg_padding_stego ∈ P.wired_skill_modules() 且 _try_jpeg_padding_stego 存在",
+    "CC4. README.md / README.zh.md 共 6 个 skills 声明位全部更新，且与 _kpi_canonical.py 改后实跑值一致（74→75）；test_kpi_canonical / test_doc_consistency 绿",
+    "CC5. 两次 commit（先 [无任务:测试] 后 [无任务:实现]），msg 不含明文 flag（用 sha256 前缀），未推送；git status 确认无他人文件被代提交",
+    "CC6. skill 与 _try_* docstring 含 B1 诚实口径（『⚠️ 属 B1 工具链补齐产物，不代表 LLM 自主能力』+ OCR 模板 question-specific 声明），无硬编码 flag/sha256 短路",
+    "CC7. 全量相关测试无新增失败；KPI canonical 重跑除 skills 74→75 外无其他字段漂移（offline_verified 仍=14）"
+  ],
+
+  "discipline_reminders": [
+    "租约门禁（skill ctf-agent-lease-commit-gate 口径）：测试与实现不同 commit；一 --scope + N 单词；msg 标签 T-xx 或 [无任务:说明]；推送前 ls-remote+SSH+rev-parse（本轮不推送）；禁 --force；deliverables/ 除复盘赛报不入库；commit-msg 禁含明文 flag",
+    "写共享文件前先 Read；daily log 只 append；同文件多 Edit 串行",
+    "『活着』类状态不写死；本任务不涉及 provider",
+    "环境坑：中文路径假阴性 → 用 venv python 直查；写文件用 Write/Edit 工具；/tmp 不可用",
+    "测试不得绕过生产闸（CC1）；模仿实现的自检不算守卫（CC2 负例必须打在生产 solve 入口上）"
+  ],
+
+  "privacy_notes": "flag 明文仅存在于本 handoff（开发期标定用）与题目 _analysis/ 分析工件中；skill、presolve、测试、commit msg、README 均不得出现 flag 明文（sha256 前缀除外）。密钥类内容本任务不涉及。"
+}

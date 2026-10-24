@@ -106,7 +106,7 @@ def test_wallclock_hard_uses_hard_threshold_in_detail():
 
 if __name__ == "__main__":
     test_wallclock_hit_classified()
-    test_wallclock_not_hit_returns_stuck_loop()
+    test_wallclock_not_hit_returns_unresolved()
     test_wallclock_threshold_injectable()
     test_wallclock_hit_with_flag_no_error()
     print("=== main_agent 墙钟止损测试全部通过 ===")

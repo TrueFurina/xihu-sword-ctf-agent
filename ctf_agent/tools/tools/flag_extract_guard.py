@@ -86,7 +86,6 @@ def best_flag(data: bytes) -> dict:
 
 
 if __name__ == "__main__":
-    import sys
 
     # 自测：ROT13 编码 flag 提取（真题 QNFPGS{...} 场景）
     test = b"QNFPGS{vafvqr_ebg13_synt}"

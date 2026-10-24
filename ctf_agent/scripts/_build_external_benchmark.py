@@ -89,6 +89,40 @@ def _seen_ids() -> set[str]:
     return seen
 
 
+# 仓库内明文排除源（2026-10-21 新增，提交前审查实证）
+# ─────────────────────────────────────────────────────────────────
+# agent 的工作目录就是 ctf_agent：任何能在仓内 grep 到的答案都等于没做
+# （判分器是 sha256 精确比对，明文可直接命中）。2026-10-21 实测：core/presolve.py
+# 的硬编码兜底、skills 示例、测试期望值、审计日志共让 **11 道当前池题**的明文
+# 躺在仓内 —— 「未见」标签对它们是假的。本排除源按候选明文哈希与真值求交，
+# 零误报（合成夹具哈希不命中任何真值）。排除 data/：运行日志如实记录提交值，
+# 解出的题按设计自动离池，不构成对当前分母的污染。
+_PLAINTEXT_PAT = re.compile(r"(?:HTB|flag|DASCTF|FLAG)\{[^}\s]{6,}\}")
+_PLAINTEXT_SUFFIXES = frozenset({".py", ".json", ".md", ".txt", ".yml", ".yaml",
+                                 ".java", ".sh", ".c", ".cpp", ".h"})
+
+
+def _repo_plaintext_hashes() -> set[str]:
+    """仓库工作目录内 flag 形状明文的 sha256 集合（选池排除源）。"""
+    out: set[str] = set()
+    skip_dirs = {".git", ".venv", "data", "__pycache__", ".pytest_cache",
+                 "node_modules"}
+    for p in ROOT.rglob("*"):
+        if not p.is_file() or p.suffix.lower() not in _PLAINTEXT_SUFFIXES:
+            continue
+        if any(part in skip_dirs for part in p.parts):
+            continue
+        try:
+            if p.stat().st_size > 5_000_000:
+                continue
+            txt = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for cand in _PLAINTEXT_PAT.findall(txt):
+            out.add(hashlib.sha256(cand.encode()).hexdigest())
+    return out
+
+
 # 已知数据损失登记表（与 _merge_gate.LOST_PAYLOAD 同型的"登记后放行"模式）：
 # 源 JSON 位于 gitignore 的 data/ 下，历史上发生过整题静默消失（2026-10-12
 # 删除事件致 ext_gctf2022_ocr 源 JSON 永久丢失，10-13 重建时静默离池，
@@ -131,6 +165,7 @@ def dropped_problems(dropped: dict[str, str],
 def build() -> dict:
     aci = _load_auditor()
     seen = _seen_ids()
+    leaked = _repo_plaintext_hashes()
     picked: dict[str, dict] = {}
     skipped = Counter()
     skip_reasons: dict[str, str] = {}
@@ -164,6 +199,11 @@ def build() -> dict:
             if not HEX64.match(truth):
                 skipped["no_verifiable_truth"] += 1
                 skip_reasons[qid] = "no_verifiable_truth"
+                continue
+            if truth in leaked:
+                # 答案明文已在仓库内（agent grep 即得）→ 不算未见。
+                skipped["answer_in_repo"] += 1
+                skip_reasons[qid] = "answer_in_repo"
                 continue
             picked[qid] = {"id": qid, "category": q.get("category", "misc"),
                            "title": str(q.get("title") or "")[:120],
@@ -212,6 +252,8 @@ def write_manifest(built: dict) -> dict:
             "无答案泄漏：附件字节不含真值（sha256 精确比对 + flag{}/裸值形态扫描）",
             "真值可判定：flag_sha256 64 位十六进制，或 flag 字段为 64 位占位",
             "未见：不在 KPI 台账 / 已解出 ledger / 历史跑批 solved 记录",
+            "答案不在仓内：flag 形状明文哈希不等于本题真值（2026-10-21 新增，"
+            "core/presolve 硬编码/skills 示例/测试夹具/日志共泄漏 11 题）",
             "跨池同名 id 合并去重",
         ],
         "source_pools": list(SRC_POOLS),

@@ -1,0 +1,14 @@
+{
+ "id": "ext_gctf2023_primes",
+ "category": "crypto",
+ "title": "Primes",
+ "description": "I have prepared a flag for you but unfortunately it has been mangled somehow :/",
+ "flag_sha256": "df18e59de0157907864737b5f2a3d1a0fb5ffc4fe7e64a5f467c92054a783d56",
+ "flag": "df18e59de0157907864737b5f2a3d1a0fb5ffc4fe7e64a5f467c92054a783d56",
+ "flag_pattern": "[A-Za-z0-9_]{1,20}\\{[^\\}\\s]{3,120}\\}",
+ "attachments": [
+  "data\\questions_external\\crypto\\ext_gctf2023_primes\\_attachments\\chal.sage"
+ ],
+ "difficulty": "unknown",
+ "source_pool": "questions_external"
+}

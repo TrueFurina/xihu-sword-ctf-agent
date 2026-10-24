@@ -5,7 +5,7 @@ xz1.jpg 是 JPEG（FFD8 头 + FFD9 尾），FFD9 后直接接 PNG（89504E47 魔
 按 flag_pattern 提取 flag 字符串供 presolve 直接命中。
 """
 from __future__ import annotations
-import os, re, struct, subprocess, tempfile, shutil
+import os, re, struct, subprocess, tempfile
 
 
 _FLAG_PAT = re.compile(rb"(?:flag|FLAG|Flag|DASCTF)\{[^}]{2,80}\}")
@@ -147,7 +147,6 @@ def run(params: dict) -> dict:
         except OSError:
             pass
         # 提取 PNG 内所有文本块
-        import zlib
         pos = 8
         texts = []
         while pos < len(png_data):

@@ -42,7 +42,10 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:  # 仅类型检查期导入：run_benchmark 的注解是惰性字符串，运行时不求值
+    from core.race_orchestrator import RaceController
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -345,7 +348,6 @@ def _run_benchmark_safely(args, questions, solver, use_mock: bool, race_controll
     BaseException 类，`except Exception` 抓不住）都要留下诊断信息与已完成数据，
     不允许静默丢报告。
     """
-    import dataclasses
     from pathlib import Path
 
     _progress = str(Path(args.results_dir) / "progress.jsonl")

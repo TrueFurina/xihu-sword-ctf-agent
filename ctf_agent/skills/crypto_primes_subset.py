@@ -37,7 +37,6 @@
 
 from __future__ import annotations
 
-from typing import Dict
 
 from core.coppersmith import solve_primes, gen_q_x, CoppersmithError
 
@@ -106,8 +105,6 @@ def run(params):
 
 def main() -> None:
     import argparse
-    import ast
-    import json
 
     ap = argparse.ArgumentParser(description="Google CTF 2023 PRIMES 求解器")
     ap.add_argument("--kind", required=True, choices=["solve", "gen"])

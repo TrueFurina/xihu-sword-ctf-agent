@@ -78,7 +78,6 @@ def run(params: dict) -> dict:
 
 if __name__ == "__main__":
     import glob
-    import json
     import os
 
     # 批量自测：真实 task.py 识别

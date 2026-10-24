@@ -21,6 +21,7 @@ from .bm25 import BM25, tokenize
 
 SKILLS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "skills")
 CORPUS_PATH = os.path.join(os.path.dirname(__file__), "writeups_corpus.jsonl")
+TIER_MANIFEST = "tier-manifest.json"
 
 
 def _cosine(a, b):
@@ -77,9 +78,20 @@ class WriteupIndex:
         return n
 
     def load_skills_docs(self, skills_dir: str = SKILLS_DIR, limit: int = 0) -> int:
-        """把 skills/*.py 模块 docstring 纳入语料（真实工具手册）。"""
+        """把 skills/*.py 模块 docstring 纳入语料（真实工具手册）。
+
+        tier 来自 skills/tier-manifest.json（旁路清单，缺失则 unknown）。
+        """
         if not os.path.isdir(skills_dir):
             return 0
+        tiers = {}
+        manifest_path = os.path.join(skills_dir, TIER_MANIFEST)
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, encoding="utf-8") as f:
+                    tiers = json.load(f).get("skills", {})
+            except (OSError, json.JSONDecodeError):
+                tiers = {}
         n = 0
         for py in sorted(glob.glob(os.path.join(skills_dir, "*.py"))):
             name = os.path.splitext(os.path.basename(py))[0]
@@ -88,10 +100,13 @@ class WriteupIndex:
             text = self._extract_skill_doc(py)
             if not text:
                 continue
+            tier = (tiers.get(name) or {}).get("tier", "unknown")
             self.add_doc(
                 f"skill:{name}", text,
                 {"title": name, "category": "tool",
-                 "tags": ["skill", name], "source": "skills/" + os.path.basename(py)},
+                 "tags": ["skill", name, f"tier:{tier}"],
+                 "tier": tier,
+                 "source": "skills/" + os.path.basename(py)},
             )
             n += 1
             if limit and n >= limit:
@@ -113,7 +128,8 @@ class WriteupIndex:
         self._built = True
 
     # ── 检索 ──
-    def retrieve(self, query: str, k: int = 5, embed_fn=None, alpha: float = 0.3) -> list:
+    def retrieve(self, query: str, k: int = 5, embed_fn=None, alpha: float = 0.3,
+                 tier_filter=None) -> list:
         if not self._built:
             self.build()
         q_tokens = tokenize(query)
@@ -133,7 +149,14 @@ class WriteupIndex:
         else:
             hybrid = bm25_n
 
-        ranked = sorted(range(len(hybrid)), key=lambda i: hybrid[i], reverse=True)[:k]
+        if tier_filter is None:
+            cand = list(range(len(hybrid)))
+        else:
+            allowed = set(tier_filter)
+            cand = [i for i in range(len(hybrid))
+                    if self.meta[self.bm25.doc_ids[i]].get("tier", "unknown") in allowed]
+
+        ranked = sorted(cand, key=lambda i: hybrid[i], reverse=True)[:k]
         out = []
         for i in ranked:
             did = self.bm25.doc_ids[i]
@@ -143,6 +166,7 @@ class WriteupIndex:
                 "score": round(hybrid[i], 4),
                 "title": m.get("title", did),
                 "category": m.get("category", ""),
+                "tier": m.get("tier", "unknown"),
                 "tags": m.get("tags", []),
                 "text": m.get("text", "")[:600],
                 "source": m.get("source", ""),

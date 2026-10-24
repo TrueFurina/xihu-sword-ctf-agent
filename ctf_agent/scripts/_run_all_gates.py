@@ -10,6 +10,13 @@
   ② `scripts/check_corpus_health.py`      题库健康基线（只在变坏时红）
   ③ `scripts/_build_external_benchmark.py --check`  正式基准清单 vs 磁盘
 
+2026-10-21 追加第四道（非数据类，但同属"纸面门禁"清单）：
+
+  ④ `scripts/_gate_static.py`            ruff 分级静态门禁（F821/F811 全仓零容忍，
+                                        F401/F841 核心目录零容忍）。首扫即抓出 6 个
+                                        NameError 真 bug——其中凯撒引擎被 try/except
+                                        吞成"永远解不出题"，属于静默功能死亡。
+
 ——**一道都没接进 pre-commit**，只能靠人记得手动跑。三道门禁各自都能发现问题，
 但"记得跑"这件事本身就是最弱的一环：**纸面门禁等于没有门禁**。
 
@@ -22,6 +29,16 @@
 - 题库健康：**只在回归时红**。`questions_real` 有 77 道已知历史坏题（64 道唯一附件
   是 `flag.txt` 答案键、8 道载荷随归档删除、5 道无真值），若按"坏题>0 即红"会天天假红，
   而**天天假红的护栏最终一定被人整段注释掉**——那才是真正的门禁失效。
+
+本期未纳入的两道门禁（**不是遗漏，是分工**）
+-------------------------------------------
+- **全量测试**（`pytest -m "not slow and not local"`）：约 5 分钟，由
+  `.github/workflows/ci.yml` 与 `scripts/_ci_local.sh` 跑。放进本聚合器会让
+  每次"快速体检"都变成 5 分钟起，最终没人愿意跑。
+- **覆盖率**（`scripts/_gate_coverage.py`）：要先跑一遍全量测试采数据（约 7 分钟），
+  同理不进本聚合器；与测试同一次跑的位置在 CI / `_ci_local.sh`。
+
+本聚合器的定位是「**1-2 分钟能跑完的数据真值快检**」：三道数据一致性 + 一道静态检查。
 
 退出码：0 全过 / 1 有门禁失败 / 2 脚本自身无法执行（fail-closed，不放行）。
 """
@@ -41,6 +58,8 @@ PY = sys.executable
 GATES = [
     ("truth", "机器真值 schema 审计（防异构覆盖）",
      [PY, "scripts/_truth_guard.py", "--audit"], True),
+    ("static", "ruff 静态门禁（F821/F811 全仓 + F401/F841 核心）",
+     [PY, "scripts/_gate_static.py"], True),
     ("bench", "正式基准清单 vs 磁盘一致性",
      [PY, "scripts/_build_external_benchmark.py", "--check"], True),
     ("health", "题库健康基线（只在回归时红）",
@@ -79,7 +98,7 @@ def run_gates(only: list[str] | None = None,
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="门禁聚合器（数据真值/基准类）")
-    ap.add_argument("--only", default="", help="只跑指定门禁，逗号分隔（truth/bench/health）")
+    ap.add_argument("--only", default="", help="只跑指定门禁，逗号分隔（truth/static/bench/health）")
     ap.add_argument("--json", action="store_true", help="机器可读输出")
     ap.add_argument("--verbose", action="store_true", help="打印每道门禁的输出尾部")
     args = ap.parse_args()
