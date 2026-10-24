@@ -1194,16 +1194,40 @@ def fast_solve(kind: str = "", **params) -> dict:
             from skills.rsa_fermat_factor import run as _fermat
             return _fermat(params)
         if kind in ("zip", "压缩"):
-            # 2026-08-22 疯狂刷题 8% 后补：伪加密破解优先（55 题大量 zip 主类型）
+            # ⚠️ 2026-10-15 修复（两条，均为实测而非推断）：
+            # ① **参数契约不齐**：本分支两根都要**文件路径**
+            #    （zip_fake_encryption 要 `path`、zip_filename_chain_decode 要
+            #    `zip_path`），而唯一的生产调用方 presolve._try_fast_solve 只传
+            #    `s`（正文文本）⇒ 恒 `{'ok': False, 'error': 'zip_path not found'}`
+            #    ⇒ crypto 类 zip 题实测 **0 覆盖**（misc 类由 math_engine 兜住）。
+            #    注：`zip` 还被列在 _PROVEN_FAST_SOLVE_KINDS「已实证」清单里。
+            # ② **诱饵遮蔽**：原顺序「伪加密优先」会先扫 zip 内文本，实测样本
+            #    返回 `flag='ni_cai?'`（未带 flag{} 外壳，被 presolve 的 _FLAG_RE
+            #    拦下，但链里的真 flag 也就此错过）——与 math_engine 的
+            #    misc_decode 遮蔽 misc_zip 同型故障。
+            # 现顺序：路径归一 → 先**文件名链解码**（no_brute：遇加密层立即放弃，
+            # 绝不触发 110 万候选的同步爆破；爆破交给有墙钟的 zip_crypto_bruteforce
+            # / bkcrack）→ 链未出 flag 再走伪加密/内容扫描（原路径降级保留）。
+            import os as _os
+
+            path = str(params.get("path") or params.get("zip_path") or "")
+            if path and _os.path.exists(path):
+                try:
+                    from skills.zip_filename_chain_decode import zip_filename_chain_decode
+                    _r = zip_filename_chain_decode(
+                        {"zip_path": path, "max_layers": 100, "no_brute": True})
+                    if isinstance(_r, dict) and _r.get("flag"):
+                        return _r
+                except Exception:  # noqa: BLE001 - skill 异常不得静默吞掉整条路径
+                    pass
             from skills.zip_fake_encryption import run as _zip_fake_run
             try:
-                _r = _zip_fake_run(params)
+                _r = _zip_fake_run({"path": path} if path else params)
                 if _r.get("ok"):
                     return _r
             except Exception:  # noqa: BLE001
                 pass
-            from skills.zip_filename_chain_decode import zip_filename_chain_decode
-            return zip_filename_chain_decode(params)
+            return {"ok": False, "error": "zip 链解码与伪加密均未命中"}
         if kind in ("ecb", "aes", "aes-ecb"):
             from skills.crypto_ecb_block_attack import crypto_ecb_block_attack
             return crypto_ecb_block_attack(params)
