@@ -201,6 +201,12 @@ _FAST_SOLVE_KEYWORDS = (
     ("brainfuck", "ook"), ("brainfuck", "脑洞"), ("base58", "base58"),
     ("base58", "base62"), ("base58", "比特币"), ("base58", "btc"),
     ("common_modulus", "共模"), ("small_e", "小指数"),
+    # 2026-10-15 补：zip 类**从未进过关键词表**，却一直被列在
+    # _PROVEN_FAST_SOLVE_KINDS「已实证解出」清单里 ⇒ 声明与实际断裂：
+    # presolve 从不调 fast_solve('zip')，crypto 类 zip 题 0 覆盖
+    # （misc 类靠 math_engine.misc_zip 兜住，crypto 无人兜）。
+    # 触发成本实测毫秒级（链解码 no_brute，遇加密层立即放弃，不爆破）。
+    ("zip", "zip"), ("zip", "压缩包"), ("zip", "套娃"),
 )
 
 # ── 模板实证标记（2026-08-22 锐评「写过 vs 解出过」落地）──────────
@@ -678,11 +684,24 @@ async def _try_fast_solve(question) -> Optional[str]:
         except Exception:  # noqa: BLE001
             s = ""
 
+    # zip 类模板（fast_solve 的 zip 分支）需要**文件路径**：skill 内部按
+    # path / zip_path 取值，只喂正文文本 ⇒ 恒 'zip_path not found'（实测：
+    # crypto 类套娃 zip 题 0 覆盖，misc 类靠 math_engine.misc_zip 才兜住）。
+    zip_path = ""
+    for a in attach:
+        if str(a).lower().endswith(".zip") and os.path.isfile(str(a)):
+            zip_path = str(a)
+            break
+
     def _attempt(kind: str, text: str):
         """单模板 × 单输入；命中返回 flag，否则 None。"""
         try:
             from agents.crypto_toolkit import fast_solve
-            r = fast_solve(kind, s=text)
+            kw = {"s": text}
+            if zip_path and kind in ("zip", "压缩"):
+                kw["path"] = zip_path
+                kw["zip_path"] = zip_path
+            r = fast_solve(kind, **kw)
         except Exception as exc:  # noqa: BLE001 - 单模板失败继续下一个
             _warn_import_once("agents.crypto_toolkit.fast_solve", exc)
             return None
