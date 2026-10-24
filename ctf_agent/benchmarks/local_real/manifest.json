@@ -43,7 +43,7 @@
   }
  },
  "schema": "local_real_manifest/v1",
- "written_at": "2026-10-21T14:32:57",
+ "written_at": "2026-10-24T18:16:40",
  "written_by": "benchmarks/local_real/build_artifacts.py",
- "git_head": "16370063"
+ "git_head": "02e6f998"
 }
