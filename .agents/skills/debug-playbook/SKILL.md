@@ -2,6 +2,8 @@
 name: debug-playbook
 description: 西湖论剑 CTF-Agent 排障流程：会话启动门禁失败、闸门拦截、429 限流、pytest 失败的排查路径；触发词：排障、门禁失败、429、闸门拦截、排查
 ---
+
+> 🔒 **项目已冻结（2026-10-24）**：西湖论剑已全量并入 SecAutoMind（`E:\Program\SecAutoMind`）。本技能所述流程仅适用于冻结源仓的考古/复盘场景；一切新工作在 SecAutoMind 进行（宪章见其 `AGENTS.md`）。
 # 排障手册 — 西湖论剑 CTF-Agent
 
 ## 1. 会话启动门禁失败（_session_boot.py）

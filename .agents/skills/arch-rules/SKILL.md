@@ -2,6 +2,8 @@
 name: arch-rules
 description: 西湖论剑 CTF-Agent 架构红线与三铁律；触发词：铁律、门禁、架构红线、KPI、提交
 ---
+
+> 🔒 **项目已冻结（2026-10-24）**：西湖论剑已全量并入 SecAutoMind（`E:\Program\SecAutoMind`）。本技能所述流程仅适用于冻结源仓的考古/复盘场景；一切新工作在 SecAutoMind 进行（宪章见其 `AGENTS.md`）。
 # 架构红线 — 三铁律（violate = 重演初赛 0 分）
 
 ## 1. 工件可信

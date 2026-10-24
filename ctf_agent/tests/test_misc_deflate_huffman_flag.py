@@ -413,20 +413,41 @@ def test_solves_with_third_party_imports_blocked(monkeypatch):
     assert hashlib.sha256(res["flag"].encode()).hexdigest() == _TRUTH_SHA
 
 
-@needs_question
 def test_no_flag_plaintext_in_source():
-    """反捷径：skill 源码不得含 flag 明文 / 题库 sha256。
+    """反捷径：skill 源码不得含 flag 明文 / 已知 sha256 前缀（静态判据）。
 
-    必须挂 needs_question：真值缺失时 `_TRUTH_SHA` 是空串，而空串是**任何字符串
-    的子串**，`"" not in src` 恒为 False —— 断言会变成「永远失败」，与它想守的
-    「源码没有泄漏真值」毫无关系（2026-10-20 实测就是这么红的）。
-    这里再加一道非空断言，防止以后有人把 skip 标记去掉又把空值放回来。
+    静态判据（CTF{ / OLE-E-COM / 已知 sha256 前缀）不依赖题库，干净克隆与 CI
+    上照跑，必须永远留在门禁视野里；题库真值判据在下一道
+    `test_no_question_sha256_in_source`，按 needs_question 可审计地跳过。
+
+    2026-10-24 合并裁决：T2 侧（10-20 给本测试挂 needs_question + 非空断言）与
+    origin/main 侧（10-17 拆分为静态/真值两道）修的是同一个坑——`_TRUTH_SHA`
+    为空串时是任何字符串的子串，`"" not in src` 恒为 False。合并取拆分结构
+    （静态判据不被 skip 掩盖），T2 的非空断言并入真值判据那道双重防。
     """
-    assert _TRUTH_SHA, "真值缺失时本断言无意义，应走 skip 而不是判红"
     src = (_ROOT / "skills" / "misc_deflate_huffman_flag.py").read_text(encoding="utf-8")
     assert "CTF{" not in src
     assert "OLE-E-COM" not in src
-    assert _TRUTH_SHA not in src and "b05a30c3" not in src
+    # 这条不需要题库即可断言，必须永远留在门禁视野里
+    assert "b05a30c3" not in src
+
+
+@needs_question
+def test_no_question_sha256_in_source():
+    """反捷径：skill 源码不得含**题库真值** sha256（需题库落地才能判定）。
+
+    2026-10-17 从 `test_no_flag_plaintext_in_source` 拆出。原先写成
+    `assert _TRUTH_SHA not in src and "b05a30c3" not in src`：题库未落地时
+    `_TRUTH_SHA == ""`，而 `"" not in src` 对任何字符串恒为 False →
+    干净克隆 / CI 上该用例必然红，且报错信息（`'' is contained here`）指向不明。
+    拆开后：静态判据照跑；真值判据按 `needs_question` 可审计地跳过。
+    """
+    src = (_ROOT / "skills" / "misc_deflate_huffman_flag.py").read_text(encoding="utf-8")
+    # 非空断言（T2 侧 2026-10-20 补，合并时并入）：有人去掉 skip 标记又把空值
+    # 放回来时，`"" not in src` 恒为 False → 永远红且报错指向不明。与拆分理由
+    # 同源同坑，两道防线各守一半。
+    assert _TRUTH_SHA, "真值缺失时本断言无意义，应走 skip 而不是判红"
+    assert _TRUTH_SHA not in src
 
 
 # ─────────────────────────── 6. 守卫接线 + 变异 ───────────────────────────

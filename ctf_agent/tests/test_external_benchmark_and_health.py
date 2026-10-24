@@ -15,6 +15,38 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+# ── 「题库是否落地」判据（2026-10-17） ────────────────────────────────────
+#
+# 背景：题目清单只记录载荷**引用**，载荷本体在 `data/questions_ext*/_attachments/`
+# 下，而该目录按池策略由 .gitignore 排除（`git ls-files` 0 个、历史上从未提交）。
+# 因此干净克隆 / CI 上这些载荷必然一个都不在 —— 那是「题库未落地」，不是数据丢失。
+#
+# 判据刻意是「**一个都不在**」而不是「附件目录为空」：
+#   · 一个都不在   ⇒ 未落地 ⇒ skip（理由可读，`pytest -rs` 可审计）
+#   · 部分在、部分缺 ⇒ 真实丢失形态 ⇒ **照常判红**，不被 skip 掩盖
+#
+# 用 `unittest.skipIf` 而非 `@pytest.mark.local`：local 是 *deselected*（连收集都不
+# 收集），会让护栏从门禁视野里消失；skipIf 是 *skipped*，可审计。
+# 同 `tests/test_capability_ledger_guard.py:109` 的既有取舍。
+def _declared_attachments() -> tuple[str, ...]:
+    """清单里声明的全部载荷路径（去重并保持清单顺序）。"""
+    out: list[str] = []
+    for f in sorted((ROOT / "benchmarks" / "external_unseen" / "questions").glob("*.json")):
+        q = json.loads(f.read_text(encoding="utf-8"))
+        out.extend(q.get("attachments") or [])
+    return tuple(dict.fromkeys(out))
+
+
+DECLARED_ATTACHMENTS = _declared_attachments()
+PRESENT_ATTACHMENTS = [a for a in DECLARED_ATTACHMENTS if (ROOT / a).is_file()]
+POOL_NOT_INSTALLED = bool(DECLARED_ATTACHMENTS) and not PRESENT_ATTACHMENTS
+POOL_NOT_INSTALLED_REASON = (
+    f"外部基准题库未落地：{len(DECLARED_ATTACHMENTS)} 个声明载荷全部不在磁盘"
+    "（data/ 下的载荷按池策略由 .gitignore 排除，干净克隆与 CI 上必然如此）。"
+    "题库齐备的机器上本用例照跑；若载荷**部分**缺失仍会判红。"
+)
+
+
 def _load(name):
     spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / f"{name}.py")
     m = importlib.util.module_from_spec(spec)
@@ -45,12 +77,14 @@ class TestBenchmarkManifestRules(unittest.TestCase):
             blob = json.dumps(q, ensure_ascii=False).replace("flag_sha256", "")
             self.assertNotRegex(blob, r"flag\{[^\}]{2,}\}", f"{f.stem} 疑似明文答案")
 
+    @unittest.skipIf(POOL_NOT_INSTALLED, POOL_NOT_INSTALLED_REASON)
     def test_benchmark_attachments_exist(self):
         for f in (ROOT / "benchmarks" / "external_unseen" / "questions").glob("*.json"):
             q = json.loads(f.read_text(encoding="utf-8"))
             for a in q["attachments"]:
                 self.assertTrue((ROOT / a).is_file(), f"{f.stem} 载荷缺失: {a}")
 
+    @unittest.skipIf(POOL_NOT_INSTALLED, POOL_NOT_INSTALLED_REASON)
     def test_check_passes_on_current_disk(self):
         ok, problems = bench.check()
         self.assertTrue(ok, problems[:5])

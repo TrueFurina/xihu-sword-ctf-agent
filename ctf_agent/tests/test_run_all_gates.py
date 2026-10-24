@@ -28,6 +28,32 @@ spec.loader.exec_module(g)
 HOOKS = [ROOT / "git_hooks" / "pre-commit", ROOT / "scripts" / "hooks" / "pre-commit"]
 
 
+# ── 「本地题池是否落地」判据（2026-10-17） ────────────────────────────────
+#
+# 三道数据门禁（机器真值 schema / 正式基准清单 vs 磁盘 / 题库健康基线）都要读
+# data/ 下的本地题池，而这些题池按池策略由 .gitignore 排除。干净克隆与 CI 上
+# 它们一个都不在 —— 此时「当前应全过」无从判定，属环境未就绪而非门禁失败。
+#
+# 判据是「**所有被 gitignore 的题池都不在**」，而不是「某一个不在」：
+# 只要还有题池存在（说明这是装了题库的机器），本用例照跑，池缩小 / 消失仍判红，
+# 不会被 skip 掩盖。`questions_real` 是入库的（93 个文件），故不参与该判据。
+GITIGNORED_POOLS = (
+    "questions_ext",
+    "questions_ext_cybench",
+    "questions_ext_A_20261001",
+    "questions_ext_trial5_20261001",
+    "questions_real_kpi9",
+    "questions_external",
+)
+_ABSENT_POOLS = [p for p in GITIGNORED_POOLS if not (ROOT / "data" / p).is_dir()]
+LOCAL_POOLS_NOT_INSTALLED = len(_ABSENT_POOLS) == len(GITIGNORED_POOLS)
+LOCAL_POOLS_NOT_INSTALLED_REASON = (
+    "本地题池未落地：" + "、".join(GITIGNORED_POOLS) + " 全部不在 data/ 下"
+    "（按池策略由 .gitignore 排除，干净克隆与 CI 上必然如此）。"
+    "装了题库的机器上本用例照跑；只要仍有题池存在，池缩小 / 消失仍会判红。"
+)
+
+
 class TestHookWiring(unittest.TestCase):
     """🔴 回归点：钩子里必须**真的调用**聚合器。"""
 
@@ -97,6 +123,7 @@ class TestHookWiring(unittest.TestCase):
 
 
 class TestExitCodes(unittest.TestCase):
+    @unittest.skipIf(LOCAL_POOLS_NOT_INSTALLED, LOCAL_POOLS_NOT_INSTALLED_REASON)
     def test_passes_now(self):
         rep = g.run_gates()
         self.assertTrue(rep["passed"],
