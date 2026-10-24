@@ -213,9 +213,21 @@ _FAST_SOLVE_KEYWORDS = (
 # 12 道真题真实 LLM 全量复盘（data/results/replay_real_run.log）中
 # **实际解出过**的确定性模板 kind 白名单。命中实证模板 = 有真实解出
 # 证据；未实证 kind 仅降级尝试（不拦，但日志标注「未实证」——答辩诚实）。
+# 2026-10-25 修正（实测，非推断）——原清单有一处**硬错**：
+#   `deterministic_decode` 曾被列在这里，但 fast_solve **根本没有这个 kind**——
+#   实测 fast_solve("deterministic_decode") 返回
+#   `{'ok': False, 'error': '未知题型 deterministic_decode'}`。
+#   真实解出路径是 math_engine.misc_decode → DeterministicDecodeAdapter，
+#   **不是 fast_solve**；记在 fast_solve 名下 = 把别人的战果算自己头上。
+#   （与 zip 同型：声明与实际断裂，zip 已于 2026-10-15 补关键词表接线。）
+# `rsa` / `fermat` 保留：kind 真实存在（底层 skills.rsa_fermat_factor），但
+#   实证来自 presolve 的**独立任务** `_try_rsa_factor`（同一 skill），并非
+#   fast_solve 这条路径——关键词表至今没有 rsa/fermat 关键词，presolve 从不
+#   调 fast_solve("rsa"/"fermat")。保留是为了不抹掉底层能力的实证，但口径
+#   必须写明：这是「同 skill 实证」，不是「本路径实证」。
 _PROVEN_FAST_SOLVE_KINDS = {
     "caesar", "b64", "morse", "hash", "fermat", "rsa", "zip",
-    "vigenere", "deterministic_decode", "common_modulus", "small_e",
+    "vigenere", "common_modulus", "small_e",
 }
 
 
