@@ -47,7 +47,6 @@ Google CTF 2021 misc「David and the Tree」：题面给一个 ZIP，内装
 自主能力。命中由下游 flag_pattern + 答案校验把关。
 """
 import os
-import re
 import struct
 import zlib
 

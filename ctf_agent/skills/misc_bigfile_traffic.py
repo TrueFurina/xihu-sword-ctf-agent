@@ -18,7 +18,6 @@ FLAG_RE = re.compile(rb"(?:DASCTF|flag)\{[^}\s]{3,}\}")
 def _mmap_scan(path: str, patterns: list = None, limit_mb: int = None) -> list:
     """mmap 分块扫描——大文件直接搜 flag 明文（不超时）。"""
     patterns = patterns or [b"flag{", b"DASCTF{", b"ctf{"]
-    size = os.path.getsize(path)
     with open(path, "rb") as f:
         mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         try:

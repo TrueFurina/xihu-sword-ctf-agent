@@ -1440,7 +1440,6 @@ async def _try_maze_solver(question) -> Optional[str]:
             continue
         if not src:
             continue
-        import re as _re
 
         # 迷宫地图行（'#' 墙 / 空格或 '.' 路 / S/E 出入口）
         rows = []
@@ -1774,7 +1773,7 @@ async def _try_zip_crypto_bruteforce(question) -> Optional[str]:
     if not zip_attach:
         return None
     try:
-        from skills.zip_crypto_bruteforce import run as zc_run
+        from skills.zip_crypto_bruteforce import run as zc_run  # noqa: F401  仅探测技能可导入
     except Exception as exc:  # noqa: BLE001
         logger.debug("[presolve:zip_crypto] 导入失败: %s", exc)
         return None
@@ -2297,7 +2296,7 @@ async def _try_svg_path_text(question) -> Optional[str]:
     if not attach:
         return None
     try:
-        from skills.svg_path_text import decode_container, run as svg_run
+        from skills.svg_path_text import decode_container, run as svg_run  # noqa: F401  同上
     except Exception as exc:  # noqa: BLE001
         _warn_import_once("skills.svg_path_text", exc)
         return None
@@ -2489,7 +2488,7 @@ async def _try_banana_script(question) -> Optional[str]:
         return None
     try:
         from skills.banana_script import is_banana_script as _is_banana
-        from skills.banana_script import run as banana_run
+        from skills.banana_script import run as banana_run  # noqa: F401  同上
     except Exception as exc:  # noqa: BLE001
         _warn_import_once("skills.banana_script", exc)
         return None
@@ -2678,7 +2677,7 @@ async def _try_mbr_sse_verify(question) -> Optional[str]:
         return None
     try:
         from skills.mbr_sse_verify import is_mbr_sse_verify as _is_mbr
-        from skills.mbr_sse_verify import run as mbr_run
+        from skills.mbr_sse_verify import run as mbr_run  # noqa: F401  同上
     except Exception as exc:  # noqa: BLE001
         _warn_import_once("skills.mbr_sse_verify", exc)
         return None
@@ -2841,7 +2840,7 @@ async def _try_knapsack_mhk(question) -> Optional[str]:
     if not pk or not ct:
         return None
     try:
-        from skills.crypto_knapsack_mhk import run as mhk_run
+        from skills.crypto_knapsack_mhk import run as mhk_run  # noqa: F401  同上
     except Exception as exc:  # noqa: BLE001
         _warn_import_once("skills.crypto_knapsack_mhk", exc)
         return None

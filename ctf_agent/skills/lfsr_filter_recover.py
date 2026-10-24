@@ -199,7 +199,6 @@ if __name__ == "__main__":
         print("=== 说明: 附件应位于仓库 data/questions_real/_attachments/xihu2021/FilterRandom.py (2026-08-27 将功补过尝试重建),")
         print("===       但原始源码公开渠道不可得,缺失则优雅跳过。skill 函数 solve_lfsr_filter() 仍可对任意 mask/out 调用,不计入 KPI。退出码 2。")
         sys.exit(2)
-    import re
     txt = open(SRC, encoding="utf-8").read()
     block = txt.split("'''")[1]
     lines = [l.strip() for l in block.strip().splitlines() if l.strip()]

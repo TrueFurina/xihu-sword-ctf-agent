@@ -5,7 +5,6 @@
 输出：flag 或 webshell 访问 URL
 """
 import re
-import os
 
 try:
     import httpx

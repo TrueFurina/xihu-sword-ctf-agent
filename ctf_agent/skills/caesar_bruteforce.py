@@ -7,7 +7,6 @@
 输出: 解出的明文或 None
 """
 
-import string
 
 
 def run(params):

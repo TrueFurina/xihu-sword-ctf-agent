@@ -7,7 +7,6 @@
 3. 迭代策略（候选用尽前不停止——50 次额度内——不浪费在猜测）
 """
 
-import json
 import logging
 
 log = logging.getLogger(__name__)

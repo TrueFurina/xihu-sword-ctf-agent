@@ -71,7 +71,6 @@ def run(params: dict) -> dict:
             # e=2^16：c 开根（此处给出方法——完整 BFS 见 _solve_10733.py）
             c = params.get("c")
             if c:
-                from math import gcd as _gcd
 
                 phi = (p - 1) * (q - 1)
                 ee, ph = int(e), phi

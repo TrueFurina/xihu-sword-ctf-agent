@@ -33,8 +33,6 @@ logger = logging.getLogger(__name__)
 
 async def plan_step(agent, ctx: AgentContext, attempt: int) -> dict:
     """生成下一步行动计划（JSON）。原 MainAgent._plan。"""
-    last = ctx.last_step()
-
     # ── web 题首步强制发包（2026-08-23 修复：web 0/10 根因）──
     # 题库 web 题含靶机地址（http://127.0.0.1:9001/...），但 LLM 倾向首步 reason 空转，
     # 触发 main_agent 同参数重复止损 → web 全 0 分。此处确定性强制：web 题首步若尚未

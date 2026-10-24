@@ -47,7 +47,6 @@ flag 提取：解密成功后正则扫描 flag{...} / FLAG{...}；同时把明�
 import os
 import re
 import struct
-import zlib
 import binascii
 import itertools
 import tempfile

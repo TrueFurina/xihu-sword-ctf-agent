@@ -19,7 +19,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 
 def build_hierarchical_view(ctx: Any, max_flow: int = 6, max_tried: int = 8) -> str:

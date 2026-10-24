@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,6 @@ from core.main_agent import (
     ERR_TOOL_FAILURE,
     ERR_UNRESOLVED,
     ERR_WRONG_DIRECTION,
-    StepRecord,
 )
 
 

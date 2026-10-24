@@ -20,7 +20,6 @@
     result = java_nashorn_response(params)
 """
 
-import base64
 
 
 def build_nashorn_response_script(flag_path: str = "/flag") -> str:

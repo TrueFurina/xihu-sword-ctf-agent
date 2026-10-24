@@ -183,6 +183,60 @@ def verify(dst: str) -> list:
     return problems
 
 
+def stat_fingerprint(root: str) -> dict:
+    """只读 stat 的轻量指纹（不算 sha256），用于"内容没变就跳过"。
+
+    为什么需要：每日定时快照在 data/ 没变的日子里是纯粹的空间浪费
+    （单份约 80 MB，一年就是几十 GB），而"每天都落一份一样的副本"会让
+    真正有用的那份淹没在噪音里。判据用 (文件数, 目录数, 总字节, 最新 mtime)：
+    mtime 变了就说明被动过，宁可多备一份也不漏。
+
+    **刻意不追求严格**：本函数不读文件内容。若有人用 `touch -d` 把 mtime
+    改回原值、且文件大小恰好不变，指纹会漏判——这个风险远小于"每天多 80 MB
+    把备份盘填满导致真快照写不进去"，所以接受。要严格判等用 --verify-only。
+    """
+    files = dirs = total = 0
+    newest = 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirs += len(dirnames)
+        for fn in filenames:
+            try:
+                st = os.stat(os.path.join(dirpath, fn))
+            except OSError:
+                continue
+            files += 1
+            total += st.st_size
+            newest = max(newest, int(st.st_mtime))
+    return {"file_count": files, "dir_count": dirs,
+            "total_bytes": total, "newest_mtime": newest}
+
+
+def latest_snapshot(out_root: str) -> str | None:
+    """返回 out_root 下最新的快照目录（按名字里的时间戳排序），无则 None。"""
+    try:
+        cands = [
+            d for d in os.listdir(out_root)
+            if os.path.isdir(os.path.join(out_root, d))
+            and os.path.isfile(os.path.join(out_root, d, MANIFEST_NAME))
+        ]
+    except OSError:
+        return None
+    if not cands:
+        return None
+    return os.path.join(out_root, sorted(cands)[-1])
+
+
+def manifest_fingerprint(manifest: dict) -> dict:
+    """从清单还原同样的指纹口径（newest_mtime 取 files 里 mtime 的最大值）。"""
+    files = manifest.get("files") or []
+    return {
+        "file_count": manifest.get("file_count", len(files)),
+        "dir_count": manifest.get("dir_count", len(manifest.get("dirs") or [])),
+        "total_bytes": manifest.get("total_bytes", sum(i.get("size", 0) for i in files)),
+        "newest_mtime": max((i.get("mtime", 0) for i in files), default=0),
+    }
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="data/ 全量快照（只追加，带 sha256 清单）")
     ap.add_argument("--src", default=DATA, help="源目录（默认 ctf_agent/data）")
@@ -192,6 +246,9 @@ def main(argv=None) -> int:
                     help="快照数超过该值时提醒（不自动删）")
     ap.add_argument("--verify-only", default=None, metavar="DIR",
                     help="只校验已有快照目录，不复制")
+    ap.add_argument("--skip-if-unchanged", action="store_true",
+                    help="最新快照的 stat 指纹与当前源一致时跳过（供每日定时任务用，"
+                         "避免在 data/ 没变的日子里每天多存 80 MB）")
     args = ap.parse_args(argv)
 
     if args.verify_only:
@@ -203,6 +260,25 @@ def main(argv=None) -> int:
             return 1
         print(f"[snapshot] 校验通过：{args.verify_only}")
         return 0
+
+    if args.skip_if_unchanged:
+        prev = latest_snapshot(args.out)
+        if prev:
+            try:
+                with open(os.path.join(prev, MANIFEST_NAME), encoding="utf-8") as f:
+                    prev_fp = manifest_fingerprint(json.load(f))
+                cur_fp = stat_fingerprint(args.src)
+            except (OSError, ValueError) as exc:
+                # 读不动就照常快照（宁可多备，不可因为读不到旧清单就跳过）
+                print(f"[snapshot] 旧清单不可读（{exc}），按常规执行快照")
+            else:
+                if prev_fp == cur_fp:
+                    print(f"[snapshot] 跳过：data/ 自上次快照以来无变化"
+                          f"（{cur_fp['file_count']} 文件 / {cur_fp['total_bytes']:,} 字节）")
+                    print(f"[snapshot] 上次快照：{prev}")
+                    return 0
+                diff = [k for k in cur_fp if prev_fp.get(k) != cur_fp[k]]
+                print(f"[snapshot] 检测到变化（{', '.join(diff)}），开始快照")
 
     try:
         dst = snapshot(args.src, args.out, args.name)

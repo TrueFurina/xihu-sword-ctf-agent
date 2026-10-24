@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import List, Optional, Sequence
+from typing import Optional, Sequence
 
 # 步骤分类权重（proposal §4.3 weights）
 _PATTERN_WEIGHTS = {

@@ -18,10 +18,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 from core.main_agent import (
-    ERR_HALLUCINATION,
-    ERR_STUCK_LOOP,
     ERR_TOOL_FAILURE,
-    ERR_WRONG_DIRECTION,
     VERDICT_CONTINUE,
     VERDICT_GIVE_UP,
     VERDICT_REDIRECT,
@@ -64,8 +61,6 @@ class SupervisorAgent:
         steps = ctx.steps
         if not steps:
             return None
-
-        last = steps[-1]
 
         # 规则 1：工具连续失败 ≥2 次 → 换策略
         tool_failures = sum(

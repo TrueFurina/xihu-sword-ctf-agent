@@ -6,7 +6,6 @@
 本 skill 为提示词范式型：run() 返回流程指引（供 SkillManager 加载后注入上下文）。
 """
 
-import os
 
 
 def _flow(desc: str = "") -> dict:

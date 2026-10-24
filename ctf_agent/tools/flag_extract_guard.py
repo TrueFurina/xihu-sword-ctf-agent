@@ -33,7 +33,6 @@ def extract_flags(data: bytes, max_candidates: int = 8) -> list:
     """
     cands = []
     text = data.decode("utf-8", errors="ignore")
-    low = text.lower()
 
     # ① 直接匹配（标准格式）
     for m in re.finditer(r"(?:DASCTF|flag|ctf)\{([^}\s]{3,})\}", text, re.I):
@@ -86,7 +85,6 @@ def best_flag(data: bytes) -> dict:
 
 
 if __name__ == "__main__":
-    import sys
 
     # 自测：ROT13 编码 flag 提取（真题 QNFPGS{...} 场景）
     test = b"QNFPGS{vafvqr_ebg13_synt}"

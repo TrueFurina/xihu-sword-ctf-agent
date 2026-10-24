@@ -13,7 +13,6 @@ view.php 读取时返回实体内容 = 任意文件读取。封装为可复用�
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from tools.base import ToolAdapter, ToolOutput
 

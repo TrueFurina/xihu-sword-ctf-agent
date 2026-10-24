@@ -204,7 +204,6 @@ def solve(zippath: str, bkcrack_bin: str = "", flag_name: str = "flag.txt",
     flag_size, flag_crc = _entry_info(zippath, flag_name)
     junk_crc = _entry_info(zippath, junk_name)[1]
     first_offset = flag_size - 1
-    flag_crc_msb = flag_crc >> 24
 
     # 准备 working dir（bkcrack 从 CWD 读 second_ciphertext / second_plaintext）
     work = tempfile.mkdtemp(prefix="ziphard_")

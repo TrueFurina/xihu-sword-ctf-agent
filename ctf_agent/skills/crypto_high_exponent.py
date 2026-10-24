@@ -22,7 +22,6 @@ kind：
 内存 O(2^k) 可承受；CRT 组合用「前缀范围定 k + q 根集合判重」避免 O(2^(2k)) 枚举。
 """
 
-import math
 
 
 def _gcd(a: int, b: int) -> int:
@@ -247,7 +246,7 @@ def e2k_attack(c: int, e: int, p: int, q: int, prefixes: list,
         roots_q = all_2k_roots(c, q, k)
         res["roots_q_count"] = len(roots_q)
         q_set = set(roots_q)
-        inv_pq = pow(p, -1, q)
+        pow(p, -1, q)  # 保留互素性校验（不互素则 p 不是合法因子，要抛/由外层兜）
         hi = 1 << (max_flag_len * 8)
         scanned = 0
         for mp in roots_p:

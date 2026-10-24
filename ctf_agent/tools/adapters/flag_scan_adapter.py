@@ -109,7 +109,6 @@ class FlagScanAdapter(ToolAdapter):
                 if f in seen:
                     continue
                 seen.add(f)
-                ext = os.path.splitext(f)[1].lower()
                 try:
                     if os.path.getsize(f) > 2 * 1024 * 1024:
                         continue

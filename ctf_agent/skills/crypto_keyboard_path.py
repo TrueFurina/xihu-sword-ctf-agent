@@ -273,7 +273,6 @@ def run(payload: dict) -> dict:
 
 
 if __name__ == "__main__":
-    import sys
     sample = "UYTGBNM EDCV UYTGBNM TGBUHM YTFVBH QAZXCDE TYUHN EDCTGBF RFVYGN"
     print("decode ->", decode(sample))
     print(render_ascii(sample))

@@ -11,7 +11,6 @@ flag.txt 内是陷阱 flag（ni_cai?），真实 flag 在文件名链中。封�
 from __future__ import annotations
 
 import base64
-import binascii
 import os
 import re
 import zipfile

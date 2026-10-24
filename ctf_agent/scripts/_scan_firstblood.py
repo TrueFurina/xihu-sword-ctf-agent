@@ -237,7 +237,7 @@ async def main() -> None:
         from run import build_race_solver
         from _race_start import _race_profile
 
-        from run import build_platform_solver, build_race_solver
+        from run import build_platform_solver
         _race = build_race_solver(use_mock=False, **_race_profile())
         # B-23 修复：复用 build_platform_solver（详情补全+附件下载+靶机注入）
         solver = build_platform_solver(platform, use_mock=False, core_solver=_race)

@@ -93,7 +93,6 @@ def run(params):
         return {"ok": False, "error": f"zip 文件不存在: {path}"}
 
     # 先尝试免密直解（可能本来就无需密码）
-    import tempfile
 
     try:
         import zipfile

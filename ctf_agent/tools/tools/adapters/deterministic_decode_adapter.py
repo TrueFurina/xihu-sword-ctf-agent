@@ -32,7 +32,7 @@ import os
 import re
 import string
 import urllib.parse
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from tools.base import ToolAdapter, ToolOutput
 

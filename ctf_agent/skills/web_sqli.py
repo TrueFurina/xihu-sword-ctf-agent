@@ -5,7 +5,6 @@
 输出：flag 或表的行数据
 """
 import re
-import urllib.parse
 
 try:
     import httpx
@@ -56,7 +55,6 @@ def _send(url, param, payload, method="GET"):
     if httpx is None:
         return ""
     try:
-        encoded = urllib.parse.quote(payload)
         if method.upper() == "GET":
             resp = httpx.get(url, params={param: payload}, timeout=10, follow_redirects=True)
         else:

@@ -304,7 +304,6 @@ def _wiener_attack(n: int, e: int, c: int) -> int:
             continue
         if (e * d - 1) % k != 0:
             continue
-        phi = (e * d - 1) // k
         m = int(gmpy2.powmod(c, d, n))
         if pow(m, e, n) == c:
             return m

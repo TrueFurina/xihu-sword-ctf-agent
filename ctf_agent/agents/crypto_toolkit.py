@@ -1249,11 +1249,9 @@ def fast_solve(kind: str = "", **params) -> dict:
         if kind in ("common_modulus", "共模", "c_mod"):
             # 内联共模攻击（common_modulus 是 attack_templates 字符串模板非真实函数——
             # 同 decode_multi_layer/crack_hash 教训：不依赖不存在的模块函数）
-            import math
 
             c1 = int(params["c1"]); c2 = int(params["c2"])
             e1 = int(params["e1"]); e2 = int(params["e2"]); n = int(params["n"])
-            g, x, y = math.gcd(e1, e2), 0, 0  # 扩展欧几里得求 a*e1+b*e2=1
             def _egcd(a, b):
                 if b == 0:
                     return a, 1, 0

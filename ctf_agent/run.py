@@ -100,7 +100,7 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     from config import AppConfig
     from core.main_agent import MainAgent
     from core.supervisor_agent import SupervisorAgent
-    from llm.client import ai_chat_json, get_model_for_attempt
+    from llm.client import get_model_for_attempt
     from scheduler.budget import BUDGET_STOP, BudgetExceeded, BudgetTracker
     from verify.feedback import FeedbackLoop
     from verify.flag_checker import FlagChecker

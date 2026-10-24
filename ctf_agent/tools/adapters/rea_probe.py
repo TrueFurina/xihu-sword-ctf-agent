@@ -867,7 +867,6 @@ class ReaProbeAdapter(ToolAdapter):
         lits = us.get("literals") or []
         values = [l.get("value", "") for l in lits]
         flags = _flags_in(values)
-        meta = nr.get("metadata") or {}
         lim = j.get("limitations") or []
         cov = nr.get("coverage") or {}
 
@@ -1015,7 +1014,7 @@ class ReaProbeAdapter(ToolAdapter):
         size = os.path.getsize(path)
         try:
             with open(path, "rb") as f:
-                head = f.read(0x2000)
+                f.read(0x2000)  # 只为验证可读性（OSError 分支返回失败契约）
         except OSError as exc:
             return f"[rea_probe] 读取失败：{exc}", _contract(
                 authority="unknown", status="fail", limitations=[str(exc)])
@@ -1629,10 +1628,6 @@ class ReaProbeAdapter(ToolAdapter):
             contract["evidence"] = ev
             lims = list(contract.get("limitations") or [])
             if unpack_ev and unpack_ev.get("ok"):
-                ev_note = (f"已用 upx 脱壳后分析（原文件未改动，副本 "
-                           f"{os.path.basename(str(unpack_ev.get('unpacked')))}，"
-                           f"{unpack_ev.get('sizeBefore')} B → {unpack_ev.get('sizeAfter')} B，"
-                           f"{unpack_ev.get('ms')} ms）")
                 text = (f"[rea_probe] {packer} 壳已脱（upx -d）：以下结果针对**脱壳后**的代码，"
                         f"不再是解压存根。仍未覆盖：壳本身的解压/反调试逻辑\n" + text)
                 lims.append(f"分析对象是 upx -d 产出的副本：{packer} 解压存根与壳内反调试逻辑未分析；"

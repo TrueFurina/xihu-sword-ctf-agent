@@ -11,7 +11,6 @@ shellcode 而非直接 execve("/bin/sh")。
 """
 
 import os
-import re
 
 
 # x86_64 syscall 号

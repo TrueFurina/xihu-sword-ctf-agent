@@ -19,7 +19,6 @@ kind：
               'padded_hex': '0200...', 'enc_file': 'PKCS#1.v1.5.enc', 'out_file': 'out.pdf'}
 """
 
-import math
 
 
 def _iroot(n: int, k: int) -> tuple:

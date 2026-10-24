@@ -17,7 +17,6 @@ def lll_basis(basis: list, delta: float = 0.75) -> list:
     delta: 0.25 < delta < 1，常用 0.75
     返回约减后的行向量列表。
     """
-    import math
 
     b = [list(row) for row in basis]
     n = len(b)  # 行数（维度）
@@ -81,7 +80,6 @@ def hnp_recover_secret(bits_known: list, mod: int, n_bits: int = None) -> int:
     """
     basis = []
     for t, u, kbits, low in bits_known:
-        shift = 2 ** kbits
         if low:
             row = [0] * (len(bits_known) + 2)
         else:
@@ -171,11 +169,9 @@ def crypto_lattice_attack(params: dict) -> dict:
         return {"ok": True, "secret": s}
     if kind == "small_msg":
         # 小明文：m = c - k*q，m 很小 → 格恢复（骨架）
-        n = params.get("n", 0)
         c = params.get("c", 0)
         e = params.get("e", 3)
         # m^e < n 时直接整数开方
-        import math
 
         m = round(c ** (1.0 / e))
         if pow(m, e) == c:

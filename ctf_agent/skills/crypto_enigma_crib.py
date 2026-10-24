@@ -37,7 +37,6 @@ import hashlib
 import hmac
 import os
 import re
-import struct
 
 try:
     import numpy as np

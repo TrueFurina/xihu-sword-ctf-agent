@@ -19,10 +19,8 @@ motivating 真题：CSAW-Quals 2017 forensics「missed_registration」
 """
 from __future__ import annotations
 
-import os
 import re
 import struct
-import tempfile
 from typing import Dict, Iterator, List, Optional, Tuple
 
 # 已知文件魔数（用于判定「这段拼接是一个完整文件」），按长度降序匹配

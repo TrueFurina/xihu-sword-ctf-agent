@@ -30,7 +30,7 @@ from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from eval.cases import load_questions  # noqa: E402,F401（兼容旧引用）
+from eval.cases import load_questions  # noqa: E402,F401  # 兼容旧引用
 from eval.corpus import (  # noqa: E402
     DEFAULT_ROOTS, load_corpus, measurable,
 )

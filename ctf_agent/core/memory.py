@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Optional
 
 from core.session import CommandRecord  # noqa: E402
