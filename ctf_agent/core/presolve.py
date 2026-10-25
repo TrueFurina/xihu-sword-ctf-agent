@@ -868,6 +868,13 @@ async def presolve(question, registry=None, sandbox=None, answers=None,
         # 2026-10-09 B1 确定性静态求解：PKZIP 已知明文攻击（Google CTF 2023 ziphard，bkcrack）
         asyncio.ensure_future(_try_zip_bkcrack(question)),
     ]
+    # 2026-10-25 修复（实测）：并发竞速「先完成且命中者即返回」下，浅层文本诱饵
+    # 会抢跑深层结构性真解（详见 _zip_chain_quick_flag 文档串）。在并发启动
+    # **之前**串行跑一次 zip 文件名链解码，命中即返回；未命中完全不影响原流程。
+    _quick = _zip_chain_quick_flag(question, answers)
+    if _quick:
+        _cache_presolve_hit(question, _quick)
+        return _quick
     try:
         # 2026-10-09 sha256 仲裁（primes 假命中遮蔽修复）：as_completed 先到先得，
         # 更快路径的诱饵候选会遮蔽慢路径的真解——实测 ext_gctf2023_primes 的
@@ -3180,6 +3187,75 @@ async def _try_cycling(question) -> Optional[str]:
                     getattr(question, "id", "?"), flag[:60])
         _save_candidates(question, [flag])
         return flag
+    return None
+
+
+def _zip_chain_quick_flag(question, answers) -> Optional[str]:
+    """套娃 zip 的**结构性证据**优先于浅层文本扫描（2026-10-25 实测修复）。
+
+    背景：presolve 主循环是 30+ 路并发「先完成且命中者即返回」。用 10663
+    形态样本实测（真 flag 编码在文件名链 AAA+BBB = base32(flag{}…)，第一层
+    flag.txt 放诱饵 `flag{ni_cai?}`）：
+
+      * `_try_zip_fake_encryption` → `misc_zip_fake_encryption`（只认 flag{} 外壳）
+        1.5ms 命中诱饵 ⇒ presolve **22ms 提交 flag{ni_cai?}**；
+      * 链解码真解走 `_try_math_engine`，要 **192ms** ⇒ 慢 9 倍，稳输。
+
+    而 PR #32（math_engine 引擎顺序）与 #34（fast_solve 内部顺序）都修在竞速
+    **之下**，管不到主循环的先到先得——这是「浅层诱饵遮蔽深层真解」同型故障
+    第 4 次（前 3 次分别修在引擎层 / fast_solve 层 / flag 截断层）。
+
+    修法：并发启动前**串行**跑一次 zip 文件名链解码。它的证据是「多层 zip 的
+    文件名拼起来经 base32/base64 等解码出 flag」，属结构性证据，强于「在 zip
+    内某段文本里扫到 flag{…}」。实测：
+
+      * 套娃链样本（含诱饵）  → 2.6ms 出真 flag；
+      * 单层 zip / 非 zip 附件 → 返回空 flag（零误报，1~3ms）。
+
+    安全约束（保证零行为回退）：
+
+      * `no_brute=True`：遇加密层立即放弃，绝不进密码爆破（PR #34 实测去掉该
+        参数后单用例 237s，等于给主链路埋挂死点）；
+      * 题面声明了 `expected_sha256` 时**不抢答**——让既有 sha256 仲裁逻辑照常
+        工作（抢答恰恰发生在无 sha256 声明时，实测场景 expected_sha256=None）；
+      * 仅附件为 `.zip` 时触发，其余题零额外成本。
+    """
+    if getattr(question, "expected_sha256", None):
+        return None
+    try:
+        attach = _attachments(question)
+    except Exception:  # noqa: BLE001 - 附件解析失败不阻塞主流程
+        return None
+    for _p in attach:
+        try:
+            if not str(_p).lower().endswith(".zip"):
+                continue
+            if not os.path.exists(_p):
+                continue
+            from skills.zip_filename_chain_decode import zip_filename_chain_decode
+            _r = zip_filename_chain_decode(
+                {"zip_path": _p, "max_layers": 100, "no_brute": True})
+        except Exception as _e:  # noqa: BLE001 - 单附件异常不阻塞其余
+            logger.debug("[presolve:zipchain] %s 链解码异常: %s",
+                         getattr(question, "id", "?"), _e)
+            continue
+        if not isinstance(_r, dict) or not _r.get("ok"):
+            continue
+        _cand = str(_r.get("flag") or "").strip()
+        if not _cand or not _is_plausible_flag(_cand):
+            continue
+        # 与主循环同一套闸门：flag_pattern 不符合 ⇒ 视为诱饵丢弃
+        _fp = str(getattr(question, "flag_pattern", "") or "").strip()
+        if _fp and not re.search(_fp, _cand, re.IGNORECASE):
+            logger.debug("[presolve:zipchain] %s 候选不符合 flag_pattern=%s，丢弃: %r",
+                         getattr(question, "id", "?"), _fp, _cand[:40])
+            continue
+        if not _passes_answer_check(question, _cand, answers):
+            continue
+        logger.info(
+            "[presolve:zipchain] %s 文件名链解码命中（结构性证据，优先于浅层文本扫描）: %s",
+            getattr(question, "id", "?"), _cand[:60])
+        return _cand
     return None
 
 
