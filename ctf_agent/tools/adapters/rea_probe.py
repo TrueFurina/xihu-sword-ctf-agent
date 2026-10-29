@@ -57,19 +57,112 @@ from tools.adapters.flag_scan_adapter import FLAG_PATTERNS
 
 logger = logging.getLogger(__name__)
 
-# ── REA 定位（可用环境变量覆盖，便于换机器）─────────────────────────
-_DEFAULT_NODE = r"C:\Users\Lenovo\.workbuddy\binaries\node\versions\22.22.2-6\node.exe"
-_DEFAULT_MJS = r"C:\Users\Lenovo\WorkBuddy\2026-10-17-01-34-31\.rea-probe\node_modules\rea-agents\scripts\rea.mjs"
+def _first_existing(*candidates: str) -> str:
+    for c in candidates:
+        if c and os.path.exists(c):
+            return c
+    return ""
 
-_NODE = os.environ.get("REA_NODE", _DEFAULT_NODE)
-_REA_MJS = os.environ.get("REA_MJS", _DEFAULT_MJS)
+
+def _discover_node() -> str:
+    """定位 node，**不写死用户名**。
+
+    顺序：REA_NODE 环境变量 → PATH 上的 node → WorkBuddy 自带的版本目录
+    （``~/.workbuddy/binaries/node/versions/*/node.exe``，取版本号最大的那个）。
+    """
+    import glob
+
+    pat = os.path.expanduser(
+        os.path.join("~", ".workbuddy", "binaries", "node", "versions", "*",
+                     "node.exe" if os.name == "nt" else os.path.join("bin", "node"))
+    )
+    return _first_existing(
+        os.environ.get("REA_NODE", ""),
+        shutil.which("node") or "",
+        *sorted(glob.glob(pat), reverse=True),
+    )
+
+
+def _discover_rea_mjs() -> str:
+    """定位 rea.mjs：REA_MJS 环境变量 → 常见的 node_modules 落点。"""
+    import glob
+
+    cand = [os.environ.get("REA_MJS", "")]
+    for pat in (
+        os.path.join("~", "WorkBuddy", "*", ".rea-probe", "node_modules",
+                     "rea-agents", "scripts", "rea.mjs"),
+        os.path.join("~", ".rea-probe", "node_modules",
+                     "rea-agents", "scripts", "rea.mjs"),
+    ):
+        cand.extend(sorted(glob.glob(os.path.expanduser(pat)), reverse=True))
+    return _first_existing(*cand)
+
+
+def _program_globs(name_glob: str) -> list:
+    """常见安装根目录下的候选路径（ProgramFiles / ProgramW6432 / 各盘符的 Program）。"""
+    import glob
+
+    pats = [os.path.join(r, name_glob)
+            for r in (os.environ.get("ProgramFiles", ""), os.environ.get("ProgramW6432", "")) if r]
+    if os.name == "nt":
+        for drive in "CDEFGH":
+            base = drive + ":\\Program"
+            if os.path.isdir(base):
+                pats.append(os.path.join(base, name_glob))
+    return pats
+
+
+def _discover_tool_dir(env_key: str, name_glob: str) -> str:
+    """Ghidra / JDK 这类不在 PATH 上的**目录**：环境变量 → 常见安装位置。
+
+    扫盘符是为了兼容"装在非系统盘的 Program 目录下"这种位置；找不到返回空串，
+    由调用方按"未配置"处理，不抛异常。
+    """
+    import glob
+
+    v = os.environ.get(env_key, "")
+    if v and os.path.isdir(v):
+        return v
+    for p in _program_globs(name_glob):
+        hit = sorted(glob.glob(p), reverse=True)
+        if hit:
+            return hit[0]
+    return ""
+
+
+def _discover_executable(env_key: str, name_glob: str, which_name: str) -> str:
+    """单个可执行文件（如 upx）：环境变量 → PATH → 常见安装位置。"""
+    import glob
+
+    v = os.environ.get(env_key, "")
+    if v and os.path.exists(v):
+        return v
+    found = shutil.which(which_name)
+    if found:
+        return found
+    for p in _program_globs(name_glob):
+        hit = sorted(glob.glob(p), reverse=True)
+        if hit:
+            return hit[0]
+    return ""
+
+
+
+# ── REA 定位（可移植：环境变量优先，其次自动探测，不写死本机路径）──────────
+# 早期版本把用户主目录下的 node.exe 与某个 Program 盘下的 Ghidra/JDK 绝对路径
+# 直接写在这里，后果有两个：
+#   1) 换一台机器整套 REA 不可用；
+#   2) 本机目录名随报错信息打印进日志（CI 日志是公开的）。
+# 现在改为：环境变量 > PATH / 常见安装位置探测 > 空（调用方按"未配置"处理）。
+_NODE = _discover_node()
+_REA_MJS = _discover_rea_mjs()
 
 #: Ghidra 与 JDK 21 的默认位置（decompile 通道依赖）。
 #: 必须在这里注入 —— agent 进程自身不会带这两个环境变量，
 #: 而 REA 只认环境变量：GHIDRA_INSTALL_DIR 缺失则整套反编译不可用，
 #: JAVA_HOME 指向 JDK<21 则 Ghidra 12.x 直接拒绝启动（doctor 仍报 healthy）。
-_DEFAULT_GHIDRA = os.environ.get("REA_GHIDRA_DIR", r"E:\Program\ghidra_12.1.4_PUBLIC")
-_DEFAULT_JAVA = os.environ.get("REA_JAVA_HOME", r"E:\Program\jdk-21.0.12.1+1")
+_DEFAULT_GHIDRA = _discover_tool_dir("REA_GHIDRA_DIR", "ghidra_*")
+_DEFAULT_JAVA = _discover_tool_dir("REA_JAVA_HOME", "jdk-21*")
 
 #: 单次命令硬超时（秒）——REA 的 objdump 反汇编在 12.9MB 样本上约 40s
 _TIMEOUT = int(os.environ.get("REA_TIMEOUT", "240"))
@@ -466,7 +559,7 @@ def _packer_hint_file(path: str) -> str | None:
 
 # ── UPX 脱壳（只脱 UPX，别的一律如实拒）──────────────────────────────
 #: upx 可执行文件位置；环境变量优先，其次 PATH。实测 5.2.1 才能脱 4.x 压的样本。
-_DEFAULT_UPX = os.environ.get("REA_UPX", r"E:\Program\tools\upx-5.2.1-win64\upx.exe")
+_DEFAULT_UPX = _discover_executable("REA_UPX", "tools/upx-*/upx.exe", "upx")
 _UNPACK_TIMEOUT = int(os.environ.get("REA_UNPACK_TIMEOUT", "180"))
 
 
@@ -1556,12 +1649,6 @@ class ReaProbeAdapter(ToolAdapter):
     def _run_sync(self, path: str, lane: str, selector: str = "",
                   max_funcs: int = 0, name_filter: str = "",
                   unpack: str = "auto") -> ToolOutput:
-        ok, why = _rea_available()
-        if not ok:
-            return ToolOutput(
-                text=f"[rea_probe] REA 不可用：{why}（not_applicable，勿当作'分析干净'）",
-                ok=False,
-            )
         if lane == "auto":
             lane = _sniff_lane(path)
         # 未知 lane 必须报错，不能静默回退（2026-10-20 实测：传 lane=nonsense 时
@@ -1571,6 +1658,12 @@ class ReaProbeAdapter(ToolAdapter):
             return ToolOutput(
                 text=f"[rea_probe] 未知 lane={lane!r}（不会静默回退到 pe）；"
                      f"合法值：{'|'.join(sorted(_KNOWN_LANES))}",
+                ok=False,
+            )
+        ok, why = _rea_available()
+        if not ok:
+            return ToolOutput(
+                text=f"[rea_probe] REA 不可用：{why}（not_applicable，勿当作'分析干净'）",
                 ok=False,
             )
         if lane == "unknown":
