@@ -57,7 +57,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r ctf_agent/requirements.txt
-          pip install pytest-timeout pytest-cov ruff==0.17.1
+          pip install pytest-timeout pytest-cov pytest-asyncio ruff==0.17.1
 
       - name: Static gate (ruff, fail-closed)
         # 分级零容忍：F821/F811 全仓；F401/F841 核心目录（口径见 ctf_agent/pyproject.toml）。
