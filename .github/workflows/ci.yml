@@ -78,7 +78,7 @@ jobs:
         #
         # --cov 与测试**同一次跑**：分开跑会把 CI 时间翻倍，且两次结果可能因
         # 环境差异不一致（一个过、一个不过），判断到底哪个才是真值要额外解释成本。
-        run: pytest -q -m "not slow and not local" --timeout=120 --cov=. --cov-report=json:coverage.json
+        run: pytest -q -m "not slow and not local" --timeout=120 --cov=. --cov-report=json:coverage.json --cov-report=term
         working-directory: ctf_agent
 
       - name: Coverage gate (no-regression floor)
