@@ -1181,6 +1181,31 @@ def _vigenere_crack(cipher: str, key_len: int = 0, max_key_len: int = 12) -> str
     return best_result
 
 
+def _rsa_result_to_dict(raw) -> dict:
+    """把 skills.rsa_fermat_factor.run() 的返回值统一成 fast_solve 的 dict 契约。
+
+    ⚠️ 2026-10-25 实测：`run()` 的文档契约是「解出的明文 bytes 或 None」
+    （依赖缺失时直接 None），而 fast_solve **所有其它分支一律返回 dict**。
+    不包一层 ⇒ 调用方 `r.get("flag")` 抛 AttributeError：
+      · presolve._try_fast_solve 的 `r.get(...)` 写在 `try` **外面**，无人兜；
+      · scripts/_batch_bruteforce 同样按 dict 用，被自己的 try 静默吞掉。
+    实测 fast_solve("rsa", s=...) / ("fermat", s=...) 均返回 None 而非 dict。
+    """
+    import re
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, (bytes, bytearray)):
+        text = bytes(raw).decode("utf-8", errors="ignore")
+    else:
+        text = "" if raw is None else str(raw)
+    m = re.search(r"(?:flag|ctf|DASCTF)\{[^}\s]{3,}\}", text, re.I)
+    if m:
+        return {"ok": True, "flag": m.group(0), "method": "rsa_fermat_factor"}
+    return {"ok": False,
+            "error": "rsa_fermat_factor 未解出（参数不足或依赖缺失）",
+            "raw": text[:200]}
+
+
 def fast_solve(kind: str = "", **params) -> dict:
     """crypto 高频题型一键直出（识别题型即出答案，减少 LLM 轮次——提速二）。
 
@@ -1191,19 +1216,47 @@ def fast_solve(kind: str = "", **params) -> dict:
     kind = (kind or "").lower()
     try:
         if kind in ("fermat", "rsa", "费马"):
+            # ⚠️ 2026-10-25 修复（实测，非推断）：run() 返回的是明文 bytes/None，
+            # 而本函数对外契约是 dict —— 不包一层，presolve._try_fast_solve 在
+            # `try` 外做的 `r.get("flag")` 会抛 AttributeError（且无人兜），
+            # scripts/_batch_bruteforce 的同款用法则被静默吞掉。
             from skills.rsa_fermat_factor import run as _fermat
-            return _fermat(params)
+            return _rsa_result_to_dict(_fermat(params))
         if kind in ("zip", "压缩"):
-            # 2026-08-22 疯狂刷题 8% 后补：伪加密破解优先（55 题大量 zip 主类型）
+            # ⚠️ 2026-10-15 修复（两条，均为实测而非推断）：
+            # ① **参数契约不齐**：本分支两根都要**文件路径**
+            #    （zip_fake_encryption 要 `path`、zip_filename_chain_decode 要
+            #    `zip_path`），而唯一的生产调用方 presolve._try_fast_solve 只传
+            #    `s`（正文文本）⇒ 恒 `{'ok': False, 'error': 'zip_path not found'}`
+            #    ⇒ crypto 类 zip 题实测 **0 覆盖**（misc 类由 math_engine 兜住）。
+            #    注：`zip` 还被列在 _PROVEN_FAST_SOLVE_KINDS「已实证」清单里。
+            # ② **诱饵遮蔽**：原顺序「伪加密优先」会先扫 zip 内文本，实测样本
+            #    返回 `flag='ni_cai?'`（未带 flag{} 外壳，被 presolve 的 _FLAG_RE
+            #    拦下，但链里的真 flag 也就此错过）——与 math_engine 的
+            #    misc_decode 遮蔽 misc_zip 同型故障。
+            # 现顺序：路径归一 → 先**文件名链解码**（no_brute：遇加密层立即放弃，
+            # 绝不触发 110 万候选的同步爆破；爆破交给有墙钟的 zip_crypto_bruteforce
+            # / bkcrack）→ 链未出 flag 再走伪加密/内容扫描（原路径降级保留）。
+            import os as _os
+
+            path = str(params.get("path") or params.get("zip_path") or "")
+            if path and _os.path.exists(path):
+                try:
+                    from skills.zip_filename_chain_decode import zip_filename_chain_decode
+                    _r = zip_filename_chain_decode(
+                        {"zip_path": path, "max_layers": 100, "no_brute": True})
+                    if isinstance(_r, dict) and _r.get("flag"):
+                        return _r
+                except Exception:  # noqa: BLE001 - skill 异常不得静默吞掉整条路径
+                    pass
             from skills.zip_fake_encryption import run as _zip_fake_run
             try:
-                _r = _zip_fake_run(params)
+                _r = _zip_fake_run({"path": path} if path else params)
                 if _r.get("ok"):
                     return _r
             except Exception:  # noqa: BLE001
                 pass
-            from skills.zip_filename_chain_decode import zip_filename_chain_decode
-            return zip_filename_chain_decode(params)
+            return {"ok": False, "error": "zip 链解码与伪加密均未命中"}
         if kind in ("ecb", "aes", "aes-ecb"):
             from skills.crypto_ecb_block_attack import crypto_ecb_block_attack
             return crypto_ecb_block_attack(params)
@@ -1250,8 +1303,22 @@ def fast_solve(kind: str = "", **params) -> dict:
             # 内联共模攻击（common_modulus 是 attack_templates 字符串模板非真实函数——
             # 同 decode_multi_layer/crack_hash 教训：不依赖不存在的模块函数）
 
-            c1 = int(params["c1"]); c2 = int(params["c2"])
-            e1 = int(params["e1"]); e2 = int(params["e2"]); n = int(params["n"])
+            # ⚠️ 2026-10-25 修复（实测）：原实现硬下标 `int(params["c1"])`，而唯一
+            # 生产调用方 presolve._try_fast_solve **只传 s**（附件正文文本）⇒
+            # 关键词「共模」命中时必抛 KeyError('c1')，被外层 except 兜成
+            # "common_modulus 直出失败: KeyError 'c1'" ⇒ 本路 100% 死、无痕。
+            _need = ("n", "e1", "e2", "c1", "c2")
+            _miss = [k for k in _need if params.get(k) in (None, "")]
+            if _miss:
+                return {"ok": False, "method": "common_modulus_inline",
+                        "note": f"共模攻击需结构化参数 {_need}，缺 {_miss}；"
+                               f"presolve 只传附件正文 s，本路拿不到 n/e/c"}
+            try:
+                c1 = int(params["c1"]); c2 = int(params["c2"])
+                e1 = int(params["e1"]); e2 = int(params["e2"]); n = int(params["n"])
+            except (TypeError, ValueError) as _exc:
+                return {"ok": False, "method": "common_modulus_inline",
+                        "note": f"共模参数非整数: {_exc}"}
             def _egcd(a, b):
                 if b == 0:
                     return a, 1, 0
@@ -1265,7 +1332,18 @@ def fast_solve(kind: str = "", **params) -> dict:
         if kind in ("small_e", "小指数", "low_e"):
             # 内联小指数明文攻击（small_e 是 attack_templates 字符串模板非真实函数——
             # 同 decode_multi_layer/crack_hash/common_modulus 教训）
-            c = int(params["c"]); e = int(params["e"])
+            # ⚠️ 2026-10-25 修复（实测）：同 common_modulus——原实现硬下标
+            # `int(params["c"])`，presolve 只传 s ⇒ 「小指数」命中必 KeyError。
+            _miss = [k for k in ("c", "e") if params.get(k) in (None, "")]
+            if _miss:
+                return {"ok": False, "method": "small_e_inline",
+                        "note": f"小指数攻击需结构化参数 ('c', 'e')，缺 {_miss}；"
+                               f"presolve 只传附件正文 s，本路拿不到 c/e"}
+            try:
+                c = int(params["c"]); e = int(params["e"])
+            except (TypeError, ValueError) as _exc:
+                return {"ok": False, "method": "small_e_inline",
+                        "note": f"小指数参数非整数: {_exc}"}
             # e 次方根（整数开方——m^e < n 时直接开方得明文）
             lo, hi = 0, c
             while lo <= hi:

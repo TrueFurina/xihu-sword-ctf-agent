@@ -141,9 +141,20 @@ def _brute_force_zip_password(zf: zipfile.ZipFile) -> bytes:
 
 
 def zip_filename_chain_decode(params: dict) -> dict:
-    """解压多层 zip，收集文件名链，尝试解码出 flag。"""
+    """解压多层 zip，收集文件名链，尝试解码出 flag。
+
+    params:
+        zip_path  : 外层 zip 路径（必填）
+        max_layers: 最大层数（默认 200）
+        no_brute  : True ⇒ 遇到**加密层立即放弃**，绝不进入密码爆破
+                    （2026-10-15 新增）。爆破空间是 5/6 位数字 110 万候选，
+                    同步跑可阻塞数分钟；需要**确定性快速返回**的调用方
+                    （presolve / fast_solve）必须置 True，把爆破交给有墙钟
+                    保护的专用路径（zip_crypto_bruteforce / bkcrack）。
+    """
     zip_path = params.get("zip_path", "")
     max_layers = int(params.get("max_layers", 200))
+    no_brute = bool(params.get("no_brute", False))
     if not zip_path or not os.path.exists(zip_path):
         return {"ok": False, "error": "zip_path not found"}
 
@@ -164,6 +175,13 @@ def zip_filename_chain_decode(params: dict) -> dict:
                 # 检测加密 → 爆破密码（5/6位数字+词表，捕获 zlib.error）→ 带密码读取
                 pwd = b""
                 if _zip_encrypted(z):
+                    if no_brute:
+                        return {
+                            "ok": False,
+                            "error": f"第 {layer} 层 zip 加密且 no_brute=True（跳过爆破）",
+                            "layer": layer,
+                            "chain": chain,
+                        }
                     pwd = _brute_force_zip_password(z)
                     if not pwd:
                         return {

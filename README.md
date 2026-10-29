@@ -1,17 +1,19 @@
 # xihu-sword-ctf-agent
 
-> 🔒 **FROZEN / 已冻结（2026-10-23）**：本仓库已被 **SecAutoMind**（`E:\Program\SecAutoMind`）全量吞并，
-> 现为**只读知识库**（攻击链、writeup、验证脚本、基准数据仍可参考复用）。不再作为参赛主体或维护对象，
-> 不再提交新功能。后续能力发展一律在 SecAutoMind 进行；迁移路线图见
-> `E:\Program\SecAutoMind\docs\merge_xhlj_roadmap_20261023.md`。Bug 级修复仅以支撑赛事复盘为限。
+> 🔒 **FROZEN / 已冻结（2026-10-23）**：本仓库能力已全量并入 **SecAutoMind**，此处转为**只读知识库**（攻击链、writeup、验证脚本、基准数据仍可参考复用）。不再作为参赛主体或维护对象，不再提交新功能；后续能力发展在 SecAutoMind 进行。Bug 级修复仅以支撑赛事复盘为限。迁移路线图见 [SecAutoMind](https://github.com/TrueFurina/SecAutoMind) 仓库内 `docs/` 说明。
 
-> 🔧 **确定性优先的 CTF 智能体框架** — 先用 72 个可复现确定性技能横向爆破常见题型，LLM 仅在静态分析 miss 时才作为最后手段介入，且受白名单 / token 预算 / 墙钟止损三重约束。结果可复现、可调试、且**对自己能做什么诚实**。
+> 🔧 **确定性优先的 CTF 智能体框架** — 先用 78 个可复现确定性技能横向爆破常见题型，LLM 仅在静态分析 miss 时才作为最后手段介入，且受白名单 / token 预算 / 墙钟止损三重约束。结果可复现、可调试、且**对自己能做什么诚实**。
 
 > 🌏 **中文文档 / Chinese documentation**: [README.zh.md](./README.zh.md)
+
+<details>
+<summary>⚠️ 口径说明与历史更正（Honesty disclaimer / Figure correction，点开看）</summary>
 
 > ⚠️ **Honesty disclaimer (read first)**: This project's real-world competition result on the live platform was **0 accepted flags**. All "solved / pass-rate" figures in this repo refer to **offline deterministic analysis** of historical CTF problems (the `data/questions_real/` corpus), not any live contest score. We do not claim LLM autonomous reasoning capability — the real capability here is a **deterministic static analyzer (presolve)** covering common CTF categories. See [Honest KPI](#honest-kpi) below.
 
 > 🔴 **口径更正 / Figure correction (2026-10-01)**: the "**LLM autonomous reasoning 1 / 2**" figure quoted in this README (from the 2026-09-22 clean-2 report) is **superseded and must not be cited as current truth**. The single problem behind that "1" — `real_crypto_dnui_keyboard` — was judged `solved_by=presolve` (78 ms, ≈0 tokens) in **two independent runs**: the 2026-09-29 full 17-problem pool, and the 2026-10-01 NYU stratified 5-problem trial (cold blackboard, E3 ON, deepseek). **The current verified count of LLM autonomous solves is 0.** Per project policy the original wording below is retained verbatim as a historical record of what was true at the time; this notice is what overrides it. Reminder: `2` is the *capability denominator*; the *runnable pool* (41 problems after the 2026-10-03 Google-CTF expansion) is a separate, harder set — never divide one by the other.
+
+</details>
 
 An open-source **AI agent framework for CTF (Capture The Flag)** competitions. The agent polls a DASCTF-style platform, triages challenges, runs deterministic solvers first, and only escalates to an LLM when static analysis misses. Built and battle-tested against the *West Lake Sword Tournament (西湖论剑)* AI CTF track.
 

@@ -57,7 +57,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r ctf_agent/requirements.txt
-          pip install pytest-timeout pytest-cov ruff==0.17.1
+          pip install pytest-timeout pytest-cov pytest-asyncio ruff==0.17.1
 
       - name: Static gate (ruff, fail-closed)
         # 分级零容忍：F821/F811 全仓；F401/F841 核心目录（口径见 ctf_agent/pyproject.toml）。
@@ -78,7 +78,7 @@ jobs:
         #
         # --cov 与测试**同一次跑**：分开跑会把 CI 时间翻倍，且两次结果可能因
         # 环境差异不一致（一个过、一个不过），判断到底哪个才是真值要额外解释成本。
-        run: pytest -q -m "not slow and not local" --timeout=120 --cov=. --cov-report=json:coverage.json
+        run: pytest -q -m "not slow and not local" --timeout=120 --cov=. --cov-report=json:coverage.json --cov-report=term
         working-directory: ctf_agent
 
       - name: Coverage gate (no-regression floor)

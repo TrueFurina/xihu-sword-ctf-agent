@@ -201,15 +201,33 @@ _FAST_SOLVE_KEYWORDS = (
     ("brainfuck", "ook"), ("brainfuck", "脑洞"), ("base58", "base58"),
     ("base58", "base62"), ("base58", "比特币"), ("base58", "btc"),
     ("common_modulus", "共模"), ("small_e", "小指数"),
+    # 2026-10-15 补：zip 类**从未进过关键词表**，却一直被列在
+    # _PROVEN_FAST_SOLVE_KINDS「已实证解出」清单里 ⇒ 声明与实际断裂：
+    # presolve 从不调 fast_solve('zip')，crypto 类 zip 题 0 覆盖
+    # （misc 类靠 math_engine.misc_zip 兜住，crypto 无人兜）。
+    # 触发成本实测毫秒级（链解码 no_brute，遇加密层立即放弃，不爆破）。
+    ("zip", "zip"), ("zip", "压缩包"), ("zip", "套娃"),
 )
 
 # ── 模板实证标记（2026-08-22 锐评「写过 vs 解出过」落地）──────────
 # 12 道真题真实 LLM 全量复盘（data/results/replay_real_run.log）中
 # **实际解出过**的确定性模板 kind 白名单。命中实证模板 = 有真实解出
 # 证据；未实证 kind 仅降级尝试（不拦，但日志标注「未实证」——答辩诚实）。
+# 2026-10-25 修正（实测，非推断）——原清单有一处**硬错**：
+#   `deterministic_decode` 曾被列在这里，但 fast_solve **根本没有这个 kind**——
+#   实测 fast_solve("deterministic_decode") 返回
+#   `{'ok': False, 'error': '未知题型 deterministic_decode'}`。
+#   真实解出路径是 math_engine.misc_decode → DeterministicDecodeAdapter，
+#   **不是 fast_solve**；记在 fast_solve 名下 = 把别人的战果算自己头上。
+#   （与 zip 同型：声明与实际断裂，zip 已于 2026-10-15 补关键词表接线。）
+# `rsa` / `fermat` 保留：kind 真实存在（底层 skills.rsa_fermat_factor），但
+#   实证来自 presolve 的**独立任务** `_try_rsa_factor`（同一 skill），并非
+#   fast_solve 这条路径——关键词表至今没有 rsa/fermat 关键词，presolve 从不
+#   调 fast_solve("rsa"/"fermat")。保留是为了不抹掉底层能力的实证，但口径
+#   必须写明：这是「同 skill 实证」，不是「本路径实证」。
 _PROVEN_FAST_SOLVE_KINDS = {
     "caesar", "b64", "morse", "hash", "fermat", "rsa", "zip",
-    "vigenere", "deterministic_decode", "common_modulus", "small_e",
+    "vigenere", "common_modulus", "small_e",
 }
 
 
@@ -678,11 +696,24 @@ async def _try_fast_solve(question) -> Optional[str]:
         except Exception:  # noqa: BLE001
             s = ""
 
+    # zip 类模板（fast_solve 的 zip 分支）需要**文件路径**：skill 内部按
+    # path / zip_path 取值，只喂正文文本 ⇒ 恒 'zip_path not found'（实测：
+    # crypto 类套娃 zip 题 0 覆盖，misc 类靠 math_engine.misc_zip 才兜住）。
+    zip_path = ""
+    for a in attach:
+        if str(a).lower().endswith(".zip") and os.path.isfile(str(a)):
+            zip_path = str(a)
+            break
+
     def _attempt(kind: str, text: str):
         """单模板 × 单输入；命中返回 flag，否则 None。"""
         try:
             from agents.crypto_toolkit import fast_solve
-            r = fast_solve(kind, s=text)
+            kw = {"s": text}
+            if zip_path and kind in ("zip", "压缩"):
+                kw["path"] = zip_path
+                kw["zip_path"] = zip_path
+            r = fast_solve(kind, **kw)
         except Exception as exc:  # noqa: BLE001 - 单模板失败继续下一个
             _warn_import_once("agents.crypto_toolkit.fast_solve", exc)
             return None
