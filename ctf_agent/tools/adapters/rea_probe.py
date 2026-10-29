@@ -100,8 +100,6 @@ def _discover_rea_mjs() -> str:
 
 def _program_globs(name_glob: str) -> list:
     """常见安装根目录下的候选路径（ProgramFiles / ProgramW6432 / 各盘符的 Program）。"""
-    import glob
-
     pats = [os.path.join(r, name_glob)
             for r in (os.environ.get("ProgramFiles", ""), os.environ.get("ProgramW6432", "")) if r]
     if os.name == "nt":
