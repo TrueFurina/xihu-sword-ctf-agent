@@ -86,3 +86,12 @@ select = ["F401", "F811", "F821", "F822", "F841"]
 "tests/*" = ["F401", "F841"]
 "scripts/*" = ["F401", "F841"]
 "__init__.py" = ["F401"]  # 包 __init__ 的 re-export 是公开接口，不是噪音
+
+[tool.ctf_coverage_gate]
+# 覆盖率门禁的真源。口径见 scripts/_gate_coverage.py 头部：
+#   只防倒退，不追求理想值；阈值 = 实测基线向下取整到 5 的倍数再减 5（留波动余量）。
+# 基线来源：2026-10-29 CI 实测 total = 66%（50396 条语句，17208 未覆盖）
+#   -> floor(66/5)*5 - 5 = 60
+# 抬高基线的前提是先真的把覆盖率做上去，然后改这里的数字（一笔可 review 的 diff）。
+total = 60
+metric = "percent_covered"
