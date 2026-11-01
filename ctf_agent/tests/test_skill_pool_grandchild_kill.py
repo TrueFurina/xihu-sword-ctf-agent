@@ -32,14 +32,24 @@ _FIXTURE_NAME = "zz_skillpool_fixture"
 
 
 def _win_pid_alive(pid: int) -> bool:
-    """Windows 下判断 pid 是否仍存活（PROCESS_QUERY_LIMITED_INFORMATION）。"""
+    """Windows 下判断 pid 是否**仍在运行**（不是"句柄能否打开"）。
+
+    ⚠️ 判据必须是 GetExitCodeProcess == STILL_ACTIVE(259)。
+    不能用 OpenProcess(SYNCHRONIZE) 是否成功：已退出但父进程尚未收尸的
+    进程（zombie）句柄照样能打开，于是本测试会**永远**误报"孙进程存活"，
+    把一条本该锁住回归的用例变成永久红（2026-10 实测：Job 收割正常时
+    也报 `AssertionError: 孙进程仍存活`，而 tasklist 已查无该 pid）。
+    """
     k32 = ctypes.windll.kernel32
-    SYNCHRONIZE = 0x00100000
-    h = k32.OpenProcess(SYNCHRONIZE, False, int(pid))
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    STILL_ACTIVE = 259
+    h = k32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
     if not h:
         return False
+    code = ctypes.c_uint32()
+    ok = k32.GetExitCodeProcess(h, ctypes.byref(code))
     k32.CloseHandle(h)
-    return True
+    return bool(ok) and code.value == STILL_ACTIVE
 
 
 @pytest.fixture
@@ -68,6 +78,35 @@ def fixture_module(tmp_path, monkeypatch):
     import importlib
     importlib.invalidate_caches()
     return str(mod)
+
+
+@pytest.mark.skipif(sys.platform != "win32",
+                    reason="Windows 进程存活判据")
+def test_pid_alive_probe_rejects_zombie():
+    """判据自检：已退出的 pid 必须判为"不存活"。
+
+    这是 test_grandchild_killed_on_timeout 的地基——判据一旦退回
+    "OpenProcess 能打开即存活"，那条用例就会永久红（漏报回归），
+    因此单独锁死判据本身，失败信息比"孙进程仍存活"更直指病灶。
+    """
+    import subprocess
+
+    p = subprocess.Popen([sys.executable, "-c", "pass"])
+    p.wait()  # 已退出且已收尸
+    assert not _win_pid_alive(p.pid), (
+        f"已退出进程 pid={p.pid} 被判为存活——存活判据失效")
+
+    # 反向：真在跑的进程必须判为存活，否则上一条断言会空转通过
+    alive = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and not _win_pid_alive(alive.pid):
+            time.sleep(0.05)
+        assert _win_pid_alive(alive.pid), (
+            f"运行中进程 pid={alive.pid} 被判为已死——判据恒假，回归锁失效")
+    finally:
+        alive.kill()
+        alive.wait()
 
 
 @pytest.mark.skipif(sys.platform != "win32",

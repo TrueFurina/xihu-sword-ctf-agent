@@ -88,8 +88,15 @@ def build_solver(use_mock: bool, is_correct=None, provider: Optional[str] = None
     if use_mock:
         # Mock 模式：直接走 mock_solve（可靠命中预置答案），绕过 LLM 链路
         from llm.mock import mock_solve, set_preset_answers
+        from eval.cases import load_questions, preset_answers as _bank_preset
 
-        set_preset_answers(answers)
+        # 合并题库自带明文/sha256 预期值（自产教学/靶场 demo 题 + 本地真值题），
+        # 使 mock 模式能解出本地已知答案的题；官方答案书优先级更高。
+        try:
+            _bank_answers = _bank_preset(load_questions(include_disclosed=True))
+        except Exception:  # 题库缺失不阻断 mock
+            _bank_answers = {}
+        set_preset_answers({**_bank_answers, **answers})
 
         async def solver(question, attempt, correction=None):
             return mock_solve(question.id, question.to_prompt_text(), question.category)

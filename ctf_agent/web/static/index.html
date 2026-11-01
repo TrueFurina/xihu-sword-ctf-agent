@@ -256,9 +256,9 @@ function flagCell(t) {
 function durationCell(t) {
   if (t.status === "running") {
     const start = localRunStart[t.task_id] || (localRunStart[t.task_id] = Date.now());
-    return `<td class="dur-cell" data-task-id="${escapeHtml(t.task_id)}" data-start="${start}">${Date.now() - start}</td>`;
+    return `<span class="dur-cell" data-task-id="${escapeHtml(t.task_id)}" data-start="${start}">${Date.now() - start}</span>`;
   }
-  return `<td>${t.duration_ms > 0 ? t.duration_ms : "—"}</td>`;
+  return `${t.duration_ms > 0 ? t.duration_ms : "—"}`;
 }
 
 function interveneCell(t) {
@@ -327,7 +327,7 @@ function fmtClock(ms) {
 // 1s 心跳：更新倒计时 + 运行中题目的本地已跑时长
 function tick() {
   updateCountdown();
-  document.querySelectorAll("td.dur-cell[data-start]").forEach(td => {
+  document.querySelectorAll(".dur-cell[data-start]").forEach(td => {
     td.textContent = (Date.now() - Number(td.dataset.start));
   });
 }
