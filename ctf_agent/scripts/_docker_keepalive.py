@@ -58,14 +58,17 @@ class KeepAlive(threading.Thread):
         super().__init__(daemon=True)
         self.interval = interval
         self.docker_bin = docker_bin
-        self._stop = threading.Event()
+        # ⚠️ 不能叫 `_stop`：threading.Thread 把 `_stop` 定义成**方法**
+        # （join() → _wait_for_tstate_lock() → self._stop()），属性覆盖它
+        # 会让 join() 抛 `TypeError: 'Event' object is not callable`。
+        self._stop_evt = threading.Event()
         self.pokes = 0
 
     def stop(self) -> None:
-        self._stop.set()
+        self._stop_evt.set()
 
     def run(self) -> None:
-        while not self._stop.wait(self.interval):
+        while not self._stop_evt.wait(self.interval):
             try:
                 subprocess.run(
                     [self.docker_bin, "version"],

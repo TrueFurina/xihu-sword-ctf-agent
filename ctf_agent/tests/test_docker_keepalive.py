@@ -195,3 +195,29 @@ def test_ast_scanners_have_real_input():
     tree = ast.parse(src)
     funcs = [n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.ClassDef))]
     assert {"main", "KeepAlive"} & set(funcs), f"顶层定义里缺少 main/KeepAlive：{funcs}"
+
+
+def test_keepalive_thread_join_does_not_raise():
+    """心跳线程必须能被 join()——`_stop` 属性覆盖 Thread._stop() 的回归锁。
+
+    病灶：`self._stop = threading.Event()` 覆盖了 threading.Thread 的
+    `_stop()` **方法**；`thread.join()` → `_wait_for_tstate_lock()` →
+    `self._stop()` → `TypeError: 'Event' object is not callable`。
+
+    为什么原测套漏了：既有用例只调 `stop()` + `is_alive()`，从不 `join()`，
+    于是「对象还在、pokes 还在涨、只是 join 就崩」这种半坏状态全绿通过。
+    而生产代码里一旦有人为了「干净收尾」加一行 `thread.join()`，即崩。
+    """
+    import threading
+    import time as _time
+
+    from scripts._docker_keepalive import KeepAlive
+
+    ka = KeepAlive(interval=0.05, docker_bin=sys.executable)
+    # 真名必须是 _stop 之外的名字（防止后人改回去）
+    assert not isinstance(getattr(threading.Thread, "_stop", None), threading.Event)
+    ka.start()
+    _time.sleep(0.2)
+    ka.stop()
+    ka.join(timeout=5)  # 修复前：这里抛 TypeError
+    assert not ka.is_alive(), "stop() 后线程未在 5s 内退出"
