@@ -34,11 +34,13 @@ class MarginalValueEstimator:
         exploit = (float(score) * p_hat) / t_hat
 
         n_i = self.pull_counts.get(qid, 0)
-        n = self.total_pulls
         if n_i == 0:
-            explore = float("inf")
-        else:
-            explore = math.sqrt(2.0 * math.log(n + 1) / n_i)
+            # 未探索的题无条件优先。直接返回 inf，而不是 exploit + factor*inf ——
+            # 后者在 exploration_factor=0（纯利用模式）时是 0*inf = nan，
+            # NaN 与任何数比较都为 False，排序会静默失效（未探索题不再被优先）。
+            return float("inf")
+        n = self.total_pulls
+        explore = math.sqrt(2.0 * math.log(n + 1) / n_i)
         return exploit + self.exploration_factor * explore
 
     def record_pull(self, qid: str) -> None:

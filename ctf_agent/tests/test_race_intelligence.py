@@ -78,6 +78,18 @@ def test_marginal_value_unexplored_is_inf():
     assert mv.estimate("q1", 100, 0.5, 10.0, 0.0) == float("inf")
 
 
+def test_marginal_value_unexplored_is_inf_with_zero_exploration():
+    """纯利用模式（exploration_factor=0）下，未探索题仍应优先，而不是 NaN。
+
+    旧实现返回 exploit + 0*inf = NaN；NaN 与任何数比较恒为 False，
+    排序会静默失效（未探索题不再被优先）。
+    """
+    mv = MarginalValueEstimator(exploration_factor=0.0)
+    v = mv.estimate("q1", 100, 0.5, 10.0, 0.0)
+    assert v == float("inf"), f"应为 inf，实际 {v!r}"
+    assert not math.isnan(v)
+
+
 def test_marginal_value_exploit_monotonic():
     mv = MarginalValueEstimator()
     mv.record_pull("q1")
