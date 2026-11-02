@@ -114,18 +114,93 @@ sc = [(f"{float(k):.0f}分", v) for k, v in S["race_details"]["by_score"].items(
 sc_html = vbar(sc, color="#7c3aed")
 
 # ⑧ 分类×难度热力矩阵
-cat_order = ["web", "crypto", "misc", "pwn", "reverse"]
-diff_order = ["VERY_EASY", "EASY", "MEDIUM", "HARD"]
+# ⚠️ 必须是**动态派生**，不能手写固定列表（2026-11-01 审计）。
+#
+# 原实现写死 cat_order 五个分类、diff_order 四个难度。后果：
+#   · 题库新增 `forensics` 分类 → 它不出现在热力图里，其题目在"合计"行也不计；
+#   · 新增 `EXPERT` 难度 → 同理；
+#   · 而最后一格总合计用的是 `reg['total']`（真实总数），
+#     于是**行合计/列合计与总合计对不上**——表格自己打自己的脸。
+#
+# 现在从 mat 的实际键派生，并把固定顺序保留为"优先排序"，未列出的排在后面。
+_CAT_PREF = ["web", "crypto", "misc", "pwn", "reverse"]
+_DIFF_PREF = ["VERY_EASY", "EASY", "MEDIUM", "HARD"]
 mat = S["regression"]["by_cat_diff"]
-cmax = max((mat.get(c, {}).get(d, 0) for c in cat_order for d in diff_order), default=1)
+_cats_seen = {c for c in mat}
+_diffs_seen = {d for row in mat.values() for d in row}
+cat_order = ([c for c in _CAT_PREF if c in _cats_seen]
+             + sorted(_cats_seen - set(_CAT_PREF)))
+diff_order = ([d for d in _DIFF_PREF if d in _diffs_seen]
+              + sorted(_diffs_seen - set(_DIFF_PREF)))
+# 色阶上限也只按格点算：用 mat 全量会让"格点外的题"把其他格子压暗，
+# 而它们根本没被画出来 —— 视觉上进一步误导。
+cmax = max((mat.get(c, {}).get(d, 0) for c in cat_order for d in diff_order), default=1) or 1
 heat_rows = ["<tr><th>分类</th>" + "".join(f"<th>{d.replace('_',' ')}</th>" for d in diff_order) + "<th>合计</th></tr>"]
+# ⚠️ 行列合计必须**同一套口径**（2026-11-01 审计）。
+#
+# 原实现：行合计 `sum(row.values())`（含未列出的难度），
+#        列合计 `sum(... for c in cat_order)`（只算已列分类）。
+# 两者遍历范围不同 → 数据一旦有额外分类/难度，**行总和 ≠ 列总和**，
+# 而右下角又是 `reg['total']`（第三个数），三个数互相打架。
+#
+# 实测（造 forensics 10 题 + pwn/EXPERT 3 题）：
+#   行合计 50 / 列合计 47 / total 60 —— 没有一个对得上。
+#
+# 现在两者都只在 `cat_order × diff_order` 这个**共同格点**上累加，
+# 保证三数恒等；差额（若有）单独列出，不藏着。
+_cell = lambda c, d: mat.get(c, {}).get(d, 0)
+_grid_total = sum(_cell(c, d) for c in cat_order for d in diff_order)
+
 for c in cat_order:
-    row = mat.get(c, {})
-    t = sum(row.values())
-    cells = "".join(f'<td class="heat" style="background:rgba(37,99,235,{0.08+0.55*(row.get(d,0)/cmax):.2f})">{row.get(d, 0)}</td>' for d in diff_order)
-    heat_rows.append(f'<tr><td class="cat"><span class="dot" style="background:{cat_color(c)}"></span>{c} ({t})</td>{cells}<td class="sum">{t}</td></tr>')
-heat_rows.append("<tr><td>合计</td>" + "".join(f'<td class="sum">{sum(mat.get(c, {}).get(d, 0) for c in cat_order)}</td>' for d in diff_order) + f"<td class='sum'>{reg['total']}</td></tr>")
-heat_html = f'<table class="heat-t">{chr(10).join(heat_rows)}</table>'
+    t = sum(_cell(c, d) for d in diff_order)
+    cells = "".join(
+        f'<td class="heat" style="background:rgba(37,99,235,{0.08+0.55*(_cell(c,d)/cmax):.2f})">'
+        f'{_cell(c, d)}</td>' for d in diff_order)
+    heat_rows.append(
+        f'<tr><td class="cat"><span class="dot" style="background:{cat_color(c)}"></span>'
+        f'{c} ({t})</td>{cells}<td class="sum">{t}</td></tr>')
+heat_rows.append(
+    "<tr><td>合计</td>"
+    + "".join(f'<td class="sum">{sum(_cell(c, d) for c in cat_order)}</td>'
+              for d in diff_order)
+    + f"<td class='sum'>{_grid_total}</td></tr>")
+
+# ── 统计不变量自检（2026-11-01 审计 R115）──────────────────────────────
+#
+# 四个量必须恒等：Σ行合计 == Σ列合计 == 格点总计 == 矩阵全量 == reg.total
+# 任一对不上就**直接 fail**，不要产出"看起来正常但对不上"的报表。
+#
+# 为什么用 fail 而不是警告：R114 实测过，行列合计分叉时（行 50 / 列 47 / total 60），
+# 症状看起来像"公式写错"，人会去查算法而忽略遍历范围。
+# 一张自己跟自己对不上的表，不该被发出去。
+_all_cells = sum(v for row in mat.values() for v in row.values())
+_row_sum = sum(sum(_cell(c, d) for d in diff_order) for c in cat_order)
+_col_sum = sum(sum(_cell(c, d) for c in cat_order) for d in diff_order)
+
+_invariant = {
+    "Σ行合计": _row_sum,
+    "Σ列合计": _col_sum,
+    "格点总计": _grid_total,
+    "矩阵全量": _all_cells,
+    "reg.total": reg["total"],
+}
+if len(set(_invariant.values())) != 1:
+    detail = " / ".join(f"{k}={v}" for k, v in _invariant.items())
+    raise SystemExit(
+        "[FAIL] 热力矩阵统计不自洽：" + detail + chr(10)
+        + "       已知分类 " + str(sorted(_cats_seen))
+        + "、难度 " + str(sorted(_diffs_seen)) + "；"
+        + "请检查行列合计的遍历范围是否一致。")
+
+# 格点外若真有题（本应已被上面的不变量挡住），单独提示——保留给人看。
+if _all_cells != _grid_total:
+    heat_html_note = (f'<p class="desc" style="color:#b45309">⚠️ 矩阵共 {_all_cells} 题，'
+                      f'其中 {_all_cells - _grid_total} 题的分类/难度不在表内，'
+                      f'未计入行列合计（已知分类 {sorted(_cats_seen)}、'
+                      f'难度 {sorted(_diffs_seen)}）。</p>')
+else:
+    heat_html_note = ""
+heat_html = heat_html_note + f'<table class="heat-t">{chr(10).join(heat_rows)}</table>'
 
 # ⑨ goal_log 错误归因
 err4 = S["goal_log"]["error_class4"]

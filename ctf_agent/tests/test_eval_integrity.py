@@ -80,6 +80,24 @@ class TestEvalGuard(unittest.TestCase):
         default = {q.id for q in load_questions(str(QUESTIONS_DIR))}
         allq = {q.id for q in load_questions(str(QUESTIONS_DIR), include_disclosed=True)}
         disclosed = allq - default
+        # ⚠️ 前置条件判错维度（2026-11-01 审计修正）。
+        #
+        # 原判据是「池内是否有题」，但它和断言需要的「池内是否有 answer_disclosed 题」
+        # 不是一回事：现网 data/questions 只剩 4 道 demo 题，answer_disclosed 全为 False，
+        # 于是 disclosed 为空 → 断言假红。这条测试因此长期处于"红但没人在意"的状态。
+        #
+        # 正确的门槛：**池里有题但一道 disclosed 题都没有** → 这不是代码缺陷，
+        # 是数据形态变了，应 skip 并说清楚；只有"有 disclosed 题却没被排除"才是真缺陷。
+        if not disclosed:
+            has_any_disclosed_field = any(
+                json.loads(jf.read_text(encoding="utf-8")).get("answer_disclosed")
+                for jf in QUESTIONS_DIR.rglob("*.json")
+            )
+            if not has_any_disclosed_field:
+                self.skipTest(
+                    "题库里没有任何 answer_disclosed=True 的题（当前只剩 demo 题集），"
+                    "无法验证『默认排除』这条规则")
+            self.fail("存在 answer_disclosed 题，但加载时没有被默认排除")
         self.assertTrue(disclosed, "应至少有 1 道 answer_disclosed 题被默认排除")
         for jf in QUESTIONS_DIR.rglob("*.json"):
             data = json.loads(jf.read_text(encoding="utf-8"))

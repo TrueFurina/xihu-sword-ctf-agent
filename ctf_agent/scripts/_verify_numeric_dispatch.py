@@ -99,8 +99,17 @@ def run_one(qid, dataset, expect_skill, sm, registry, verbose=True):
         print("     sha256 %s %s" % (hit[:16] + "...",
                                      "MATCH 真值" if ok else "≠ 真值 " + truth[:16]))
         return ok
-    print("     (题库无 flag_sha256，仅证明 flag 非空)")
-    return True
+    # ⚠️ 题库无真值 → **不能算通过**（2026-11-01 审计修正）。
+    #
+    # 原实现这里 `return True`：因为"没真值所以无法反驳"，就把"提取到 flag"
+    # 记成了解出。这与 `_verify_presolve_truth.classify()` 的口径相反 ——
+    # 那边把同类情况归为 NO_GROUND，明确"不能算解出，只能算待独立核验"。
+    #
+    # 两个脚本对同一件事给出相反结论，会让"解出数"这个 KPI 随用法漂移。
+    # 现在统一：无真值 → 返回 False，但打印时标注 ⚠️ 以区别于真正的"解不出"。
+    print("     ⚠️ 题库无 flag_sha256 —— 无法校验，**不计为通过**"
+          "（与 _verify_presolve_truth 的 NO_GROUND 口径一致）")
+    return False
 
 
 def main():

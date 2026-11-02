@@ -34,17 +34,32 @@ def run(params):
 
 
 def _try_decode(text):
-    """尝试 Base64 → Base32 → Base16 解码。"""
+    """按**特异性从高到低**尝试：Base16(hex) → Base32 → Base64。
+
+    ⚠️ 顺序是功能性的，不是随意的（2026-11-01 审计）。
+
+    原顺序是 Base64 → Base32 → Base16，实测有个硬缺陷：
+    **hex 的字符集是 base64 的子集**（0-9a-f 全在 base64 字母表里），
+    所以纯 hex 串会先被 Base64 分支"成功"解码成乱码并提前 return，
+    永远走不到 Base16 分支。
+
+        输入 "666c61677b6865787d"
+        Base64 先试 → '뮜�^��...'（乱码，但 isprintable 检查通过了一部分）
+        正确的 Base16 → 'flag{hex}'
+
+    修复：把判定条件**最严格**的 Base16 放最前（全 hex 字符 + 偶数长度），
+    其次 Base32（大写字母表 + 长度约束），最后 Base64（最宽松）。
+    """
     text = text.strip()
     if not text:
         return None
 
-    # Base64
+    # Base16 (hex)
     try:
-        padded = text + "=" * ((4 - len(text) % 4) % 4) if len(text) % 4 else text
-        result = base64.b64decode(padded).decode("utf-8", errors="replace")
-        if result and all(c.isprintable() or c in "\n\r\t" for c in result):
-            return result
+        if all(c in "0123456789abcdefABCDEF" for c in text) and len(text) % 2 == 0:
+            result = bytes.fromhex(text).decode("utf-8", errors="replace")
+            if result and all(c.isprintable() or c in "\n\r\t" for c in result):
+                return result
     except Exception:
         pass
 
@@ -57,12 +72,12 @@ def _try_decode(text):
     except Exception:
         pass
 
-    # Base16 (hex)
+    # Base64
     try:
-        if all(c in "0123456789abcdefABCDEF" for c in text) and len(text) % 2 == 0:
-            result = bytes.fromhex(text).decode("utf-8", errors="replace")
-            if result and all(c.isprintable() or c in "\n\r\t" for c in result):
-                return result
+        padded = text + "=" * ((4 - len(text) % 4) % 4) if len(text) % 4 else text
+        result = base64.b64decode(padded).decode("utf-8", errors="replace")
+        if result and all(c.isprintable() or c in "\n\r\t" for c in result):
+            return result
     except Exception:
         pass
 

@@ -73,7 +73,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.join(BASE, "benchmark.json")
 MANIFEST = os.path.join(BASE, "export_manifest.json")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
-INNER_RE = re.compile(r"\{(.+)\}", re.DOTALL)
+INNER_RE = re.compile(r"\{(.+?)\}", re.DOTALL)
 
 
 def sha(s):

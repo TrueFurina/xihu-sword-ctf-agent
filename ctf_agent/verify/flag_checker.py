@@ -40,7 +40,9 @@ def sha256_matches(flag: str, expected_sha256: Optional[str]) -> Optional[bool]:
     if not truth:
         return None
     cands = [str(flag).strip()]
-    m = re.search(r"flag\{(.+)\}", cands[0], re.IGNORECASE | re.DOTALL)
+    # 非贪婪：flag 本身不含花括号；贪婪会把 "flag{a} (hint: {b})" 整段吃进去，
+    # 算出与真值不符的摘要 → 把答对的题判成答错（2026-11-01 审计统一口径）。
+    m = re.search(r"flag\{(.+?)\}", cands[0], re.IGNORECASE | re.DOTALL)
     if m:
         cands.append(m.group(1))
     return any(

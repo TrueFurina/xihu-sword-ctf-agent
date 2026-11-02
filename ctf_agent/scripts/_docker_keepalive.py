@@ -58,9 +58,17 @@ class KeepAlive(threading.Thread):
         super().__init__(daemon=True)
         self.interval = interval
         self.docker_bin = docker_bin
-        # ⚠️ 不能叫 `_stop`：threading.Thread 把 `_stop` 定义成**方法**
-        # （join() → _wait_for_tstate_lock() → self._stop()），属性覆盖它
-        # 会让 join() 抛 `TypeError: 'Event' object is not callable`。
+        # ⚠️ 命名必须避开 `Thread` 的私有成员 `_stop`。
+        #
+        # `threading.Thread` 自己有一个 `_stop()` **方法**，在 `join()` 的
+        # `_wait_for_tstate_lock()` 收尾路径里被调用。用 `self._stop = Event()`
+        # 覆盖它之后：
+        #
+        #     join() -> _wait_for_tstate_lock() -> self._stop()
+        #     TypeError: 'Event' object is not callable
+        #
+        # start/run/stop 全都正常，只有 join() 会炸 —— 所以这个 bug 能活很久。
+        # 同类私有名：`_started`、`_tstate_lock`。
         self._stop_evt = threading.Event()
         self.pokes = 0
 

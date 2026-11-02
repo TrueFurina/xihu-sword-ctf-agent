@@ -54,6 +54,29 @@ def build_registry():
     return registry
 
 
+def classify(extracted: bool, matched: bool, has_ground_truth: bool) -> str:
+    """把单题结果归入四类之一。
+
+    这一段原来埋在 `main()` 的 for 循环里（`verdict` 三元嵌套），既不好读、
+    也没法单独测。2026-11-01 审计把它抽出来，并补了 tests/test_presolve_truth_classify.py。
+
+    四类的语义边界（这是判据，改动前请读注释）：
+      MATCH        提取到了，且与题库真值一致 —— 唯一的"可验证解出"
+      NO_GROUND    提取到了，但题库本身没有真值 —— **不能算解出**，只能算"待独立核验"
+      EXTRACT_BAD  提取到了，但与真值不符 —— 最危险的一类：管线给出了错答案
+      MISS         没提取到 —— 需要 LLM 推理或独立攻击链
+
+    ⚠️ NO_GROUND 与 MATCH 必须分开计数。历史上把两者合并成"解出数"，
+    会把"题库没真值所以没法反驳"算成"解出来了"—— 这正是 R59 审计
+    发现的 14 vs 2 落差的来源之一。
+    """
+    if not extracted:
+        return "MISS"
+    if not has_ground_truth:
+        return "NO_GROUND"
+    return "MATCH" if matched else "EXTRACT_BAD"
+
+
 async def main():
     qs = load_questions("data/questions_real")
     print(f"加载真题 {len(qs)} 道\n")

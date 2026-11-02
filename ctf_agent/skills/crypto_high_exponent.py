@@ -140,6 +140,19 @@ def factor_from_hint(hint: int, e: int, n: int) -> dict:
 
 
 def _crt(a1: int, m1: int, a2: int, m2: int) -> int:
+    """两模数 CRT。**前提：gcd(m1, m2) == 1**（2026-11-01 审计标注）。
+
+    本处调用方是 RSA 的 (p, q)，必然互素。非互素请用
+    `skills/crypto_hastad_broadcast.py::_crt`（任意个数、允许非互素、返回 None 表示无解）。
+    """
+    _g = m1
+    _b = m2
+    while _b:
+        _g, _b = _b, _g % _b
+    if _g != 1:
+        raise ValueError(
+            f"_crt 要求模数互素，收到 gcd={_g}；"
+            "非互素请用 skills/crypto_hastad_broadcast._crt")
     return (a1 + m1 * ((a2 - a1) * pow(m1, -1, m2) % m2)) % (m1 * m2)
 
 

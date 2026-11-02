@@ -63,7 +63,7 @@ def matches_truth(candidate: bytes, truth_digest: str) -> bool:
         return False
     if sha256_hex(candidate) == truth:
         return True
-    m = re.search(rb"\{(.+)\}", candidate, re.DOTALL)
+    m = re.search(rb"\{(.+?)\}", candidate, re.DOTALL)
     return bool(m) and sha256_hex(m.group(1)) == truth
 
 

@@ -53,7 +53,7 @@ def _matches(cand: bytes, truth: str) -> bool:
         return False
     if sha_hex(cand) == truth:
         return True
-    m = re.search(rb"\{(.+)\}", cand, re.DOTALL)
+    m = re.search(rb"\{(.+?)\}", cand, re.DOTALL)
     return bool(m) and sha_hex(m.group(1)) == truth
 
 

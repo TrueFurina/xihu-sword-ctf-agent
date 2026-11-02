@@ -27,6 +27,23 @@ print("p%4 =", p % 4, " q%4 =", q % 4)
 
 # ---- helpers (提前定义) ----
 def crt(a1, m1, a2, m2):
+    """两模数 CRT。
+
+    ⚠️ **前提：gcd(m1, m2) == 1**（2026-11-01 审计标注）。
+    原实现直接 `pow(m1, -1, m2)`——非互素时抛 `ValueError: base is not invertible`，
+    而不是给出"无解"或做降模合并。
+
+    本处调用方都是 RSA 的 (p, q)，两个不同素数必然互素，所以当前安全。
+    但这是**调用方的保证**，不是函数自身的保证：换个人拿它去合并非互素模数，
+    会拿到一个异常而非正确答案。
+
+    需要通用版本（任意个数、允许非互素、做一致性校验）请用
+    `skills/crypto_hastad_broadcast.py::_crt`，它返回 `(C, N)` 或 `None`。
+    """
+    if math.gcd(m1, m2) != 1:
+        raise ValueError(
+            f"crt 要求模数互素，收到 gcd={math.gcd(m1, m2)}；"
+            "非互素请用 skills/crypto_hastad_broadcast._crt")
     return (a1 + m1 * ((a2 - a1) * pow(m1, -1, m2) % m2)) % (m1 * m2)
 
 def sqrt_mod_pp(x, p):

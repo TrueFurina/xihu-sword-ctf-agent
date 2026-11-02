@@ -193,16 +193,21 @@ class DeterministicDecodeAdapter(ToolAdapter):
         return current if current != text else ""
 
     def _try_base_decode(self, text: str) -> Optional[str]:
-        """尝试 Base64 → Base32 → Base16 逐个解码。"""
+        """按**特异性从高到低**尝试：Base16(hex) → Base32 → Base64。
+
+        ⚠️ 顺序是功能性的（2026-11-01 审计）：
+        hex 的字符集是 base64 的子集，原顺序（Base64 优先）会让纯 hex 串
+        被 Base64 分支误解码成乱码并提前 return。见 skills/base64_multilayer.py 同款注释。
+        """
         text = text.strip()
         if not text:
             return None
-        # Base64
+        # Base16 (hex)
         try:
-            padded = text + "=" * ((4 - len(text) % 4) % 4) if len(text) % 4 else text
-            result = base64.b64decode(padded).decode("utf-8", errors="replace")
-            if result and all(c.isprintable() or c in "\n\r\t" for c in result):
-                return result
+            if all(c in "0123456789abcdefABCDEF" for c in text) and len(text) % 2 == 0:
+                result = bytes.fromhex(text).decode("utf-8", errors="replace")
+                if result and all(c.isprintable() or c in "\n\r\t" for c in result):
+                    return result
         except Exception:
             pass
         # Base32
@@ -213,12 +218,12 @@ class DeterministicDecodeAdapter(ToolAdapter):
                 return result
         except Exception:
             pass
-        # Base16 (hex)
+        # Base64
         try:
-            if all(c in "0123456789abcdefABCDEF" for c in text) and len(text) % 2 == 0:
-                result = bytes.fromhex(text).decode("utf-8", errors="replace")
-                if result and all(c.isprintable() or c in "\n\r\t" for c in result):
-                    return result
+            padded = text + "=" * ((4 - len(text) % 4) % 4) if len(text) % 4 else text
+            result = base64.b64decode(padded).decode("utf-8", errors="replace")
+            if result and all(c.isprintable() or c in "\n\r\t" for c in result):
+                return result
         except Exception:
             pass
         return None
