@@ -1,6 +1,6 @@
 # 西湖论剑 CTF-Agent (xihu-sword-ctf-agent)
 
-> 🔒 **FROZEN / 已冻结（2026-10-23）**：本仓库已被 **SecAutoMind**（`E:\Program\SecAutoMind`）全量吞并，现为**只读知识库**。不再作为参赛主体或维护对象；后续能力发展一律在 SecAutoMind 进行。迁移路线图见 `E:\Program\SecAutoMind\docs\merge_xhlj_roadmap_20261023.md`。
+> 🔒 **FROZEN / 已冻结（2026-10-23）**：本仓库已被 **SecAutoMind** 全量吞并，现为**只读知识库**。不再作为参赛主体或维护对象；后续能力发展一律在 SecAutoMind 进行。迁移路线图见 [SecAutoMind/docs/merge_xhlj_roadmap_20261023.md](https://github.com/TrueFurina/SecAutoMind-src/blob/main/docs/merge_xhlj_roadmap_20261023.md)。
 
 > 🌏 **English documentation / 英文文档**: [README.md](./README.md)
 
