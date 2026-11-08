@@ -3,15 +3,17 @@ rem ============================================================
 rem  Xihu Lunjian CTF-Agent - Race Starter (P0-1)
 rem  Entry  : scripts\_race_start.py --compete
 rem  Log    : data\results\race.log (append)
-rem  Env    : baidu qianfan real LLM + whitelist enforced
+rem  Env    : glm-4-flash (Z.ai 永久免费, ZHIPU_API_KEY) primary + baidu/xfyun 多源 + whitelist
 rem  Note   : platform token from CTF_AGENT_PLATFORM_TOKEN /
 rem           DASCTF_TOKEN env or Windows registry (setx)
 rem ============================================================
 set CTF_AGENT_USE_REAL_LLM=1
 rem 2026-08-21 赛后修复：provider 从 deepseek 改 baidu（deepseek 402 已死）。
 rem 竞速矩阵实际由 _race_start.py RACE_PROFILES 按 RACE_PROFILE 构建，
-rem 此处 provider 仅影响单源兜底路径；保持 baidu 与 config 默认一致。
-set CTF_AGENT_LLM_PROVIDER=baidu
+rem 此处 provider 仅影响单源兜底路径。2026-11-08 默认改 glm：glm-4-flash 为
+rem Z.ai 永久免费档（$0），ZHIPU_API_KEY 已确认有效并真发通（preflight ⑤ PASS），
+rem 不再依赖 ernie 余额。baidu 仍保留在 live/medium/minimal 矩阵中作多源。
+set CTF_AGENT_LLM_PROVIDER=glm
 rem 防御：显式清空 base_url，避免继承 WorkBuddy Bash 环境里遗留的
 rem CTF_AGENT_LLM_BASE_URL=https://qianfan.baidubce.com/...（8/19 旧配置），
 rem 否则该值会覆盖每个 provider 的正确端点 → 全 401（LLM 失效根因）。

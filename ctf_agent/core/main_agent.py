@@ -190,6 +190,45 @@ def _apply_shallow_escalation(agent, ctx) -> bool:
     return True
 
 
+def _apply_reason_loop_fallback(agent, ctx) -> bool:
+    """纯推理循环且无可用探针时的加性兜底提示（P1 加固，2026-11-08）。
+
+    `_force_deep_probe`(main_agent.py:211) 已对 reason-loop 尝试强制探针，但仅在
+    存在适用探针(rea_probe/wasm_probe/pcap_probe)且有附件时才动手
+    （main_agent.py:263-264 无附件 → return None）。离线测试 crypto/reverse/misc 多缺
+    附件/靶机，探针无的放矢 → 函数直接 return None，agent 继续在 reason 循环里空烧
+    预算（对应 goal_log 107 纯推理空转 + 52 wallclock_timeout 全在 t1）。
+
+    本函数在确认 reason-loop 且探针未生效时，注入强提示要求改用
+    `script`(python 沙盒)/`http_request` 拿真实证据，禁止纯推理空转。预算硬止损
+    （墙钟 300s / 预算硬顶）仍由主循环既有逻辑兜底，本函数不改动任何终止语义。
+    纯函数式只读 ctx；去重用 ctx.reason_escalated（动态属性，默认 False）。
+    """
+    steps = list(getattr(ctx, "steps", None) or [])
+    if len(steps) < _FORCED_STREAK or getattr(ctx, "candidate_flag", None):
+        return False
+    window = steps[-_FORCED_STREAK:]
+    reason_loop = all(
+        str(getattr(s, "action", "") or "") == "reason"
+        and not str(getattr(s, "tool_used", "") or "")
+        for s in window
+    )
+    if not reason_loop:
+        return False
+    # 探针已成功注入过则交还给 _force_deep_probe，不重复提示
+    if getattr(ctx, "forced_probes", None):
+        return False
+    if getattr(ctx, "reason_escalated", False):
+        return False
+    ctx.reason_escalated = True
+    ctx.advisor_hint = (
+        "⚠️ 纯推理空转检测：连续多步仅做推理、无任何工具/脚本证据。"
+        "立即改用 script 工具（python 沙盒）做确定性计算/变换，或用 http_request "
+        "探测靶机埠与服务；禁止继续纯推理空转——没有证据支撑的推理不计入进度。"
+    )
+    return True
+
+
 def _pick_probe_target(tool: str, attachments: list) -> Optional[str]:
     """按魔数为探针选目标附件；无魔数命中时取最大文件（二进制通常是最大的）。"""
     magics = _PROBE_MAGIC.get(tool, ())
@@ -888,6 +927,11 @@ class MainAgent:
                 _forced_probe = await _force_deep_probe(self, question, ctx)
                 if _forced_probe:
                     logger.info("[%s] 强制深挖已执行: %s", question.id, _forced_probe)
+                # P1 加固（2026-11-08）：探针无的放矢（无附件/无适用探针）时，
+                # 纯推理空转仍会空烧预算；注入"改用 script/http_request"强提示兜底。
+                if _apply_reason_loop_fallback(self, ctx):
+                    logger.info("[%s] 纯推理空转兜底提示已注入（无可用探针，要求改用 script/http_request）",
+                                question.id)
 
                 # ── 卡关处理（P0-A 修复：先升级再放弃，而非直接 break）──
                 # 原逻辑在监督咨询前就 break，导致 HARD 题未升级重型模型就被放弃，

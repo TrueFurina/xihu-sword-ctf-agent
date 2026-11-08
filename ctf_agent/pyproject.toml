@@ -26,6 +26,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "pytest-asyncio>=0.24",
     "pytest-timeout>=2.2",
 ]
 # 可选：本地 OCR（tesseract 需系统级安装，未装则视觉兜底走 LLM）

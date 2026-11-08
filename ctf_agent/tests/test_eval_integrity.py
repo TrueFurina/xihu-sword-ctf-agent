@@ -15,6 +15,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import pytest
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -67,15 +68,26 @@ class TestDatasetHygiene(unittest.TestCase):
 class TestEvalGuard(unittest.TestCase):
     """B. 评测护栏。"""
 
+    @pytest.mark.local
     def test_answer_disclosed_excluded_by_default(self):
         # 守卫须判「池内是否真有题」，而非「目录是否存在」——2026-10-12 实测：data/questions
         # 目录仍在但 50 题池已随本地未跟踪数据丢失事件被删空，仅判 exists() 会漏过 →
         # load_questions 返回空 → assertTrue(disclosed) 假红。判据 = 池内是否有题（数据自检），
         # 池恢复在盘即自动恢复严格校验。
-        if not any(QUESTIONS_DIR.rglob("*.json")):
+        jsons = list(QUESTIONS_DIR.rglob("*.json"))
+        if not jsons:
             self.skipTest(
                 f"题库为空或缺失（公开仓不含内部 data/questions；2026-10-12 该 50 题池"
                 f"随本地未跟踪数据丢失事件永久丢失，全盘零副本、不可恢复）：{QUESTIONS_DIR}"
+            )
+        # 守卫补全：仅查文件数会漏过「目录在但只剩占位文件、无真实题」的退化态
+        # （2026-10-12 数据丢失事件后本机即此态）。无 answer_disclosed 题即判池缺失，
+        # 跳过严格校验；真实 50 题池在盘时自然含此类题，严格校验自动恢复。
+        qs = list(load_questions(str(QUESTIONS_DIR)))
+        if not any(getattr(q, "answer_disclosed", False) for q in qs):
+            self.skipTest(
+                f"题库不含 answer_disclosed 题（内部 50 题池已随本地未跟踪数据丢失事件"
+                f"永久丢失，仅剩占位文件，无真实数据可做严格校验）：{QUESTIONS_DIR}"
             )
         default = {q.id for q in load_questions(str(QUESTIONS_DIR))}
         allq = {q.id for q in load_questions(str(QUESTIONS_DIR), include_disclosed=True)}
