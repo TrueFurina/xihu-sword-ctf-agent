@@ -6,6 +6,8 @@
 - 无数据题：has_attachment/has_target 均 False → should_early_exit 触发（backlog P0 早退）；
 - 详情拉取失败（429 模拟）：detail_fetch_failed 标记正确、且不误伤已有真实数据；
 - 附件下载失败（字节为空）：降级为空附件列表、不抛异常、仍可判定早退。
+- reverse 题（二进制附件 + 靶机）：二进制落地、靶机注入、不早退 —— 证明 P0 harness 覆盖 P3 reverse live 路径；
+- misc 题（仅靶机、无附件）：靶机视为可解输入、不早退 —— 证明纯靶机类 misc 也能进入求解。
 """
 
 import asyncio
@@ -178,6 +180,71 @@ async def test_attachment_download_failure_degrades_gracefully(tmp_path):
     early, reason = inv.should_early_exit()
     assert early is True
     assert question.attachments == []
+
+
+@pytest.mark.asyncio
+async def test_reverse_challenge_injects_binary_and_target(tmp_path):
+    # P3 关键用例：真实 DASCTF reverse 题需要 (1) 二进制附件落地给 file_analyze；(2) 靶机注入。
+    # 旧 build_platform_solver 闭包依赖 ch.extra["access"]（poller 从未预填）→ 靶机永不注入，
+    # 这正是 reverse/misc 0 解的根因之一。harness 显式调 get_access + _extract_targets 兜底。
+    detail = ChallengeInfo(
+        id="r1", title="RE-01", category="reverse",
+        description="crackme", flag_format=r"flag\{[^}]+\}",
+        has_attachment=True,
+        extra={"difficulty": "hard",
+               "attachment": {"url": "http://x/re1.bin"},
+               "endpoints": [{"exposeIps": ["10.1.2.3:9999"]}]},
+    )
+    access = AccessInfo(host="10.1.2.3", port=9999, url="http://10.1.2.3:9999")
+    platform = FakePlatform(
+        detail=detail,
+        attachment_urls=["http://example.com/re1.bin"],
+        access=access,
+    )
+    ch = _ch(id="r1", title="RE-01", category="reverse", description="",
+             has_attachment=True, extra={})
+
+    question, inv = await prepare_question(platform, ch, cache_dir=str(tmp_path))
+
+    # 二进制附件下载落地（file_analyze 可拿到的输入）
+    assert inv.has_attachment is True
+    assert len(inv.attachment_paths) == 1
+    assert os.path.exists(inv.attachment_paths[0])
+    assert question.attachments == inv.attachment_paths
+
+    # 靶机注入（来自显式 get_access + endpoints 兜底）
+    assert inv.has_target is True
+    assert any("10.1.2.3" in t for t in inv.targets)
+    assert "靶机" in question.description
+
+    # 有输入 → 不应早退（reverse 题应能进入求解）
+    early, reason = inv.should_early_exit()
+    assert early is False and reason == ""
+    assert inv.has_solvable_input() is True
+    prompt = build_injection_prompt(inv, question)
+    assert prompt and inv.attachment_paths[0] in prompt and "10.1.2.3" in prompt
+
+
+@pytest.mark.asyncio
+async def test_misc_challenge_target_only_no_early_exit(tmp_path):
+    # 纯靶机类 misc（如流量分析 remote 靶机）：无附件但有靶机 → 靶机视为可解输入，不早退。
+    detail = ChallengeInfo(
+        id="m1", title="MISC-01", category="misc", description="",
+        has_attachment=False,
+        extra={"endpoints": [{"exposeIps": ["10.9.9.9:5000"]}]},
+    )
+    access = AccessInfo(host="10.9.9.9", port=5000, url="http://10.9.9.9:5000")
+    platform = FakePlatform(detail=detail, attachment_urls=[], access=access)
+    ch = _ch(id="m1", title="MISC-01", category="misc", description="",
+             has_attachment=False, extra={})
+
+    question, inv = await prepare_question(platform, ch, cache_dir=str(tmp_path))
+
+    assert inv.has_attachment is False
+    assert inv.has_target is True
+    early, reason = inv.should_early_exit()
+    assert early is False and reason == ""  # 靶机是可解输入，不早退
+    assert inv.has_solvable_input() is True
 
 
 def test_input_inventory_defaults():
