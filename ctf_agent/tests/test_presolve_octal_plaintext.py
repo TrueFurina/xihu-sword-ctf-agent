@@ -113,5 +113,71 @@ def test_octal_is_fast_on_large_desc():
     assert ms < 2000, f"八进制提取耗时 {ms:.0f}ms 超阈值"
 
 
+# ── 题面十六进制 ASCII 明文识别（2026-11-11 新增，与 octal 同族）───────────
+def _hex_of(s: str) -> str:
+    """把字符串逐字节转成连续十六进制串。"""
+    return s.encode("latin-1").hex()
+
+
+HEXFLAG = "flag{h3x_d3m0_OK}"
+
+
+def test_hex_in_desc_is_solved():
+    """题面给出十六进制 ASCII 串（无附件）必须解出 flag。"""
+    desc = f"密文以十六进制给出，解码即为答案：{_hex_of(HEXFLAG)}"
+    got = _run(P._try_fast_solve(_q("hex1", "crypto", desc)))
+    assert got and HEXFLAG in str(got), f"题面十六进制串未解出: {got!r}"
+
+
+def test_hex_spaced_bytes_is_solved():
+    """题面给出空格分隔的 hex 字节序（如 `4f 4b 7b`）必须解出 flag。"""
+    desc = "逐字节十六进制如下：" + " ".join(f"{b:02x}" for b in HEXFLAG.encode("latin-1"))
+    got = _run(P._try_fast_solve(_q("hex2", "crypto", desc)))
+    assert got and HEXFLAG in str(got), f"空格分隔 hex 未解出: {got!r}"
+
+
+def test_hex_unit_extracts_plaintext():
+    """_desc_hex_candidates 能从题面 hex 段解码出明文候选。"""
+    desc = f"解码这段 hex：{_hex_of('key:HEXdec data:kwam{x}')} 即可得到后续输入"
+    out = P._desc_hex_candidates(desc)
+    assert out, f"hex 明文未被提取: {out!r}"
+    assert any("key:HEXdec" in o for o in out), f"解码结果缺失: {out}"
+
+
+def test_hex_skips_sha256_like():
+    """64 位 SHA256 类 hex 解码为随机 binary（含 >127 控制字节）必须被拒。"""
+    sha_like = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    assert len(sha_like) == 64 and re_fullmatch_hex(sha_like)
+    out = P._desc_hex_candidates(f"完整性校验值：{sha_like}")
+    assert not out, f"SHA256 类 hex 被误当明文: {out!r}"
+
+
+def test_hex_skips_short_and_years():
+    """年份 / 短 hex（2024、deadbeef<ASCII 不可打印）必须被拒。"""
+    # 2024 仅 4 hex 位 <8 阈值；deadbeef 解码为 0xde.. 非可打印 ASCII
+    out = P._desc_hex_candidates("成立于 2024 年，样本 deadbeef")
+    assert not out, f"年份/短 hex 被误当明文: {out!r}"
+
+
+def test_hex_no_flag_returns_none():
+    """题面 hex 解码后不含 flag 模式时，端到端必须返回 None（不虚报）。"""
+    desc = f"十六进制序列如下：{_hex_of('hello world')}"
+    got = _run(P._try_fast_solve(_q("hexn", "crypto", desc)))
+    assert not got, f"无 flag 题面却返回了 {got!r}（虚报）"
+
+
+def test_hex_candidate_count_is_bounded():
+    """候选条数必须有上限，长题面不得爆炸。"""
+    seg = _hex_of("flag{x}")
+    big = "   ".join(seg for _ in range(500))
+    out = P._desc_hex_candidates(big)
+    assert len(out) <= 8, f"hex 候选数 {len(out)} 爆炸"
+
+
+def re_fullmatch_hex(s: str) -> bool:
+    import re as _re
+    return bool(_re.fullmatch(r"[0-9a-fA-F]+", s))
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

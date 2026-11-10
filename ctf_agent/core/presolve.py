@@ -330,6 +330,62 @@ def _desc_octal_candidates(raw: str, max_c: int = 4) -> list:
     return out
 
 
+# ── 题面十六进制 ASCII 明文识别（2026-11-11 新增，确定性、零 LLM）──────────
+# 与 octal 同族：覆盖「密文以十六进制串写在题面」形态（如 `4f4b7b...` 解码得
+# `OK{...}`、`666c61677b...` 解码得 `flag{...}`；也含空格/逗号分隔字节序
+# `4f 4b 7b` / `4f,4b,7b`）。presolve 此前对此类「密文写在题面」形态命中 0
+# （`_desc_cipher_candidates` 仅切字母数字 token，且描述候选只喂 _DESC_PROBE_KINDS
+# 解码类模板，里面没有 hex 这个 kind）。
+# 安全纪律（与 octal 完全一致）：① 仅当解码后全可打印 ASCII（0x20-0x7E）才输出，
+#   杜绝在 SHA256/普通长 hex 上误触发（随机 binary 解码多含 >127 控制字节即被拒）；
+#   ② 任何命中仍须经下游 _FLAG_RE（及 _passes_answer_check / sha256 真值）把关，
+#    不新增误报面；③ 候选有界截断。
+def _desc_hex_candidates(raw: str, max_c: int = 4) -> list:
+    """从题面提取十六进制 ASCII 序列，解码为明文候选（有界、顺序稳定）。"""
+    out = []
+    text = raw or ""
+
+    def _decode_hex(hexstr: str):
+        hexstr = hexstr.strip()
+        if hexstr[:2] in ("0x", "0X"):
+            hexstr = hexstr[2:]
+        if len(hexstr) < 8 or len(hexstr) % 2 != 0:
+            return None
+        if not re.fullmatch(r"[0-9a-fA-F]+", hexstr):
+            return None
+        try:
+            data = bytes.fromhex(hexstr)
+        except ValueError:
+            return None
+        if not data or any(c < 0x20 or c > 0x7E for c in data):
+            return None
+        try:
+            txt = data.decode("ascii")
+        except UnicodeDecodeError:
+            return None
+        # 至少含一段字母（纯 hex 数字串极少是目标明文，降噪）
+        if not re.search(r"[A-Za-z]{3,}", txt):
+            return None
+        return txt
+
+    # ① 连续 hex 串（前后非 hex 边界，避免从长单词中间截断）
+    for m in re.finditer(r"(?<![0-9a-fA-F])[0-9a-fA-F]{8,}(?![0-9a-fA-F])", text):
+        txt = _decode_hex(m.group(0))
+        if txt:
+            out.append(txt[:_DESC_CAND_MAXLEN])
+            if len(out) >= max_c:
+                return out
+    # ② 空格/逗号分隔的 hex 字节序列（如 `4f 4b 7b` / `4f,4b,7b`）
+    for m in re.finditer(r"(?:[0-9a-fA-F]{1,2}[\s,]){2,}[0-9a-fA-F]{1,2}", text):
+        hexstr = "".join(re.findall(r"[0-9a-fA-F]{1,2}", m.group(0)))
+        txt = _decode_hex(hexstr)
+        if txt and txt not in out:
+            out.append(txt[:_DESC_CAND_MAXLEN])
+            if len(out) >= max_c:
+                return out
+    return out
+
+
 # ── presolve 已接线的确定性 skill 清单（2026-09-22 大确定性 skill 覆盖）────
 # 单一真值：本模块经生产链路（_tasks 并发嗅探）实际调用的 skills.* 模块。
 # tests/test_skill_coverage.py 据此断言覆盖度，杜绝「写过的 skill 没接线 / RDD 自夸」。
@@ -781,6 +837,17 @@ async def _try_fast_solve(question) -> Optional[str]:
             if fm and _is_plausible_flag(fm.group(0)):
                 flag = fm.group(0)
                 logger.info("[presolve:octal] %s 八进制解码直出 flag=%s",
+                            getattr(question, "id", "?"), flag[:60])
+                _save_candidates(question, [flag])
+                return flag
+    # 2026-11-11 新增：题面十六进制 ASCII 序列 → 明文候选（与 octal 同族）
+    hex_cands = _desc_hex_candidates(raw)
+    if hex_cands:
+        for hc in hex_cands:
+            fm = _FLAG_RE.search(hc)
+            if fm and _is_plausible_flag(fm.group(0)):
+                flag = fm.group(0)
+                logger.info("[presolve:hex] %s 十六进制解码直出 flag=%s",
                             getattr(question, "id", "?"), flag[:60])
                 _save_candidates(question, [flag])
                 return flag
