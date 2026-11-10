@@ -853,143 +853,28 @@ def build_platform_solver(platform, use_mock: bool = False, cache_dir: str = "da
     core = core_solver or build_solver(use_mock, validate_locally=False, race_controller=race_controller)
     os.makedirs(cache_dir, exist_ok=True)
 
-    async def _download(url: str) -> str:
-        """下载平台附件到本地缓存，返回本地路径（失败返回空串）。"""
-        from urllib.parse import urlparse
-
-        try:
-            name = os.path.basename(urlparse(url).path) or f"att_{abs(hash(url))}.bin"
-            local = os.path.join(cache_dir, name)
-            if os.path.exists(local) and os.path.getsize(local) > 0:
-                return local
-            # P0修复（2026-08-21）：复用平台客户端下载（自动带鉴权头，避免403）
-            if hasattr(platform, "download_attachment_bytes"):
-                content = await platform.download_attachment_bytes(url)
-            else:
-                import httpx
-                async with httpx.AsyncClient(timeout=60, follow_redirects=True, trust_env=False) as client:
-                    headers = {}
-                    token = getattr(platform, "token", "")
-                    auth_header = getattr(platform, "auth_header", "Authorization")
-                    if token:
-                        headers[auth_header] = token
-                    resp = await client.get(url, headers=headers)
-                    if resp.status_code != 200:
-                        raise RuntimeError(f"HTTP {resp.status_code}")
-                    content = resp.content
-            if content:
-                with open(local, "wb") as fh:
-                    fh.write(content)
-                logger.info("附件已下载: %s (%d B)", name, len(content))
-                return local
-        except Exception as exc:  # noqa: BLE001 - 附件下载失败不阻塞解题
-            logger.warning("附件下载失败 %s: %s", url, exc)
-        return ""
+    from core.attachment_harness import prepare_question
 
     async def solver(ch) -> dict:
-        """平台题 → 本地 Question → 核心求解 → 返回含 flag 的 dict。"""
-        # ── P0① 双保险（2026-08-21 赛中）：solver 入口无条件补全详情 ──
-        #    列表接口仅返回 {id,name,order,isOpen,hasSolved}，无 endpoints/attachment；
-        #    竞速抢一血路径走 _to_question 不经 poller，ch.extra 缺 endpoints →
-        #    靶机永不注入 → supervisor 误判"题目缺少附件或靶机地址" → 死循环 0 解出。
-        #    此处 solver 入口自行 get_challenge 补全，确保任意入口都拿到真实靶机/附件/题面。
-        try:
-            _detail = await platform.get_challenge(ch.id)
-            # P0-④（2026-08-21 赛后）：429 限流下 get_challenge 可能返回空 ChallengeInfo
-            # （detail 拉取失败）。再重试一次（利用 5 分钟缓存命中或限流窗口过去），
-            # 仍失败才标记 _detail_fetch_failed 交由下游止损，避免一枪毙命式空转。
-            if _detail is None or not getattr(_detail, "extra", None):
-                await asyncio.sleep(2.0)
-                _detail = await platform.get_challenge(ch.id)
-            if _detail is not None:
-                _dextra = dict(getattr(_detail, "extra", None) or {})
-                _cextra = dict(getattr(ch, "extra", None) or {})
-                for _k in ("endpoints", "attachment", "attachments", "difficulty", "description", "score", "flag_format"):
-                    if _dextra.get(_k) is not None:
-                        _cextra[_k] = _dextra[_k]
-                ch.extra = _cextra
-                # 同步布尔属性（关键：list 阶段这两个字段恒 False，必须从 detail 更新）
-                if getattr(_detail, "has_attachment", False):
-                    ch.has_attachment = True
-                if getattr(_detail, "has_instance", False):
-                    ch.has_instance = True
-                # P0 数据链路修复（2026-08-21）：详情 description 权威覆盖——
-                # _parse_challenge 可能已把标题兜底进 ch.description（非空），
-                # 若仍只按"为空才填"则真实题面永远合并不进去（0 解出回归）。
-                _dd = getattr(_detail, "description", "") or ""
-                if _dd and _dd != getattr(ch, "title", ""):
-                    ch.description = _dd
-                if not getattr(ch, "flag_format", "") and getattr(_detail, "flag_format", ""):
-                    ch.flag_format = _detail.flag_format
-        except Exception as _e:  # noqa: BLE001 - 补全失败不阻塞解题
-            logger.warning("[%s] solver 入口 get_challenge 补全失败: %s", ch.id, _e)
-            # P0-④（2026-08-21 赛后）：补全失败（多为 429 限流导致 detail 拉取失败）
-            # 标记无数据，下游 main_agent 据此快速止损，不再空转烧墙钟。
-            ch.extra = dict(getattr(ch, "extra", None) or {})
-            # P0 数据链路修复（2026-08-21）：仅当 ch 确实无任何真实数据时才标记
-            # _detail_fetch_failed——若已有 endpoints/attachment/题面（来自 poller
-            # 或前一帧），不得用"拉详情失败"覆盖成无数据，否则真实题被误杀。
-            _has_real = bool(
-                ch.extra.get("endpoints")
-                or ch.extra.get("attachment") or ch.extra.get("attachments")
-                or getattr(ch, "description", "")
-            )
-            if not _has_real:
-                ch.extra["_detail_fetch_failed"] = True
-        question = Question(
-            id=ch.id,
-            title=ch.title,
-            category=ch.category,
-            description=str(ch.description or ""),
-            flag_pattern=getattr(ch, "flag_format", None) or r"flag\{[^}]+\}",
-            # O1 联动（2026-08-21 P0-2 修复）：平台难度写入 Question.difficulty 字段
-            # （main_agent 统一读 question.difficulty；空串而非省略，避免落默认 "easy"
-            #  导致全题误判 120s 墙钟；未知难度回落 300s MEDIUM）。
-            difficulty=str((ch.extra or {}).get("difficulty", "")),
-            # 平台附加元信息（access 靶机访问等）仍经 extra 透传
-            extra={"difficulty": (ch.extra or {}).get("difficulty", ""),
-                   "platform_meta": (ch.extra or {})},
-        )
-        # 附件下载（平台 URL → 本地缓存；失败不阻塞）
-        if ch.has_attachment:
-            urls = await platform.download_attachment(ch.id)
-            local_paths = []
-            for u in urls:
-                p = await _download(str(u))
-                if p:
-                    local_paths.append(p)
-            question.attachments = local_paths
-            if local_paths:
-                logger.info("[%s] 附件就绪: %s", ch.id, local_paths)
-        # 靶机访问信息注入描述（web/pwn 需要真实地址）
-        access = (ch.extra or {}).get("access") if hasattr(ch, "extra") else None
-        if access:
-            host = access.get("host") or ""
-            port = access.get("port") or 0
-            url = access.get("url") or ""
-            if host or url:
-                question.description = (
-                    f"{question.description}\n\n[靶机访问] host={host} port={port} url={url}"
-                )
-        # ── P0 修复（2026-08-21 正式赛）：endpoints 靶机地址注入——
-        #    列表接口无 endpoints，get_challenge 详情才有（poller 已补全到 ch.extra）。
-        #    复用 _scan_firstblood._extract_targets 解析 portMappings/proxyIps →
-        #    拼进 description（LLM 提示词可见）+ question.extra["targets"]（工具层可用）。
-        try:
-            from scripts._scan_firstblood import _extract_targets
+        """平台题 → 富化 Question → 核心求解 → 返回含 flag 的 dict。
 
-            _targets = _extract_targets(ch.extra or {})
-            if _targets:
-                question.extra["targets"] = _targets
-                if "靶机" not in question.description:
-                    question.description = (
-                        (question.description + "\n" if question.description else "")
-                        + "靶机地址: " + " ".join(_targets)
-                    )
-        except Exception as _texc:  # noqa: BLE001 - 靶机注入失败不阻塞
-            logger.warning("[%s] 靶机地址注入跳过: %s", ch.id, _texc)
+        准备逻辑（详情补全 + 附件下载 + 靶机注入）已抽至
+        ``core.attachment_harness.prepare_question``（可单测，见
+        tests/test_attachment_harness.py）。此处仅做：
+          · 调 harness 拿到富化 Question + InputInventory；
+          · P0 早退门禁：无任何可取证输入且题面也为空 → 直接跳过，省 LLM 推理；
+          · 否则交核心 solver。
+        """
+        question, inv = await prepare_question(platform, ch, cache_dir=cache_dir)
+        # P0 早退门禁（HARDENING_BACKLOG P0）：无附件且无靶机、且题面也为空 →
+        # 确实无任何可取证输入，结构化早退，不进入 reason→reason 空转。
+        # 注：纯推理题（题面含完整题干、无文件/靶机）仍放行给 core 处理。
+        exit_flag, reason = inv.should_early_exit()
+        if exit_flag and not question.description.strip():
+            logger.warning("[%s] 无附件/靶机且题面为空，结构化早退: %s",
+                           getattr(ch, "id", "?"), reason)
+            return {"task_status": "skipped_no_data", "reason": reason}
         return await core(question, 0, None)
-
     return solver
 
 
