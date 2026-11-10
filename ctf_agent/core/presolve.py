@@ -296,6 +296,40 @@ def _desc_cipher_candidates(raw: str) -> list:
     return out
 
 
+# ── 题面八进制 ASCII 明文识别（2026-11-11 新增，确定性、零 LLM）──────────
+# 场景：题面直接给出「八进制 ASCII 序列」（如「flag.txt 是八进制 ASCII 序列，
+# 解码得 key:... + data:kwam{...}」）。presolve 此前对此类「密文写在题面」形态
+# 命中 0（`_desc_cipher_candidates` 仅切字母数字 token，3 位八进制 token 太短被跳过）。
+# 现新增：扫描连续八进制数字段 → 解码为可打印 ASCII 明文 → 作为候选喂入既有
+# 解码器循环（caesar/b64/vigenere…）或直接查 flag 模式。
+# 安全纪律：① 仅当整段 token 全为 0-7 八进制数字且解码后全可打印 ASCII 才输出，
+#            杜绝在普通数字/年份/文件权限上误触发（权限八进制解码多 >127 即被拒）；
+#         ② 任何命中仍须经下游 _FLAG_RE（及 _passes_answer_check / sha256 真值）
+#            把关，不新增误报面。
+def _desc_octal_candidates(raw: str, max_c: int = 4) -> list:
+    """从题面提取连续八进制 ASCII 序列，解码为明文候选（有界、顺序稳定）。"""
+    out = []
+    # 按「非八进制数字且非空白」切分，得到仅含八进制数字+空白的段落
+    for seg in re.split(r"[^0-7\s]+", raw or ""):
+        toks = [t for t in seg.split() if re.fullmatch(r"[0-7]{1,3}", t)]
+        if len(toks) < 3:
+            continue
+        try:
+            decoded = bytes(int(t, 8) for t in toks)
+        except ValueError:
+            continue
+        if not decoded or any(c < 0x20 or c > 0x7E for c in decoded):
+            continue
+        txt = decoded.decode("ascii")
+        # 至少含一段字母（纯数字八进制段极少是目标明文，降噪）
+        if not re.search(r"[A-Za-z]{3,}", txt):
+            continue
+        out.append(txt[:_DESC_CAND_MAXLEN])
+        if len(out) >= max_c:
+            break
+    return out
+
+
 # ── presolve 已接线的确定性 skill 清单（2026-09-22 大确定性 skill 覆盖）────
 # 单一真值：本模块经生产链路（_tasks 并发嗅探）实际调用的 skills.* 模块。
 # tests/test_skill_coverage.py 据此断言覆盖度，杜绝「写过的 skill 没接线 / RDD 自夸」。
@@ -736,6 +770,20 @@ async def _try_fast_solve(question) -> Optional[str]:
                 return got
     # ② 题面密文候选（新增；仅解码类模板，见 _DESC_PROBE_KINDS 注释）
     cands = _desc_cipher_candidates(raw)
+    # 2026-11-11 新增：题面八进制 ASCII 序列 → 明文候选（明文识别扩展）
+    oct_cands = _desc_octal_candidates(raw)
+    if oct_cands:
+        cands = cands + oct_cands
+        # 解码后若直接含 flag 明文（如 data:flag{...}），直接提取；
+        # 仍须经 _is_plausible_flag 把关（与 _attempt 同纪律，不新增误报面）
+        for oc in oct_cands:
+            fm = _FLAG_RE.search(oc)
+            if fm and _is_plausible_flag(fm.group(0)):
+                flag = fm.group(0)
+                logger.info("[presolve:octal] %s 八进制解码直出 flag=%s",
+                            getattr(question, "id", "?"), flag[:60])
+                _save_candidates(question, [flag])
+                return flag
     if cands:
         for kind, hint in _FAST_SOLVE_KEYWORDS:
             if hint in desc and kind in _DESC_PROBE_KINDS:
